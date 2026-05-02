@@ -1,0 +1,15 @@
+.DS_Store
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+
+# Laravel backend dependencies and runtime files
+backend-api/vendor/
+backend-api/storage/*.key
+backend-api/storage/logs/
+backend-api/bootstrap/cache/*.php
+
+# Environment files
+.env
+backend-api/.env
