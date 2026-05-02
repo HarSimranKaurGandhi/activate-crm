@@ -18,11 +18,21 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                (class_exists(\Pdo\Mysql::class) && defined('Pdo\Mysql::ATTR_SSL_CA')
-                    ? constant('Pdo\Mysql::ATTR_SSL_CA')
-                    : constant('PDO::MYSQL_ATTR_SSL_CA')) => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            'options' => extension_loaded('pdo_mysql')
+                ? (static function (): array {
+                    $sslCa = env('MYSQL_ATTR_SSL_CA');
+
+                    if (! $sslCa) {
+                        return [];
+                    }
+
+                    $sslCaOption = class_exists(\Pdo\Mysql::class) && defined('Pdo\Mysql::ATTR_SSL_CA')
+                        ? constant('Pdo\Mysql::ATTR_SSL_CA')
+                        : 1009; // Legacy PDO::MYSQL_ATTR_SSL_CA numeric value.
+
+                    return [$sslCaOption => $sslCa];
+                })()
+                : [],
         ],
     ],
     'migrations' => ['table' => 'migrations'],

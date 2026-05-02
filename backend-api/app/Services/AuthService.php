@@ -6,7 +6,9 @@ use App\Models\LoginLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AuthService
 {
@@ -31,12 +33,20 @@ class AuthService
 
         $token = $user->createToken('react-api')->plainTextToken;
 
-        LoginLog::create([
-            'user_id' => $user->id,
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'logged_in_at' => now(),
-        ]);
+        try {
+            LoginLog::create([
+                'user_id' => $user->id,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'log_in_at' => now(),
+            ]);
+        } catch (Throwable $exception) {
+            // Do not block successful login if optional activity-log schema differs.
+            Log::warning('Login log insert failed', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         return [
             'token' => $token,
@@ -56,10 +66,10 @@ class AuthService
 
         $loginLog = LoginLog::query()
             ->where('user_id', $user->id)
-            ->whereNull('logged_out_at')
-            ->latest('logged_in_at')
+            ->whereNull('log_out_at')
+            ->latest('log_in_at')
             ->first();
 
-        $loginLog?->update(['logged_out_at' => now()]);
+        $loginLog?->update(['log_out_at' => now()]);
     }
 }
