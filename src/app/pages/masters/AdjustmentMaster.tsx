@@ -2,9 +2,10 @@ import { useData } from '../../context/DataContext';
 import { Plus, Edit, Trash2, Power } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { LoadingState } from '../../components/common/AsyncState';
 
 export const AdjustmentMaster = () => {
-  const { adjustments, addAdjustment, updateAdjustment, deleteAdjustment } = useData();
+  const { adjustments, addAdjustment, updateAdjustment, deleteAdjustment, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -14,13 +15,13 @@ export const AdjustmentMaster = () => {
     status: 'active' as 'active' | 'inactive'
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      updateAdjustment(editingId, formData);
+      await updateAdjustment(editingId, formData);
       toast.success('Adjustment updated successfully');
     } else {
-      addAdjustment(formData);
+      await addAdjustment(formData);
       toast.success('Adjustment added successfully');
     }
     setShowModal(false);
@@ -39,8 +40,8 @@ export const AdjustmentMaster = () => {
     setShowModal(true);
   };
 
-  const toggleStatus = (id: string, currentStatus: 'active' | 'inactive') => {
-    updateAdjustment(id, { status: currentStatus === 'active' ? 'inactive' : 'active' });
+  const toggleStatus = async (adjustment: any) => {
+    await updateAdjustment(adjustment.id, { ...adjustment, status: adjustment.status === 'active' ? 'inactive' : 'active' });
   };
 
   return (
@@ -86,7 +87,7 @@ export const AdjustmentMaster = () => {
                   </td>
                   <td className="px-6 py-4">
                     <button
-                      onClick={() => toggleStatus(adjustment.id, adjustment.status)}
+                      onClick={() => toggleStatus(adjustment)}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                         adjustment.status === 'active'
                           ? 'bg-green-50 text-green-700 hover:bg-green-100'
@@ -106,10 +107,10 @@ export const AdjustmentMaster = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this adjustment?')) {
-                            deleteAdjustment(adjustment.id);
-                            toast.success('Adjustment deleted');
+                        onClick={async () => {
+                          if (confirm('Deactivate this adjustment?')) {
+                            await deleteAdjustment(adjustment.id);
+                            toast.success('Adjustment deactivated');
                           }
                         }}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -122,6 +123,7 @@ export const AdjustmentMaster = () => {
               ))}
             </tbody>
           </table>
+          {loading && <LoadingState label="Loading adjustments..." />}
         </div>
       </div>
 

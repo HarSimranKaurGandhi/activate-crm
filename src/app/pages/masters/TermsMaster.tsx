@@ -2,35 +2,36 @@ import { useData } from '../../context/DataContext';
 import { Plus, Edit, Trash2, Power } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { LoadingState } from '../../components/common/AsyncState';
 
 export const TermsMaster = () => {
-  const { terms, addTerm, updateTerm, deleteTerm } = useData();
+  const { terms, addTerm, updateTerm, deleteTerm, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ content: '', status: 'active' as 'active' | 'inactive' });
+  const [formData, setFormData] = useState({ title: '', content: '', status: 'active' as 'active' | 'inactive' });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      updateTerm(editingId, formData);
+      await updateTerm(editingId, formData);
       toast.success('Term updated successfully');
     } else {
-      addTerm(formData);
+      await addTerm(formData);
       toast.success('Term added successfully');
     }
     setShowModal(false);
     setEditingId(null);
-    setFormData({ content: '', status: 'active' });
+    setFormData({ title: '', content: '', status: 'active' });
   };
 
   const handleEdit = (term: any) => {
     setEditingId(term.id);
-    setFormData({ content: term.content, status: term.status });
+    setFormData({ title: term.title, content: term.content, status: term.status });
     setShowModal(true);
   };
 
-  const toggleStatus = (id: string, currentStatus: 'active' | 'inactive') => {
-    updateTerm(id, { status: currentStatus === 'active' ? 'inactive' : 'active' });
+  const toggleStatus = async (term: any) => {
+    await updateTerm(term.id, { ...term, status: term.status === 'active' ? 'inactive' : 'active' });
   };
 
   return (
@@ -41,7 +42,7 @@ export const TermsMaster = () => {
           <button
             onClick={() => {
               setEditingId(null);
-              setFormData({ content: '', status: 'active' });
+              setFormData({ title: '', content: '', status: 'active' });
               setShowModal(true);
             }}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
@@ -56,6 +57,7 @@ export const TermsMaster = () => {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Term Content</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Title</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
@@ -64,9 +66,10 @@ export const TermsMaster = () => {
               {terms.map(term => (
                 <tr key={term.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-gray-900">{term.content}</td>
+                  <td className="px-6 py-4 text-gray-600">{term.title}</td>
                   <td className="px-6 py-4">
                     <button
-                      onClick={() => toggleStatus(term.id, term.status)}
+                      onClick={() => toggleStatus(term)}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                         term.status === 'active'
                           ? 'bg-green-50 text-green-700 hover:bg-green-100'
@@ -86,10 +89,10 @@ export const TermsMaster = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this term?')) {
-                            deleteTerm(term.id);
-                            toast.success('Term deleted');
+                        onClick={async () => {
+                          if (confirm('Deactivate this term?')) {
+                            await deleteTerm(term.id);
+                            toast.success('Term deactivated');
                           }
                         }}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -102,6 +105,7 @@ export const TermsMaster = () => {
               ))}
             </tbody>
           </table>
+          {loading && <LoadingState label="Loading terms..." />}
         </div>
       </div>
 
@@ -112,6 +116,16 @@ export const TermsMaster = () => {
               {editingId ? 'Edit Term' : 'Add Term'}
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Term Content</label>
                 <textarea

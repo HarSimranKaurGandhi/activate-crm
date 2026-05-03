@@ -1,158 +1,105 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { useAuth } from '../auth/AuthContext';
+import { categoryService, brandService, adjustmentService, termService, customerFieldService } from '../../services/masterService';
+import { productService } from '../../services/productService';
+import { customerService } from '../../services/customerService';
+import { quotationService } from '../../services/quotationService';
+import { settingsService } from '../../services/settingsService';
+import {
+  adjustmentPayload,
+  brandPayload,
+  categoryPayload,
+  customerFieldPayload,
+  customerPayload,
+  mapAdjustment,
+  mapBrand,
+  mapCategory,
+  mapCompanySettings,
+  mapCustomer,
+  mapCustomerField,
+  mapProduct,
+  mapQuotation,
+  mapTerm,
+  productPayload,
+  quotationPayload,
+  termPayload,
+} from '../../services/mappers';
 
-interface Product {
-  id: string;
-  image: string;
-  name: string;
-  modelNumber: string;
-  category: string;
-  brand: string;
-  mrp: number;
-  usualSellingPrice: number;
-  gstPercent: number;
-  specifications: string;
-  status: 'active' | 'inactive';
-}
-
-interface Customer {
-  id: string;
-  name: string;
-  company: string;
-  email: string;
-  phone: string;
-  address: string;
-  gstNumber?: string;
-  customFields?: Record<string, any>;
-}
-
-interface QuotationItem {
-  id: string;
-  product: Product;
-  quantity: number;
-  price: number;
-  discount: number;
-  specifications: string;
-}
-
-interface Quotation {
-  id: string;
-  number: string;
-  date: string;
-  customer: Customer;
-  salesperson: {
-    name: string;
-    phone: string;
-    email: string;
-  };
-  items: QuotationItem[];
-  globalDiscount: number;
-  adjustments: Record<string, { enabled: boolean; amount: number }>;
-  gstInclusive: boolean;
-  showDiscount: boolean;
-  terms: string[];
-  status: 'draft' | 'pending' | 'approved' | 'rejected';
-  subtotal: number;
-  taxAmount: number;
-  grandTotal: number;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  status: 'active' | 'inactive';
-}
-
-interface Brand {
-  id: string;
-  name: string;
-  status: 'active' | 'inactive';
-}
-
-interface Adjustment {
-  id: string;
-  name: string;
-  type: 'fixed' | 'percentage';
-  defaultValue: number;
-  status: 'active' | 'inactive';
-}
-
-interface Term {
-  id: string;
-  content: string;
-  status: 'active' | 'inactive';
-}
-
-interface CustomField {
-  id: string;
-  name: string;
-  type: 'text' | 'number' | 'date' | 'select';
-  options?: string[];
-  required: boolean;
-}
-
-interface CompanySettings {
-  name: string;
-  logo: string;
-  gstNumber: string;
-  address: string;
-  phone: string;
-  email: string;
+const emptySettings = {
+  name: '',
+  logo: '',
+  gstNumber: '',
+  address: '',
+  phone: '',
+  email: '',
+  defaultSalespersonName: '',
+  defaultSalespersonPhone: '',
+  defaultSalespersonEmail: '',
   bankDetails: {
-    bankName: string;
-    accountNumber: string;
-    ifsc: string;
-    branch: string;
-  };
-  quotationPrefix: string;
-  letterhead?: string;
-}
+    id: '',
+    bankName: '',
+    accountName: '',
+    accountNumber: '',
+    ifsc: '',
+    branch: '',
+  },
+  quotationPrefix: 'QT-',
+  nextNumber: 1,
+  padding: 5,
+  defaultValidityDays: 30,
+  letterhead: '',
+};
 
 interface DataContextType {
-  products: Product[];
-  addProduct: (product: Omit<Product, 'id'>) => void;
-  updateProduct: (id: string, product: Partial<Product>) => void;
-  deleteProduct: (id: string) => void;
-
-  customers: Customer[];
-  addCustomer: (customer: Omit<Customer, 'id'>) => void;
-  updateCustomer: (id: string, customer: Partial<Customer>) => void;
-  deleteCustomer: (id: string) => void;
-
-  quotations: Quotation[];
-  addQuotation: (quotation: Omit<Quotation, 'id' | 'number'>) => void;
-  updateQuotation: (id: string, quotation: Partial<Quotation>) => void;
-  deleteQuotation: (id: string) => void;
-
-  categories: Category[];
-  addCategory: (category: Omit<Category, 'id'>) => void;
-  updateCategory: (id: string, category: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
-
-  brands: Brand[];
-  addBrand: (brand: Omit<Brand, 'id'>) => void;
-  updateBrand: (id: string, brand: Partial<Brand>) => void;
-  deleteBrand: (id: string) => void;
-
-  adjustments: Adjustment[];
-  addAdjustment: (adjustment: Omit<Adjustment, 'id'>) => void;
-  updateAdjustment: (id: string, adjustment: Partial<Adjustment>) => void;
-  deleteAdjustment: (id: string) => void;
-
-  terms: Term[];
-  addTerm: (term: Omit<Term, 'id'>) => void;
-  updateTerm: (id: string, term: Partial<Term>) => void;
-  deleteTerm: (id: string) => void;
-
-  customFields: CustomField[];
-  addCustomField: (field: Omit<CustomField, 'id'>) => void;
-  updateCustomField: (id: string, field: Partial<CustomField>) => void;
-  deleteCustomField: (id: string) => void;
-
-  settings: CompanySettings;
-  updateSettings: (settings: Partial<CompanySettings>) => void;
+  loading: boolean;
+  refreshAll: () => Promise<void>;
+  products: any[];
+  addProduct: (product: any) => Promise<void>;
+  updateProduct: (id: string, product: any) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+  customers: any[];
+  addCustomer: (customer: any) => Promise<any>;
+  updateCustomer: (id: string, customer: any) => Promise<void>;
+  deleteCustomer: (id: string) => Promise<void>;
+  quotations: any[];
+  addQuotation: (quotation: any) => Promise<void>;
+  updateQuotation: (id: string, quotation: any) => Promise<void>;
+  submitQuotationForApproval: (id: string) => Promise<void>;
+  approveQuotation: (id: string, remarks?: string) => Promise<void>;
+  rejectQuotation: (id: string, remarks: string) => Promise<void>;
+  reviseQuotation: (id: string, remarks: string) => Promise<void>;
+  categories: any[];
+  addCategory: (category: any) => Promise<void>;
+  updateCategory: (id: string, category: any) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  brands: any[];
+  addBrand: (brand: any) => Promise<void>;
+  updateBrand: (id: string, brand: any) => Promise<void>;
+  deleteBrand: (id: string) => Promise<void>;
+  adjustments: any[];
+  addAdjustment: (adjustment: any) => Promise<void>;
+  updateAdjustment: (id: string, adjustment: any) => Promise<void>;
+  deleteAdjustment: (id: string) => Promise<void>;
+  terms: any[];
+  addTerm: (term: any) => Promise<void>;
+  updateTerm: (id: string, term: any) => Promise<void>;
+  deleteTerm: (id: string) => Promise<void>;
+  customFields: any[];
+  addCustomField: (field: any) => Promise<void>;
+  updateCustomField: (id: string, field: any) => Promise<void>;
+  deleteCustomField: (id: string) => Promise<void>;
+  settings: typeof emptySettings;
+  updateSettings: (settings: any) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
+
+const asArray = (value: any) => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  return [];
+};
 
 export const useData = () => {
   const context = useContext(DataContext);
@@ -163,159 +110,265 @@ export const useData = () => {
 };
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: '1',
-      image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400',
-      name: 'Commercial Treadmill Pro X1',
-      modelNumber: 'TM-PRO-X1-2024',
-      category: 'Cardio Equipment',
-      brand: 'FitPro',
-      mrp: 185000,
-      usualSellingPrice: 165000,
-      gstPercent: 18,
-      specifications: '4.0 HP motor, 22" touchscreen, Max speed 20 km/h, Max weight 200kg, Auto-incline 0-15%',
-      status: 'active',
-    },
-    {
-      id: '2',
-      image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400',
-      name: 'Smith Machine Elite Series',
-      modelNumber: 'SM-ELITE-500',
-      category: 'Strength Equipment',
-      brand: 'IronForce',
-      mrp: 245000,
-      usualSellingPrice: 220000,
-      gstPercent: 18,
-      specifications: 'Linear bearing system, 7-degree reverse pitch, Safety stops, Plate storage, Max load 400kg',
-      status: 'active',
-    },
-  ]);
+  const { token } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [quotations, setQuotations] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
+  const [adjustments, setAdjustments] = useState<any[]>([]);
+  const [terms, setTerms] = useState<any[]>([]);
+  const [customFields, setCustomFields] = useState<any[]>([]);
+  const [settings, setSettings] = useState(emptySettings);
 
-  const [customers, setCustomers] = useState<Customer[]>([
-    {
-      id: '1',
-      name: 'Rajesh Kumar',
-      company: 'Elite Fitness Center',
-      email: 'rajesh@elitefitness.com',
-      phone: '+91 98765 43210',
-      address: '123, MG Road, Bangalore - 560001',
-      gstNumber: '29ABCDE1234F1Z5',
-    },
-    {
-      id: '2',
-      name: 'Priya Sharma',
-      company: 'Power Gym Chain',
-      email: 'priya@powergym.com',
-      phone: '+91 98765 43211',
-      address: '456, Sector 17, Chandigarh - 160017',
-      gstNumber: '04XYZAB5678G1Z2',
-    },
-  ]);
+  const loadSettings = useCallback(async () => {
+    const [company, banks, numbering] = await Promise.all([
+      settingsService.company(),
+      settingsService.bankDetails(),
+      settingsService.quotationNumbering(),
+    ]);
+    const bankList = asArray(banks);
+    const defaultBank = bankList.find((bank: any) => bank.is_default) || bankList[0];
+    setSettings(mapCompanySettings(company, defaultBank, numbering));
+  }, []);
 
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const refreshAll = useCallback(async () => {
+    if (!token) return;
 
-  const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'Cardio Equipment', status: 'active' },
-    { id: '2', name: 'Strength Equipment', status: 'active' },
-    { id: '3', name: 'Functional Training', status: 'active' },
-    { id: '4', name: 'Accessories', status: 'active' },
-  ]);
+    setLoading(true);
+    try {
+      const [
+        categoryResult,
+        brandResult,
+        productResult,
+        customerResult,
+        quotationResult,
+        adjustmentResult,
+        termResult,
+        customFieldResult,
+      ] = await Promise.all([
+        categoryService.list(),
+        brandService.list(),
+        productService.list(),
+        customerService.list(),
+        quotationService.list(),
+        adjustmentService.list(),
+        termService.list(),
+        customerFieldService.list(),
+      ]);
 
-  const [brands, setBrands] = useState<Brand[]>([
-    { id: '1', name: 'FitPro', status: 'active' },
-    { id: '2', name: 'IronForce', status: 'active' },
-    { id: '3', name: 'PowerMax', status: 'active' },
-  ]);
+      setCategories(asArray(categoryResult.data).map(mapCategory));
+      setBrands(asArray(brandResult.data).map(mapBrand));
+      setProducts(asArray(productResult.data).map(mapProduct));
+      setCustomers(asArray(customerResult.data).map(mapCustomer));
+      setQuotations(asArray(quotationResult.data).map(mapQuotation));
+      setAdjustments(asArray(adjustmentResult.data).map(mapAdjustment));
+      setTerms(asArray(termResult.data).map(mapTerm));
+      setCustomFields(asArray(customFieldResult.data).map(mapCustomerField));
+      await loadSettings();
+    } finally {
+      setLoading(false);
+    }
+  }, [loadSettings, token]);
 
-  const [adjustments, setAdjustments] = useState<Adjustment[]>([
-    { id: '1', name: 'Delivery Charges', type: 'fixed', defaultValue: 5000, status: 'active' },
-    { id: '2', name: 'Installation Charges', type: 'fixed', defaultValue: 3000, status: 'active' },
-    { id: '3', name: 'Freight Charges', type: 'percentage', defaultValue: 2, status: 'active' },
-  ]);
+  useEffect(() => {
+    if (token) {
+      refreshAll();
+    } else {
+      setProducts([]);
+      setCustomers([]);
+      setQuotations([]);
+      setCategories([]);
+      setBrands([]);
+      setAdjustments([]);
+      setTerms([]);
+      setCustomFields([]);
+      setSettings(emptySettings);
+    }
+  }, [refreshAll, token]);
 
-  const [terms, setTerms] = useState<Term[]>([
-    { id: '1', content: 'Payment: 50% advance, 50% on delivery', status: 'active' },
-    { id: '2', content: 'Delivery within 15-20 working days from order confirmation', status: 'active' },
-    { id: '3', content: 'Warranty: 2 years on motor, 1 year on parts, lifetime on frame', status: 'active' },
-    { id: '4', content: 'Installation and training included', status: 'active' },
-    { id: '5', content: 'Prices are subject to change without prior notice', status: 'active' },
-  ]);
-
-  const [customFields, setCustomFields] = useState<CustomField[]>([
-    { id: '1', name: 'Business Type', type: 'select', options: ['Gym', 'Hotel', 'Residential', 'Corporate'], required: false },
-  ]);
-
-  const [settings, setSettings] = useState<CompanySettings>({
-    name: 'FitEquip Solutions Pvt Ltd',
-    logo: '',
-    gstNumber: '29AABCT1234C1Z5',
-    address: '789, Industrial Area, Phase 2, Bangalore - 560058, Karnataka, India',
-    phone: '+91 80 2345 6789',
-    email: 'sales@fitequip.com',
-    bankDetails: {
-      bankName: 'HDFC Bank',
-      accountNumber: '50200012345678',
-      ifsc: 'HDFC0001234',
-      branch: 'MG Road, Bangalore',
-    },
-    quotationPrefix: 'FEQ',
-    letterhead: '',
-  });
-
-  // Generate quotation number
-  const generateQuotationNumber = () => {
-    const count = quotations.length + 1;
-    const date = new Date();
-    const year = date.getFullYear().toString().slice(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    return `${settings.quotationPrefix}-${year}${month}-${count.toString().padStart(4, '0')}`;
+  const replaceById = (setter: React.Dispatch<React.SetStateAction<any[]>>, item: any) => {
+    setter((current) => current.map((existing) => (existing.id === item.id ? item : existing)));
   };
 
-  const value: DataContextType = {
+  const value = useMemo<DataContextType>(() => ({
+    loading,
+    refreshAll,
     products,
-    addProduct: (product) => setProducts([...products, { ...product, id: Date.now().toString() }]),
-    updateProduct: (id, product) => setProducts(products.map(p => p.id === id ? { ...p, ...product } : p)),
-    deleteProduct: (id) => setProducts(products.filter(p => p.id !== id)),
-
+    async addProduct(product) {
+      const created = await productService.create(productPayload(product, categories, brands));
+      setProducts((current) => [mapProduct(created), ...current]);
+    },
+    async updateProduct(id, product) {
+      const updated = await productService.update(id, productPayload(product, categories, brands));
+      replaceById(setProducts, mapProduct(updated));
+    },
+    async deleteProduct(id) {
+      const updated = await productService.status(id, false);
+      replaceById(setProducts, mapProduct(updated));
+    },
     customers,
-    addCustomer: (customer) => setCustomers([...customers, { ...customer, id: Date.now().toString() }]),
-    updateCustomer: (id, customer) => setCustomers(customers.map(c => c.id === id ? { ...c, ...customer } : c)),
-    deleteCustomer: (id) => setCustomers(customers.filter(c => c.id !== id)),
-
+    async addCustomer(customer) {
+      const created = await customerService.create(customerPayload(customer, customFields));
+      const mapped = mapCustomer(created);
+      setCustomers((current) => [mapped, ...current]);
+      return mapped;
+    },
+    async updateCustomer(id, customer) {
+      const updated = await customerService.update(id, customerPayload(customer, customFields));
+      replaceById(setCustomers, mapCustomer(updated));
+    },
+    async deleteCustomer(id) {
+      const updated = await customerService.status(id, false);
+      replaceById(setCustomers, mapCustomer(updated));
+    },
     quotations,
-    addQuotation: (quotation) => setQuotations([...quotations, { ...quotation, id: Date.now().toString(), number: generateQuotationNumber() }]),
-    updateQuotation: (id, quotation) => setQuotations(quotations.map(q => q.id === id ? { ...q, ...quotation } : q)),
-    deleteQuotation: (id) => setQuotations(quotations.filter(q => q.id !== id)),
-
+    async addQuotation(quotation) {
+      const created = await quotationService.create(quotationPayload(quotation));
+      setQuotations((current) => [mapQuotation(created), ...current]);
+    },
+    async updateQuotation(id, quotation) {
+      const updated = await quotationService.update(id, quotationPayload(quotation));
+      replaceById(setQuotations, mapQuotation(updated));
+    },
+    async submitQuotationForApproval(id) {
+      const updated = await quotationService.submitForApproval(id);
+      replaceById(setQuotations, mapQuotation(updated));
+    },
+    async approveQuotation(id, remarks) {
+      const updated = await quotationService.approve(id, remarks);
+      replaceById(setQuotations, mapQuotation(updated));
+    },
+    async rejectQuotation(id, remarks) {
+      const updated = await quotationService.reject(id, remarks);
+      replaceById(setQuotations, mapQuotation(updated));
+    },
+    async reviseQuotation(id, remarks) {
+      const updated = await quotationService.revise(id, remarks);
+      replaceById(setQuotations, mapQuotation(updated));
+    },
     categories,
-    addCategory: (category) => setCategories([...categories, { ...category, id: Date.now().toString() }]),
-    updateCategory: (id, category) => setCategories(categories.map(c => c.id === id ? { ...c, ...category } : c)),
-    deleteCategory: (id) => setCategories(categories.filter(c => c.id !== id)),
-
+    async addCategory(category) {
+      const created = await categoryService.create(categoryPayload(category));
+      setCategories((current) => [mapCategory(created), ...current]);
+    },
+    async updateCategory(id, category) {
+      const updated = await categoryService.update(id, categoryPayload(category));
+      replaceById(setCategories, mapCategory(updated));
+    },
+    async deleteCategory(id) {
+      const updated = await categoryService.status(id, false);
+      replaceById(setCategories, mapCategory(updated));
+    },
     brands,
-    addBrand: (brand) => setBrands([...brands, { ...brand, id: Date.now().toString() }]),
-    updateBrand: (id, brand) => setBrands(brands.map(b => b.id === id ? { ...b, ...brand } : b)),
-    deleteBrand: (id) => setBrands(brands.filter(b => b.id !== id)),
-
+    async addBrand(brand) {
+      const created = await brandService.create(brandPayload(brand));
+      setBrands((current) => [mapBrand(created), ...current]);
+    },
+    async updateBrand(id, brand) {
+      const updated = await brandService.update(id, brandPayload(brand));
+      replaceById(setBrands, mapBrand(updated));
+    },
+    async deleteBrand(id) {
+      const updated = await brandService.status(id, false);
+      replaceById(setBrands, mapBrand(updated));
+    },
     adjustments,
-    addAdjustment: (adjustment) => setAdjustments([...adjustments, { ...adjustment, id: Date.now().toString() }]),
-    updateAdjustment: (id, adjustment) => setAdjustments(adjustments.map(a => a.id === id ? { ...a, ...adjustment } : a)),
-    deleteAdjustment: (id) => setAdjustments(adjustments.filter(a => a.id !== id)),
-
+    async addAdjustment(adjustment) {
+      const created = await adjustmentService.create(adjustmentPayload(adjustment));
+      setAdjustments((current) => [mapAdjustment(created), ...current]);
+    },
+    async updateAdjustment(id, adjustment) {
+      const updated = await adjustmentService.update(id, adjustmentPayload(adjustment));
+      replaceById(setAdjustments, mapAdjustment(updated));
+    },
+    async deleteAdjustment(id) {
+      const updated = await adjustmentService.status(id, false);
+      replaceById(setAdjustments, mapAdjustment(updated));
+    },
     terms,
-    addTerm: (term) => setTerms([...terms, { ...term, id: Date.now().toString() }]),
-    updateTerm: (id, term) => setTerms(terms.map(t => t.id === id ? { ...t, ...term } : t)),
-    deleteTerm: (id) => setTerms(terms.filter(t => t.id !== id)),
-
+    async addTerm(term) {
+      const created = await termService.create(termPayload(term));
+      setTerms((current) => [mapTerm(created), ...current]);
+    },
+    async updateTerm(id, term) {
+      const updated = await termService.update(id, termPayload(term));
+      replaceById(setTerms, mapTerm(updated));
+    },
+    async deleteTerm(id) {
+      const updated = await termService.status(id, false);
+      replaceById(setTerms, mapTerm(updated));
+    },
     customFields,
-    addCustomField: (field) => setCustomFields([...customFields, { ...field, id: Date.now().toString() }]),
-    updateCustomField: (id, field) => setCustomFields(customFields.map(f => f.id === id ? { ...f, ...field } : f)),
-    deleteCustomField: (id) => setCustomFields(customFields.filter(f => f.id !== id)),
-
+    async addCustomField(field) {
+      const created = await customerFieldService.create(customerFieldPayload(field));
+      setCustomFields((current) => [mapCustomerField(created), ...current]);
+    },
+    async updateCustomField(id, field) {
+      const updated = await customerFieldService.update(id, customerFieldPayload(field));
+      replaceById(setCustomFields, mapCustomerField(updated));
+    },
+    async deleteCustomField(id) {
+      await customerFieldService.remove(id);
+      setCustomFields((current) => current.filter((field) => field.id !== id));
+    },
     settings,
-    updateSettings: (newSettings) => setSettings({ ...settings, ...newSettings }),
-  };
+    async updateSettings(nextSettings) {
+      const companyPayload = {
+        company_name: nextSettings.name,
+        address: nextSettings.address || null,
+        phone: nextSettings.phone || null,
+        email: nextSettings.email || null,
+        gst_number: nextSettings.gstNumber || null,
+        logo_path: nextSettings.logo || null,
+        letterhead_path: nextSettings.letterhead || null,
+        default_salesperson_name: nextSettings.defaultSalespersonName || null,
+        default_salesperson_phone: nextSettings.defaultSalespersonPhone || null,
+        default_salesperson_email: nextSettings.defaultSalespersonEmail || null,
+      };
+
+      const bankPayload = {
+        bank_name: nextSettings.bankDetails.bankName,
+        account_name: nextSettings.bankDetails.accountName || nextSettings.name,
+        account_number: nextSettings.bankDetails.accountNumber,
+        ifsc_code: nextSettings.bankDetails.ifsc || null,
+        branch: nextSettings.bankDetails.branch || null,
+        is_default: true,
+        is_active: true,
+      };
+
+      const numberingPayload = {
+        quotation_prefix: nextSettings.quotationPrefix,
+        next_number: nextSettings.nextNumber || 1,
+        padding: nextSettings.padding || 5,
+        default_validity_days: nextSettings.defaultValidityDays || 30,
+      };
+
+      await settingsService.updateCompany(companyPayload);
+      if (nextSettings.bankDetails.id) {
+        await settingsService.updateBankDetail(nextSettings.bankDetails.id, bankPayload);
+      } else {
+        await settingsService.storeBankDetail(bankPayload);
+      }
+      await settingsService.updateQuotationNumbering(numberingPayload);
+      await loadSettings();
+      toast.success('Settings updated successfully');
+    },
+  }), [
+    adjustments,
+    brands,
+    categories,
+    customFields,
+    customers,
+    loadSettings,
+    loading,
+    products,
+    quotations,
+    refreshAll,
+    settings,
+    terms,
+  ]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 };

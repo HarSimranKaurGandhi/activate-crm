@@ -1,13 +1,16 @@
 import { useNavigate, useParams } from 'react-router';
 import { useData } from '../context/DataContext';
-import { ArrowLeft, Save, Upload } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { LoadingState } from '../components/common/AsyncState';
 
 export const ProductForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { products, addProduct, updateProduct, categories, brands } = useData();
+  const { products, addProduct, updateProduct, categories, brands, loading } = useData();
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string[]>>({});
 
   const [formData, setFormData] = useState({
     image: '',
@@ -31,16 +34,30 @@ export const ProductForm = () => {
     }
   }, [id, products]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (id) {
-      updateProduct(id, formData);
-      toast.success('Product updated successfully');
-    } else {
-      addProduct(formData);
-      toast.success('Product added successfully');
+    setErrors({});
+
+    if (!formData.name || (!formData.category && !(formData as any).categoryId) || formData.mrp < 0 || formData.usualSellingPrice < 0) {
+      toast.error('Please complete the required product fields');
+      return;
     }
-    navigate('/products');
+
+    setSubmitting(true);
+    try {
+      if (id) {
+        await updateProduct(id, formData);
+        toast.success('Product updated successfully');
+      } else {
+        await addProduct(formData);
+        toast.success('Product added successfully');
+      }
+      navigate('/products');
+    } catch (error: any) {
+      setErrors(error.errors || {});
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -55,6 +72,11 @@ export const ProductForm = () => {
           </h2>
         </div>
 
+        {loading && id ? (
+          <div className="bg-white rounded-2xl border border-gray-200 p-8">
+            <LoadingState label="Loading product..." />
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-8 space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -74,7 +96,7 @@ export const ProductForm = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Product Name *
@@ -86,19 +108,20 @@ export const ProductForm = () => {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              {errors.product_name?.[0] && <p className="text-sm text-red-600 mt-1">{errors.product_name[0]}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Model Number *
+                Model Number
               </label>
               <input
                 type="text"
-                required
                 value={formData.modelNumber}
                 onChange={(e) => setFormData({ ...formData, modelNumber: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              {errors.model_number?.[0] && <p className="text-sm text-red-600 mt-1">{errors.model_number[0]}</p>}
             </div>
 
             <div>
@@ -116,14 +139,14 @@ export const ProductForm = () => {
                   <option key={cat.id} value={cat.name}>{cat.name}</option>
                 ))}
               </select>
+              {errors.category_id?.[0] && <p className="text-sm text-red-600 mt-1">{errors.category_id[0]}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Brand *
+                Brand
               </label>
               <select
-                required
                 value={formData.brand}
                 onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -169,8 +192,8 @@ export const ProductForm = () => {
                 type="number"
                 required
                 value={formData.gstPercent}
-                onChange={(e) => setFormData({ ...formData, gstPercent: parseFloat(e.target.value) })}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                readOnly
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-600"
               />
             </div>
 
@@ -189,12 +212,11 @@ export const ProductForm = () => {
               </select>
             </div>
 
-            <div className="col-span-2">
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Specifications *
+                Specifications
               </label>
               <textarea
-                required
                 rows={4}
                 value={formData.specifications}
                 onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
@@ -214,13 +236,15 @@ export const ProductForm = () => {
             </button>
             <button
               type="submit"
+              disabled={submitting}
               className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all"
             >
               <Save className="w-5 h-5" />
-              {id ? 'Update' : 'Save'} Product
+              {submitting ? 'Saving...' : `${id ? 'Update' : 'Save'} Product`}
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

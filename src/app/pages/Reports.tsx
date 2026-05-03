@@ -1,8 +1,9 @@
 import { useData } from '../context/DataContext';
 import { FileText, Users, Package, TrendingUp } from 'lucide-react';
+import { LoadingState } from '../components/common/AsyncState';
 
 export const Reports = () => {
-  const { quotations, customers, products } = useData();
+  const { quotations, customers, products, loading } = useData();
 
   const totalQuotations = quotations.length;
   const approvedQuotations = quotations.filter(q => q.status === 'approved').length;
@@ -32,7 +33,7 @@ export const Reports = () => {
       let totalQty = 0;
       let totalRevenue = 0;
       quotations.forEach(q => {
-        q.items.forEach(item => {
+        q.items.forEach((item: any) => {
           if (item.product.id === product.id) {
             totalQty += item.quantity;
             totalRevenue += item.price * item.quantity;
@@ -49,9 +50,10 @@ export const Reports = () => {
     <div className="p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         <h2 className="text-2xl font-semibold text-gray-900">Reports & Analytics</h2>
+        {loading && <LoadingState label="Loading reports..." />}
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
@@ -94,7 +96,7 @@ export const Reports = () => {
         </div>
 
         {/* Revenue Stats */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-8">
             <p className="text-sm font-medium text-blue-600 mb-2">Total Revenue (Approved)</p>
             <p className="text-4xl font-bold text-blue-900">

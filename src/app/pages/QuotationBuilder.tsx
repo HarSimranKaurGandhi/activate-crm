@@ -4,6 +4,9 @@ import { ArrowLeft, Plus, Search, GripVertical, Trash2, ChevronDown, Save } from
 import { useState, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { toast } from 'sonner';
+import { productService } from '../../services/productService';
+import { mapProduct } from '../../services/mappers';
+import { LoadingState } from '../components/common/AsyncState';
 
 interface QuotationItem {
   id: string;
@@ -44,7 +47,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
   };
 
   return (
-    <tr ref={(node) => drag(drop(node))} className="border-b border-gray-200 hover:bg-gray-50">
+    <tr ref={(node) => { drag(drop(node)); }} className="border-b border-gray-200 hover:bg-gray-50">
       <td className="px-4 py-3">
         <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
       </td>
@@ -55,17 +58,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
         <div>
           <div className="font-medium text-gray-900">{item.product.name}</div>
           <div className="text-sm text-gray-500">{item.product.modelNumber}</div>
-          <button
-            onClick={() => {
-              const newSpecs = prompt('Edit specifications:', item.specifications);
-              if (newSpecs !== null) {
-                onUpdate(item.id, { specifications: newSpecs });
-              }
-            }}
-            className="text-xs text-blue-600 hover:underline mt-1"
-          >
-            Edit specs
-          </button>
+          {item.specifications && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{item.specifications}</div>}
         </div>
       </td>
       <td className="px-4 py-3">
@@ -127,13 +120,13 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
 export const QuotationBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { products, customers, quotations, addQuotation, updateQuotation, adjustments, terms: masterTerms } = useData();
+  const { products, customers, quotations, addQuotation, updateQuotation, adjustments, terms: masterTerms, settings, loading } = useData();
 
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [salesperson, setSalesperson] = useState({
-    name: 'Sales Manager',
-    phone: '+91 98765 43210',
-    email: 'sales@fitequip.com',
+    name: '',
+    phone: '',
+    email: '',
   });
   const [items, setItems] = useState<QuotationItem[]>([]);
   const [globalDiscount, setGlobalDiscount] = useState(0);
@@ -141,13 +134,14 @@ export const QuotationBuilder = () => {
   const [gstInclusive, setGstInclusive] = useState(false);
   const [showDiscount, setShowDiscount] = useState(true);
   const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
-  const [customTerm, setCustomTerm] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [selectableProducts, setSelectableProducts] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    const quotation = id ? quotations.find(q => q.id === id) : null;
     if (id) {
-      const quotation = quotations.find(q => q.id === id);
       if (quotation) {
         setSelectedCustomer(quotation.customer);
         setSalesperson(quotation.salesperson);
@@ -158,14 +152,34 @@ export const QuotationBuilder = () => {
         setShowDiscount(quotation.showDiscount);
         setSelectedTerms(quotation.terms);
       }
+    } else if (settings.defaultSalespersonName || settings.defaultSalespersonEmail || settings.defaultSalespersonPhone) {
+      setSalesperson({
+        name: settings.defaultSalespersonName || '',
+        phone: settings.defaultSalespersonPhone || '',
+        email: settings.defaultSalespersonEmail || '',
+      });
     }
 
-    const adjMap: Record<string, { enabled: boolean; amount: number }> = {};
-    adjustments.forEach(adj => {
-      adjMap[adj.id] = { enabled: false, amount: adj.defaultValue };
-    });
-    setSelectedAdjustments(adjMap);
-  }, [id, quotations, adjustments]);
+    if (!quotation) {
+      const adjMap: Record<string, { enabled: boolean; amount: number }> = {};
+      adjustments.forEach(adj => {
+        adjMap[adj.id] = { enabled: false, amount: adj.defaultValue };
+      });
+      setSelectedAdjustments(adjMap);
+    }
+  }, [id, quotations, adjustments, settings]);
+
+  useEffect(() => {
+    if (!showProductModal) return;
+
+    productService
+      .selectable({ is_active: true })
+      .then((result) => {
+        const data = Array.isArray(result.data) ? result.data : [];
+        setSelectableProducts(data.map(mapProduct));
+      })
+      .catch(() => setSelectableProducts(products.filter((product) => product.status === 'active')));
+  }, [products, showProductModal]);
 
   useEffect(() => {
     if (globalDiscount > 0) {
@@ -244,7 +258,15 @@ export const QuotationBuilder = () => {
 
   const totals = calculateTotals();
 
-  const handleSave = () => {
+  if (loading && id) {
+    return (
+      <div className="p-8">
+        <LoadingState label="Loading quotation..." />
+      </div>
+    );
+  }
+
+  const handleSave = async () => {
     if (!selectedCustomer) {
       toast.error('Please select a customer');
       return;
@@ -270,14 +292,19 @@ export const QuotationBuilder = () => {
       grandTotal: totals.grandTotal,
     };
 
-    if (id) {
-      updateQuotation(id, quotationData);
-      toast.success('Quotation updated successfully');
-    } else {
-      addQuotation(quotationData);
-      toast.success('Quotation created successfully');
+    setSaving(true);
+    try {
+      if (id) {
+        await updateQuotation(id, quotationData);
+        toast.success('Quotation updated successfully');
+      } else {
+        await addQuotation(quotationData);
+        toast.success('Quotation created successfully');
+      }
+      navigate('/quotations');
+    } finally {
+      setSaving(false);
     }
-    navigate('/quotations');
   };
 
   return (
@@ -301,12 +328,12 @@ export const QuotationBuilder = () => {
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
           >
             <Save className="w-5 h-5" />
-            Save Quotation
+            {saving ? 'Saving...' : 'Save Quotation'}
           </button>
         </div>
 
         {/* Customer & Salesperson */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <h3 className="font-semibold text-gray-900 mb-4">Customer Details</h3>
             {selectedCustomer ? (
@@ -365,9 +392,9 @@ export const QuotationBuilder = () => {
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Products Table */}
-          <div className="col-span-2 bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900">Products</h3>
               <button
@@ -518,15 +545,6 @@ export const QuotationBuilder = () => {
                     <span className="text-sm text-gray-700">{term.content}</span>
                   </label>
                 ))}
-                <div className="mt-3">
-                  <input
-                    type="text"
-                    value={customTerm}
-                    onChange={(e) => setCustomTerm(e.target.value)}
-                    placeholder="Add custom term..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                  />
-                </div>
               </div>
             </div>
 
@@ -575,8 +593,8 @@ export const QuotationBuilder = () => {
                 ✕
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              {products.filter(p => p.status === 'active').map(product => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(selectableProducts.length ? selectableProducts : products.filter(p => p.status === 'active')).map(product => (
                 <div
                   key={product.id}
                   onClick={() => addProduct(product)}

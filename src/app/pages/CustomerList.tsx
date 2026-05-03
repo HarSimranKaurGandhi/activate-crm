@@ -2,10 +2,12 @@ import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
 import { Plus, Search, Edit, Trash2, Building } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
+import { EmptyState, LoadingState } from '../components/common/AsyncState';
 
 export const CustomerList = () => {
   const navigate = useNavigate();
-  const { customers, deleteCustomer } = useData();
+  const { customers, deleteCustomer, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredCustomers = customers.filter(c =>
@@ -40,7 +42,7 @@ export const CustomerList = () => {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredCustomers.map((customer) => (
               <div
                 key={customer.id}
@@ -58,9 +60,10 @@ export const CustomerList = () => {
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm('Are you sure you want to delete this customer?')) {
-                          deleteCustomer(customer.id);
+                      onClick={async () => {
+                        if (confirm('Deactivate this customer?')) {
+                          await deleteCustomer(customer.id);
+                          toast.success('Customer deactivated');
                         }
                       }}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -82,10 +85,9 @@ export const CustomerList = () => {
             ))}
           </div>
 
-          {filteredCustomers.length === 0 && (
-            <div className="py-12 text-center text-gray-500">
-              No customers found. Add your first customer to get started.
-            </div>
+          {loading && <LoadingState label="Loading customers..." />}
+          {!loading && filteredCustomers.length === 0 && (
+            <EmptyState label="No customers found. Add your first customer to get started." />
           )}
         </div>
       </div>

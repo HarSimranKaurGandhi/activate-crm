@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Filter, Calendar, Eye, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Calendar, Eye, Edit } from 'lucide-react';
 import { useState } from 'react';
+import { LoadingState } from '../components/common/AsyncState';
+import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
 
 export const QuotationList = () => {
   const navigate = useNavigate();
-  const { quotations, deleteQuotation } = useData();
+  const { quotations, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -16,9 +18,11 @@ export const QuotationList = () => {
     const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
 
     let matchesDate = true;
-    if (dateRange.start && dateRange.end) {
+    if (dateRange.start || dateRange.end) {
       const qDate = new Date(q.date);
-      matchesDate = qDate >= new Date(dateRange.start) && qDate <= new Date(dateRange.end);
+      const startsAfter = dateRange.start ? qDate >= new Date(dateRange.start) : true;
+      const endsBefore = dateRange.end ? qDate <= new Date(dateRange.end) : true;
+      matchesDate = startsAfter && endsBefore;
     }
 
     return matchesSearch && matchesStatus && matchesDate;
@@ -41,9 +45,9 @@ export const QuotationList = () => {
 
         {/* Filters */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
-            <div className="col-span-2">
+            <div className="md:col-span-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -145,13 +149,8 @@ export const QuotationList = () => {
                       ₹{quotation.grandTotal.toLocaleString('en-IN')}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        quotation.status === 'approved' ? 'bg-green-50 text-green-700' :
-                        quotation.status === 'pending' ? 'bg-amber-50 text-amber-700' :
-                        quotation.status === 'rejected' ? 'bg-red-50 text-red-700' :
-                        'bg-gray-50 text-gray-700'
-                      }`}>
-                        {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${quotationStatusClass(quotation.status)}`}>
+                        {quotationStatusLabel(quotation.status)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -170,22 +169,18 @@ export const QuotationList = () => {
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => {
-                            if (confirm('Are you sure you want to delete this quotation?')) {
-                              deleteQuotation(quotation.id);
-                            }
-                          }}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </td>
                   </tr>
                 ))}
-                {filteredQuotations.length === 0 && (
+                {loading && (
+                  <tr>
+                    <td colSpan={7}>
+                      <LoadingState label="Loading quotations..." />
+                    </td>
+                  </tr>
+                )}
+                {!loading && filteredQuotations.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                       No quotations found. Create your first quotation to get started.

@@ -2,10 +2,12 @@ import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
 import { Plus, Search, Edit, Trash2, Package } from 'lucide-react';
 import { useState } from 'react';
+import { EmptyState, LoadingState } from '../components/common/AsyncState';
+import { toast } from 'sonner';
 
 export const ProductList = () => {
   const navigate = useNavigate();
-  const { products, deleteProduct } = useData();
+  const { products, deleteProduct, loading } = useData();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredProducts = products.filter(p =>
@@ -40,7 +42,7 @@ export const ProductList = () => {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredProducts.map((product) => (
               <div
                 key={product.id}
@@ -62,9 +64,10 @@ export const ProductList = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this product?')) {
-                            deleteProduct(product.id);
+                      onClick={async () => {
+                          if (confirm('Deactivate this product?')) {
+                            await deleteProduct(product.id);
+                            toast.success('Product deactivated');
                           }
                         }}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -98,10 +101,9 @@ export const ProductList = () => {
             ))}
           </div>
 
-          {filteredProducts.length === 0 && (
-            <div className="py-12 text-center text-gray-500">
-              No products found. Add your first product to get started.
-            </div>
+          {loading && <LoadingState label="Loading products..." />}
+          {!loading && filteredProducts.length === 0 && (
+            <EmptyState label="No products found. Add your first product to get started." />
           )}
         </div>
       </div>

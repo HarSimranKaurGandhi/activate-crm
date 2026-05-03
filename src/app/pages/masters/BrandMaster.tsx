@@ -2,20 +2,21 @@ import { useData } from '../../context/DataContext';
 import { Plus, Edit, Trash2, Power } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { LoadingState } from '../../components/common/AsyncState';
 
 export const BrandMaster = () => {
-  const { brands, addBrand, updateBrand, deleteBrand } = useData();
+  const { brands, addBrand, updateBrand, deleteBrand, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', status: 'active' as 'active' | 'inactive' });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      updateBrand(editingId, formData);
+      await updateBrand(editingId, formData);
       toast.success('Brand updated successfully');
     } else {
-      addBrand(formData);
+      await addBrand(formData);
       toast.success('Brand added successfully');
     }
     setShowModal(false);
@@ -29,8 +30,8 @@ export const BrandMaster = () => {
     setShowModal(true);
   };
 
-  const toggleStatus = (id: string, currentStatus: 'active' | 'inactive') => {
-    updateBrand(id, { status: currentStatus === 'active' ? 'inactive' : 'active' });
+  const toggleStatus = async (brand: any) => {
+    await updateBrand(brand.id, { ...brand, status: brand.status === 'active' ? 'inactive' : 'active' });
   };
 
   return (
@@ -66,7 +67,7 @@ export const BrandMaster = () => {
                   <td className="px-6 py-4 font-medium text-gray-900">{brand.name}</td>
                   <td className="px-6 py-4">
                     <button
-                      onClick={() => toggleStatus(brand.id, brand.status)}
+                      onClick={() => toggleStatus(brand)}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                         brand.status === 'active'
                           ? 'bg-green-50 text-green-700 hover:bg-green-100'
@@ -86,10 +87,10 @@ export const BrandMaster = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this brand?')) {
-                            deleteBrand(brand.id);
-                            toast.success('Brand deleted');
+                        onClick={async () => {
+                          if (confirm('Deactivate this brand?')) {
+                            await deleteBrand(brand.id);
+                            toast.success('Brand deactivated');
                           }
                         }}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -102,6 +103,7 @@ export const BrandMaster = () => {
               ))}
             </tbody>
           </table>
+          {loading && <LoadingState label="Loading brands..." />}
         </div>
       </div>
 

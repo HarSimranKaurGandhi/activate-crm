@@ -56,7 +56,7 @@ class ProductService extends CrudService
     public function create(array $data): Product
     {
         $data['is_active'] = $data['is_active'] ?? true;
-
+        $data['unit'] = $request->unit ?? '1';
         return Product::create($data)->load($this->relations);
     }
 

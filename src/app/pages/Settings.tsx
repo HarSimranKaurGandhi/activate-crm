@@ -1,16 +1,29 @@
 import { useData } from '../context/DataContext';
 import { Save, Building, CreditCard } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { useEffect, useState } from 'react';
+import { FieldError } from '../components/common/AsyncState';
 
 export const Settings = () => {
   const { settings, updateSettings } = useData();
   const [formData, setFormData] = useState(settings);
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string[]>>({});
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    setFormData(settings);
+  }, [settings]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings(formData);
-    toast.success('Settings updated successfully');
+    setSaving(true);
+    setErrors({});
+    try {
+      await updateSettings(formData);
+    } catch (error: any) {
+      setErrors(error.errors || {});
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -28,8 +41,8 @@ export const Settings = () => {
               <h3 className="text-lg font-semibold text-gray-900">Company Information</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Company Name *
                 </label>
@@ -40,6 +53,7 @@ export const Settings = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <FieldError message={errors.company_name?.[0]} />
               </div>
 
               <div>
@@ -53,27 +67,27 @@ export const Settings = () => {
                   placeholder="https://example.com/logo.png"
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {formData.logo && <img src={formData.logo} alt="Logo preview" className="mt-3 h-14 object-contain" />}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  GST Number *
+                  GST Number
                 </label>
                 <input
                   type="text"
-                  required
                   value={formData.gstNumber}
                   onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <FieldError message={errors.gst_number?.[0]} />
               </div>
 
-              <div className="col-span-2">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Address *
+                  Address
                 </label>
                 <textarea
-                  required
                   rows={3}
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -83,11 +97,10 @@ export const Settings = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone *
+                  Phone
                 </label>
                 <input
                   type="tel"
-                  required
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -96,15 +109,15 @@ export const Settings = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
+                  Email
                 </label>
                 <input
                   type="email"
-                  required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <FieldError message={errors.email?.[0]} />
               </div>
 
               <div>
@@ -118,6 +131,7 @@ export const Settings = () => {
                   placeholder="https://example.com/letterhead.jpg"
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {formData.letterhead && <img src={formData.letterhead} alt="Letterhead preview" className="mt-3 h-16 w-full object-cover rounded-lg border border-gray-200" />}
               </div>
 
               <div>
@@ -132,6 +146,7 @@ export const Settings = () => {
                   placeholder="e.g., FEQ"
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <FieldError message={errors.quotation_prefix?.[0]} />
               </div>
             </div>
           </div>
@@ -145,7 +160,7 @@ export const Settings = () => {
               <h3 className="text-lg font-semibold text-gray-900">Bank Details</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Bank Name *
@@ -160,6 +175,7 @@ export const Settings = () => {
                   })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <FieldError message={errors.bank_name?.[0]} />
               </div>
 
               <div>
@@ -176,15 +192,15 @@ export const Settings = () => {
                   })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <FieldError message={errors.account_number?.[0]} />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  IFSC Code *
+                  IFSC Code
                 </label>
                 <input
                   type="text"
-                  required
                   value={formData.bankDetails.ifsc}
                   onChange={(e) => setFormData({
                     ...formData,
@@ -192,15 +208,15 @@ export const Settings = () => {
                   })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <FieldError message={errors.ifsc_code?.[0]} />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Branch *
+                  Branch
                 </label>
                 <input
                   type="text"
-                  required
                   value={formData.bankDetails.branch}
                   onChange={(e) => setFormData({
                     ...formData,
@@ -215,10 +231,11 @@ export const Settings = () => {
           <div className="flex justify-end">
             <button
               type="submit"
+              disabled={saving}
               className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
             >
               <Save className="w-5 h-5" />
-              Save Settings
+              {saving ? 'Saving...' : 'Save Settings'}
             </button>
           </div>
         </form>

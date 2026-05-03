@@ -2,20 +2,21 @@ import { useData } from '../../context/DataContext';
 import { Plus, Edit, Trash2, Power } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { LoadingState } from '../../components/common/AsyncState';
 
 export const CategoryMaster = () => {
-  const { categories, addCategory, updateCategory, deleteCategory } = useData();
+  const { categories, addCategory, updateCategory, deleteCategory, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', status: 'active' as 'active' | 'inactive' });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      updateCategory(editingId, formData);
+      await updateCategory(editingId, formData);
       toast.success('Category updated successfully');
     } else {
-      addCategory(formData);
+      await addCategory(formData);
       toast.success('Category added successfully');
     }
     setShowModal(false);
@@ -29,8 +30,8 @@ export const CategoryMaster = () => {
     setShowModal(true);
   };
 
-  const toggleStatus = (id: string, currentStatus: 'active' | 'inactive') => {
-    updateCategory(id, { status: currentStatus === 'active' ? 'inactive' : 'active' });
+  const toggleStatus = async (category: any) => {
+    await updateCategory(category.id, { ...category, status: category.status === 'active' ? 'inactive' : 'active' });
   };
 
   return (
@@ -66,7 +67,7 @@ export const CategoryMaster = () => {
                   <td className="px-6 py-4 font-medium text-gray-900">{category.name}</td>
                   <td className="px-6 py-4">
                     <button
-                      onClick={() => toggleStatus(category.id, category.status)}
+                      onClick={() => toggleStatus(category)}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                         category.status === 'active'
                           ? 'bg-green-50 text-green-700 hover:bg-green-100'
@@ -86,10 +87,10 @@ export const CategoryMaster = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this category?')) {
-                            deleteCategory(category.id);
-                            toast.success('Category deleted');
+                        onClick={async () => {
+                          if (confirm('Deactivate this category?')) {
+                            await deleteCategory(category.id);
+                            toast.success('Category deactivated');
                           }
                         }}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -102,6 +103,7 @@ export const CategoryMaster = () => {
               ))}
             </tbody>
           </table>
+          {loading && <LoadingState label="Loading categories..." />}
         </div>
       </div>
 

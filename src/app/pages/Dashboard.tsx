@@ -1,12 +1,41 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
 import { Plus, FileText, Clock, Calendar } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { dashboardService } from '../../services/dashboardService';
+import { EmptyState, LoadingState } from '../components/common/AsyncState';
+import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { quotations } = useData();
+  const { quotations, loading: dataLoading } = useData();
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [summary, setSummary] = useState({ total_quotations: 0, pending_for_approval: 0 });
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo = new Date(today);
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+    const format = (date: Date) => date.toISOString().slice(0, 10);
+    if (dateFilter === 'today') return { from_date: format(today), to_date: format(now) };
+    if (dateFilter === 'week') return { from_date: format(weekAgo), to_date: format(now) };
+    if (dateFilter === 'month') return { from_date: format(monthAgo), to_date: format(now) };
+    return {};
+  }, [dateFilter]);
+
+  useEffect(() => {
+    setSummaryLoading(true);
+    dashboardService
+      .quotationSummary(dateRange)
+      .then(setSummary)
+      .catch(() => setSummary({ total_quotations: 0, pending_for_approval: 0 }))
+      .finally(() => setSummaryLoading(false));
+  }, [dateRange]);
 
   const filterQuotations = () => {
     const now = new Date();
@@ -32,7 +61,7 @@ export const Dashboard = () => {
   };
 
   const filteredQuotations = filterQuotations();
-  const pendingApproval = quotations.filter(q => q.status === 'pending').length;
+  const isLoading = dataLoading || summaryLoading;
 
   return (
     <div className="p-8">
@@ -78,13 +107,13 @@ export const Dashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Total Quotations */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-gray-600 text-sm font-medium">Total Quotations</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{filteredQuotations.length}</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.total_quotations}</p>
                 <p className="text-sm text-gray-500 mt-2">
                   {dateFilter === 'all' ? 'All time' : `Last ${dateFilter === 'today' ? 'day' : dateFilter}`}
                 </p>
@@ -100,7 +129,7 @@ export const Dashboard = () => {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-gray-600 text-sm font-medium">Pending for Approval</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{pendingApproval}</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.pending_for_approval}</p>
                 <p className="text-sm text-gray-500 mt-2">Awaiting review</p>
               </div>
               <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center">
@@ -111,7 +140,15 @@ export const Dashboard = () => {
         </div>
 
         {/* Recent Quotations */}
-        {filteredQuotations.length > 0 && (
+        {isLoading && <LoadingState label="Loading dashboard..." />}
+
+        {!isLoading && filteredQuotations.length === 0 && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+            <EmptyState label="No quotations found for this period." />
+          </div>
+        )}
+
+        {!isLoading && filteredQuotations.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Quotations</h3>
             <div className="space-y-3">
@@ -135,13 +172,8 @@ export const Dashboard = () => {
                       <p className="font-semibold text-gray-900">₹{quotation.grandTotal.toLocaleString('en-IN')}</p>
                       <p className="text-sm text-gray-500">{new Date(quotation.date).toLocaleDateString('en-IN')}</p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      quotation.status === 'approved' ? 'bg-green-50 text-green-700' :
-                      quotation.status === 'pending' ? 'bg-amber-50 text-amber-700' :
-                      quotation.status === 'rejected' ? 'bg-red-50 text-red-700' :
-                      'bg-gray-50 text-gray-700'
-                    }`}>
-                      {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${quotationStatusClass(quotation.status)}`}>
+                      {quotationStatusLabel(quotation.status)}
                     </span>
                   </div>
                 </div>

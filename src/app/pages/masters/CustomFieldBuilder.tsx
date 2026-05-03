@@ -1,27 +1,32 @@
 import { useData } from '../../context/DataContext';
-import { Plus, Edit, Trash2, Type } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { LoadingState } from '../../components/common/AsyncState';
 
 export const CustomFieldBuilder = () => {
-  const { customFields, addCustomField, updateCustomField, deleteCustomField } = useData();
+  const { customFields, addCustomField, updateCustomField, deleteCustomField, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    type: 'text' as 'text' | 'number' | 'date' | 'select',
+    type: 'text' as 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'date' | 'select' | 'checkbox',
     options: [] as string[],
     required: false,
   });
   const [optionInput, setOptionInput] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.type === 'select' && formData.options.length === 0) {
+      toast.error('Add at least one dropdown option');
+      return;
+    }
     if (editingId) {
-      updateCustomField(editingId, formData);
+      await updateCustomField(editingId, formData);
       toast.success('Custom field updated successfully');
     } else {
-      addCustomField(formData);
+      await addCustomField(formData);
       toast.success('Custom field added successfully');
     }
     setShowModal(false);
@@ -111,9 +116,9 @@ export const CustomFieldBuilder = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (confirm('Are you sure you want to delete this custom field?')) {
-                            deleteCustomField(field.id);
+                            await deleteCustomField(field.id);
                             toast.success('Custom field deleted');
                           }
                         }}
@@ -134,6 +139,7 @@ export const CustomFieldBuilder = () => {
               )}
             </tbody>
           </table>
+          {loading && <LoadingState label="Loading custom fields..." />}
         </div>
       </div>
 
@@ -164,9 +170,13 @@ export const CustomFieldBuilder = () => {
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="text">Text</option>
+                  <option value="textarea">Textarea</option>
                   <option value="number">Number</option>
+                  <option value="email">Email</option>
+                  <option value="phone">Phone</option>
                   <option value="date">Date</option>
                   <option value="select">Dropdown (Select)</option>
+                  <option value="checkbox">Checkbox</option>
                 </select>
               </div>
 
@@ -178,7 +188,7 @@ export const CustomFieldBuilder = () => {
                       type="text"
                       value={optionInput}
                       onChange={(e) => setOptionInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())}
                       className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter option"
                     />

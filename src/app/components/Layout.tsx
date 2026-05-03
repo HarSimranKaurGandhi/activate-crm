@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { LayoutDashboard, FileText, Users, Package, Database, BarChart3, Settings, LogOut, Menu } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Package, Database, BarChart3, Settings, LogOut } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -24,7 +25,7 @@ const navigation = [
 
 export const Layout = () => {
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, logout } = useAuth();
   const [mastersOpen, setMastersOpen] = useState(true);
 
   const isActive = (href: string) => {
@@ -110,7 +111,10 @@ export const Layout = () => {
         </nav>
 
         <div className="p-3 border-t border-gray-200">
-          <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-xl transition-all">
+          <button
+            onClick={() => logout()}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-xl transition-all"
+          >
             <LogOut className="w-5 h-5" />
             <span>Logout</span>
           </button>
@@ -127,11 +131,11 @@ export const Layout = () => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">SA</span>
+                <span className="text-white text-sm font-medium">{String(user?.name || 'U').slice(0, 2).toUpperCase()}</span>
               </div>
               <div className="text-sm">
-                <div className="font-medium text-gray-900">Sales Admin</div>
-                <div className="text-gray-500">admin@fitequip.com</div>
+                <div className="font-medium text-gray-900">{user?.name || 'User'}</div>
+                <div className="text-gray-500">{user?.email || ''}</div>
               </div>
             </div>
           </div>

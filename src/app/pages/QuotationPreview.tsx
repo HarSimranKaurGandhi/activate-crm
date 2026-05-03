@@ -1,14 +1,40 @@
 import { useNavigate, useParams } from 'react-router';
 import { useData } from '../context/DataContext';
-import { ArrowLeft, Download, Edit, Check, X } from 'lucide-react';
+import { ArrowLeft, Download, Edit, Check, X, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { useEffect, useState } from 'react';
+import { quotationService } from '../../services/quotationService';
+import { mapQuotation } from '../../services/mappers';
+import { useAuth } from '../auth/AuthContext';
+import { LoadingState } from '../components/common/AsyncState';
+import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
 
 export const QuotationPreview = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { quotations, updateQuotation, settings, adjustments: masterAdjustments, terms: masterTerms } = useData();
+  const { quotations, submitQuotationForApproval, approveQuotation, rejectQuotation, settings, adjustments: masterAdjustments, terms: masterTerms } = useData();
+  const { user } = useAuth();
+  const [previewQuotation, setPreviewQuotation] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState(Boolean(id));
 
-  const quotation = quotations.find(q => q.id === id);
+  useEffect(() => {
+    if (!id) return;
+
+    setPreviewLoading(true);
+    quotationService.preview(id).then((preview) => {
+      setPreviewQuotation(mapQuotation(preview.quotation));
+    }).catch(() => undefined).finally(() => setPreviewLoading(false));
+  }, [id]);
+
+  const quotation = previewQuotation || quotations.find(q => q.id === id);
+
+  if (previewLoading && !quotation) {
+    return (
+      <div className="p-8">
+        <LoadingState label="Loading quotation preview..." />
+      </div>
+    );
+  }
 
   if (!quotation) {
     return (
@@ -26,9 +52,27 @@ export const QuotationPreview = () => {
     );
   }
 
-  const handleStatusChange = (status: 'approved' | 'rejected') => {
-    updateQuotation(quotation.id, { status });
-    toast.success(`Quotation ${status}`);
+  const canApprove = ['admin', 'operations'].includes(user?.role?.name);
+
+  const handleSubmitForApproval = async () => {
+    await submitQuotationForApproval(quotation.id);
+    setPreviewQuotation({ ...quotation, status: 'pending' });
+    toast.success('Quotation submitted for approval');
+  };
+
+  const handleApproval = async (status: 'approved' | 'rejected') => {
+    if (status === 'approved') {
+      await approveQuotation(quotation.id);
+      setPreviewQuotation({ ...quotation, status: 'approved' });
+      toast.success('Quotation approved');
+      return;
+    }
+
+    const remarks = prompt('Reject reason');
+    if (!remarks) return;
+    await rejectQuotation(quotation.id, remarks);
+    setPreviewQuotation({ ...quotation, status: 'rejected' });
+    toast.success('Quotation rejected');
   };
 
   const handlePrint = () => {
@@ -53,17 +97,26 @@ export const QuotationPreview = () => {
             Back to Quotations
           </button>
           <div className="flex items-center gap-3">
-            {quotation.status === 'pending' && (
+            {quotation.status === 'draft' && (
+              <button
+                onClick={handleSubmitForApproval}
+                className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+              >
+                <Send className="w-5 h-5" />
+                Submit for Approval
+              </button>
+            )}
+            {quotation.status === 'pending' && canApprove && (
               <>
                 <button
-                  onClick={() => handleStatusChange('approved')}
+                  onClick={() => handleApproval('approved')}
                   className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
                   <Check className="w-5 h-5" />
                   Approve
                 </button>
                 <button
-                  onClick={() => handleStatusChange('rejected')}
+                  onClick={() => handleApproval('rejected')}
                   className="flex items-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700"
                 >
                   <X className="w-5 h-5" />
@@ -118,7 +171,7 @@ export const QuotationPreview = () => {
             </div>
 
             {/* Quotation Details */}
-            <div className="grid grid-cols-2 gap-8 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
               <div>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Bill To</h3>
                 <div className="text-gray-900">
@@ -152,13 +205,8 @@ export const QuotationPreview = () => {
                     </div>
                     <div className="flex justify-between gap-8">
                       <span className="text-gray-600 font-medium">Status:</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        quotation.status === 'approved' ? 'bg-green-100 text-green-700' :
-                        quotation.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                        quotation.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {quotation.status.toUpperCase()}
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${quotationStatusClass(quotation.status)}`}>
+                        {quotationStatusLabel(quotation.status)}
                       </span>
                     </div>
                   </div>
@@ -183,7 +231,7 @@ export const QuotationPreview = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {quotation.items.map((item, index) => {
+                  {quotation.items.map((item: any, index: number) => {
                     const basePrice = item.price * item.quantity;
                     const discountAmount = basePrice * (item.discount / 100);
                     const afterDiscount = basePrice - discountAmount;
@@ -230,7 +278,7 @@ export const QuotationPreview = () => {
                   </div>
 
                   {/* Show adjustments */}
-                  {Object.entries(quotation.adjustments).map(([adjId, adj]) => {
+                  {Object.entries(quotation.adjustments).map(([adjId, adj]: [string, any]) => {
                     if (!adj.enabled) return null;
                     const adjustment = masterAdjustments.find(a => a.id === adjId);
                     if (!adjustment) return null;
@@ -253,7 +301,7 @@ export const QuotationPreview = () => {
                         <div className="flex justify-between text-gray-700">
                           <span>Total (Before Tax):</span>
                           <span className="font-semibold">
-                            ₹{(quotation.subtotal + Object.entries(quotation.adjustments).reduce((sum, [adjId, adj]) => {
+                            ₹{(quotation.subtotal + Object.entries(quotation.adjustments).reduce((sum, [adjId, adj]: [string, any]) => {
                               if (!adj.enabled) return sum;
                               const adjustment = masterAdjustments.find(a => a.id === adjId);
                               if (!adjustment) return sum;
@@ -286,7 +334,7 @@ export const QuotationPreview = () => {
               <div className="mb-8">
                 <h3 className="font-bold text-gray-900 mb-3">Terms & Conditions:</h3>
                 <div className="space-y-2">
-                  {quotation.terms.map((termId, index) => (
+                  {quotation.terms.map((termId: string, index: number) => (
                     <div key={termId} className="flex gap-2">
                       <span className="text-gray-600">{index + 1}.</span>
                       <span className="text-gray-700">{getTermContent(termId)}</span>
@@ -299,7 +347,7 @@ export const QuotationPreview = () => {
             {/* Bank Details */}
             <div className="bg-blue-50 rounded-xl p-6 mb-8">
               <h3 className="font-bold text-gray-900 mb-3">Bank Details:</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-gray-600">Bank Name:</p>
                   <p className="font-semibold text-gray-900">{settings.bankDetails.bankName}</p>
