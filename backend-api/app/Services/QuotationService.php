@@ -242,9 +242,9 @@ class QuotationService extends CrudService
     {
         $setting = QuotationNumberSetting::query()->firstOrNew(['id' => 1]);
         $columns = Schema::getColumnListing('quotation_number_settings');
-        $prefix = in_array('quotation_prefix', $columns, true) ? ($setting->quotation_prefix ?: 'QT-') : 'QT-';
-        $padding = in_array('padding', $columns, true) ? ((int) ($setting->padding ?: 5)) : 5;
-        $next = in_array('next_number', $columns, true) ? max((int) ($setting->next_number ?: 1), 1) : 1;
+        $prefix = in_array('prefix', $columns, true) ? ($setting->prefix ?: 'QT-') : 'QT-';
+        $padding = 5;
+        $next = in_array('current_sequence', $columns, true) ? max((int) ($setting->current_sequence ?: 1), 1) : 1;
 
         while (Quotation::query()->where('quotation_number', $prefix.str_pad((string) $next, $padding, '0', STR_PAD_LEFT))->exists()) {
             $next++;
@@ -252,16 +252,12 @@ class QuotationService extends CrudService
 
         $attributes = [];
 
-        if (in_array('quotation_prefix', $columns, true)) {
-            $attributes['quotation_prefix'] = $prefix;
+        if (in_array('prefix', $columns, true)) {
+            $attributes['prefix'] = $prefix;
         }
 
-        if (in_array('padding', $columns, true)) {
-            $attributes['padding'] = $padding;
-        }
-
-        if (in_array('next_number', $columns, true)) {
-            $attributes['next_number'] = $next + 1;
+        if (in_array('current_sequence', $columns, true)) {
+            $attributes['current_sequence'] = $next + 1;
         }
 
         if ($attributes !== []) {

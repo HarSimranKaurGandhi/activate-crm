@@ -9,12 +9,12 @@ class CompanyBankDetail extends Model
     protected $table = 'company_bank_details';
 
     protected $fillable = [
-        'bank_name', 'account_name', 'account_number', 'ifsc_code', 'branch',
-        'is_default', 'is_active',
+        'company_setting_id', 'bank_name', 'account_name', 'account_number', 'ifsc_code', 'branch_name',
+        'upi_id', 'is_default',
     ];
 
     protected function casts(): array
     {
-        return ['is_default' => 'boolean', 'is_active' => 'boolean'];
+        return ['is_default' => 'boolean'];
     }
 }

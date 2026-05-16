@@ -16,8 +16,8 @@ class QuotationNumberingRequest extends FormRequest
         return [
             'quotation_prefix' => ['required', 'string', 'max:50', 'regex:/^[A-Z0-9\/\-_]+$/'],
             'next_number' => ['required', 'integer', 'min:1'],
-            'padding' => ['required', 'integer', 'min:1', 'max:10'],
-            'default_validity_days' => ['required', 'integer', 'min:1', 'max:365'],
+            'padding' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'default_validity_days' => ['nullable', 'integer', 'min:1', 'max:365'],
         ];
     }
 }

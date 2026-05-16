@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router';
 import { LayoutDashboard, FileText, Users, Package, Database, BarChart3, Settings, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { BrandLogo } from './BrandLogo';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -39,12 +40,7 @@ export const Layout = () => {
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
         <div className="h-16 flex items-center px-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">FE</span>
-            </div>
-            <span className="font-semibold text-gray-900">FitEquip</span>
-          </div>
+          <BrandLogo imageClassName="h-8" textClassName="text-sm tracking-[0.22em]" />
         </div>
 
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
@@ -126,9 +122,13 @@ export const Layout = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-          <h1 className="text-xl font-semibold text-gray-900">
-            {navigation.find(n => isActive(n.href || ''))?.name || 'Masters'}
-          </h1>
+          <div className="flex items-center gap-5">
+            <BrandLogo imageClassName="h-10" textClassName="text-base tracking-[0.22em]" />
+            <div className="h-10 w-px bg-gray-200" />
+            <h1 className="text-xl font-semibold text-gray-900">
+              {navigation.find(n => isActive(n.href || ''))?.name || 'Masters'}
+            </h1>
+          </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center">

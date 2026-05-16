@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class QuotationItemResource extends JsonResource
 {
@@ -16,7 +17,9 @@ class QuotationItemResource extends JsonResource
             'product_name' => $this->product_name,
             'model_number' => $this->model_number,
             'specifications' => $this->specifications,
-            'product_image_path' => $this->product_image_path,
+            'product_image_path' => $this->product_image_path
+                ? $request->getSchemeAndHttpHost().Storage::url($this->product_image_path)
+                : null,
             'unit' => $this->unit,
             'quantity' => $this->quantity,
             'mrp' => $this->mrp,

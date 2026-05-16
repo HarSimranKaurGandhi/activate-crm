@@ -317,10 +317,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async updateSettings(nextSettings) {
       const companyPayload = new FormData();
       companyPayload.append('company_name', nextSettings.name);
-      companyPayload.append('address', nextSettings.address || '');
+      companyPayload.append('address_line_1', nextSettings.address || '');
       companyPayload.append('phone', nextSettings.phone || '');
       companyPayload.append('email', nextSettings.email || '');
       companyPayload.append('gst_number', nextSettings.gstNumber || '');
+      companyPayload.append('quotation_prefix', nextSettings.quotationPrefix || 'QT-');
+      companyPayload.append('default_validity_days', String(nextSettings.defaultValidityDays || 30));
       companyPayload.append('default_salesperson_name', nextSettings.defaultSalespersonName || '');
       companyPayload.append('default_salesperson_phone', nextSettings.defaultSalespersonPhone || '');
       companyPayload.append('default_salesperson_email', nextSettings.defaultSalespersonEmail || '');
@@ -338,16 +340,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         account_name: nextSettings.bankDetails.accountName || nextSettings.name,
         account_number: nextSettings.bankDetails.accountNumber,
         ifsc_code: nextSettings.bankDetails.ifsc || null,
-        branch: nextSettings.bankDetails.branch || null,
+        branch_name: nextSettings.bankDetails.branch || null,
         is_default: true,
-        is_active: true,
       };
 
       const numberingPayload = {
         quotation_prefix: nextSettings.quotationPrefix,
         next_number: nextSettings.nextNumber || 1,
-        padding: nextSettings.padding || 5,
-        default_validity_days: nextSettings.defaultValidityDays || 30,
       };
 
       await settingsService.updateCompany(companyPayload);

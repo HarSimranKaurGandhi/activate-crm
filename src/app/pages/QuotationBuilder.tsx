@@ -10,7 +10,7 @@ import { LoadingState } from '../components/common/AsyncState';
 
 const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
-const getSellingPrice = (product: any) => Number(product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
+const getQuotationBasePrice = (product: any) => Number(product?.mrp ?? product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
 
 const calculateItemAmounts = (item: QuotationItem, gstInclusive: boolean) => {
   const basePrice = item.price * item.quantity;
@@ -81,7 +81,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
           value={item.price}
           onChange={(e) => {
             const newPrice = parseFloat(e.target.value) || 0;
-            const basePrice = getSellingPrice(item.product);
+            const basePrice = getQuotationBasePrice(item.product);
             const newDiscount = ((basePrice - newPrice) / basePrice) * 100;
             onUpdate(item.id, { price: newPrice, discount: Math.max(0, newDiscount) });
           }}
@@ -101,7 +101,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
             value={item.discount.toFixed(2)}
             onChange={(e) => {
               const newDiscount = parseFloat(e.target.value) || 0;
-              const basePrice = getSellingPrice(item.product);
+              const basePrice = getQuotationBasePrice(item.product);
               const newPrice = basePrice * (1 - newDiscount / 100);
               onUpdate(item.id, { discount: newDiscount, price: newPrice });
             }}
@@ -145,6 +145,7 @@ export const QuotationBuilder = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
   const [selectableProducts, setSelectableProducts] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -195,7 +196,7 @@ export const QuotationBuilder = () => {
       setItems(items.map(item => ({
         ...item,
         discount: globalDiscount,
-        price: getSellingPrice(item.product) * (1 - globalDiscount / 100),
+        price: getQuotationBasePrice(item.product) * (1 - globalDiscount / 100),
       })));
     }
   }, [globalDiscount]);
@@ -212,7 +213,7 @@ export const QuotationBuilder = () => {
       id: Date.now().toString(),
       product,
       quantity: 1,
-      price: getSellingPrice(product),
+      price: getQuotationBasePrice(product),
       discount: 0,
       specifications: product.specifications,
     };
@@ -278,6 +279,19 @@ export const QuotationBuilder = () => {
       customer.company.toLowerCase().includes(search) ||
       customer.phone.toLowerCase().includes(search) ||
       customer.email.toLowerCase().includes(search)
+    );
+  });
+  const filteredProducts = (selectableProducts.length ? selectableProducts : products.filter((product) => product.status === 'active')).filter((product) => {
+    const search = productSearch.trim().toLowerCase();
+
+    if (!search) {
+      return true;
+    }
+
+    return (
+      product.name.toLowerCase().includes(search) ||
+      product.modelNumber.toLowerCase().includes(search) ||
+      product.brand.toLowerCase().includes(search)
     );
   });
 
@@ -437,7 +451,7 @@ export const QuotationBuilder = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Image</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Qty</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Selling Price</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">MRP</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST%</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST Amt</th>
                     {showDiscount && (
@@ -611,31 +625,53 @@ export const QuotationBuilder = () => {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-gray-900">Select Product</h3>
               <button
-                onClick={() => setShowProductModal(false)}
+                onClick={() => {
+                  setProductSearch('');
+                  setShowProductModal(false);
+                }}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 ✕
               </button>
             </div>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search by product name, model number, or brand"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(selectableProducts.length ? selectableProducts : products.filter(p => p.status === 'active')).map(product => (
+              {filteredProducts.map(product => (
                 <div
                   key={product.id}
-                  onClick={() => addProduct(product)}
+                  onClick={() => {
+                    addProduct(product);
+                    setProductSearch('');
+                  }}
                   className="flex gap-4 p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
                 >
                   <img src={product.image} alt="" className="w-20 h-20 object-cover rounded-lg" />
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{product.name}</p>
                     <p className="text-sm text-gray-500">{product.modelNumber}</p>
+                    <p className="text-sm text-gray-500">{product.brand || 'No brand'}</p>
                     <div className="flex items-center gap-4 mt-2">
                       <span className="text-sm text-gray-500">MRP: ₹{product.mrp.toLocaleString('en-IN')}</span>
-                      <span className="text-sm font-semibold text-blue-600">₹{getSellingPrice(product).toLocaleString('en-IN')}</span>
+                      <span className="text-sm font-semibold text-blue-600">₹{getQuotationBasePrice(product).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
+            {filteredProducts.length === 0 && (
+              <div className="py-8 text-center text-sm text-gray-500">
+                No products matched your search.
+              </div>
+            )}
           </div>
         </div>
       )}

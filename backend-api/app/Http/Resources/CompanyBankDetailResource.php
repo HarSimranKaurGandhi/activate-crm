@@ -11,13 +11,15 @@ class CompanyBankDetailResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'company_setting_id' => $this->company_setting_id,
             'bank_name' => $this->bank_name,
             'account_name' => $this->account_name,
             'account_number' => $this->account_number,
             'ifsc_code' => $this->ifsc_code,
-            'branch' => $this->branch,
+            'branch_name' => $this->branch_name,
+            'branch' => $this->branch_name,
+            'upi_id' => $this->upi_id,
             'is_default' => (bool) $this->is_default,
-            'is_active' => (bool) $this->is_active,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

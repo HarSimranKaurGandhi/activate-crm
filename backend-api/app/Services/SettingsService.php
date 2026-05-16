@@ -23,6 +23,7 @@ class SettingsService
     {
         $settings = CompanySetting::query()->firstOrNew(['id' => 1]);
         $data = $this->storeCompanyAssets($data, $settings);
+        $data = $this->normalizeCompanyData($data);
         $data = $this->filterCompanyColumns($data);
         $settings->fill($data)->save();
 
@@ -87,7 +88,11 @@ class SettingsService
     public function createBankDetail(array $data): CompanyBankDetail
     {
         return DB::transaction(function () use ($data): CompanyBankDetail {
+            $data = $this->normalizeBankData($data);
             $data = $this->filterBankColumns($data);
+            if (array_key_exists('company_setting_id', $data) === false && in_array('company_setting_id', Schema::getColumnListing('company_bank_details'), true)) {
+                $data['company_setting_id'] = CompanySetting::query()->firstOrNew(['id' => 1])->id ?: 1;
+            }
             $data['is_active'] = $data['is_active'] ?? true;
             $makeDefault = (bool) ($data['is_default'] ?? false);
             $data['is_default'] = false;
@@ -105,6 +110,7 @@ class SettingsService
     public function updateBankDetail(CompanyBankDetail $bank, array $data): CompanyBankDetail
     {
         return DB::transaction(function () use ($bank, $data): CompanyBankDetail {
+            $data = $this->normalizeBankData($data);
             $data = $this->filterBankColumns($data);
             $makeDefault = array_key_exists('is_default', $data) && (bool) $data['is_default'];
             unset($data['is_default']);
@@ -154,7 +160,7 @@ class SettingsService
     public function updateQuotationNumbering(array $data): QuotationNumberSetting
     {
         $settings = QuotationNumberSetting::query()->firstOrNew(['id' => 1]);
-        $filtered = $this->filterQuotationNumberingColumns($data);
+        $filtered = $this->filterQuotationNumberingColumns($this->normalizeQuotationNumberingData($data));
 
         if ($filtered !== []) {
             $settings->fill($filtered)->save();
@@ -175,5 +181,46 @@ class SettingsService
         $allowed = Schema::getColumnListing('quotation_number_settings');
 
         return Arr::only($data, $allowed);
+    }
+
+    private function normalizeCompanyData(array $data): array
+    {
+        if (!array_key_exists('address_line_1', $data) && array_key_exists('address', $data)) {
+            $data['address_line_1'] = $data['address'];
+        }
+
+        if (!array_key_exists('default_validity_days', $data) && array_key_exists('validity_days', $data)) {
+            $data['default_validity_days'] = $data['validity_days'];
+        }
+
+        unset($data['address'], $data['validity_days']);
+
+        return $data;
+    }
+
+    private function normalizeBankData(array $data): array
+    {
+        if (!array_key_exists('branch_name', $data) && array_key_exists('branch', $data)) {
+            $data['branch_name'] = $data['branch'];
+        }
+
+        unset($data['branch']);
+
+        return $data;
+    }
+
+    private function normalizeQuotationNumberingData(array $data): array
+    {
+        if (!array_key_exists('prefix', $data) && array_key_exists('quotation_prefix', $data)) {
+            $data['prefix'] = $data['quotation_prefix'];
+        }
+
+        if (!array_key_exists('current_sequence', $data) && array_key_exists('next_number', $data)) {
+            $data['current_sequence'] = $data['next_number'];
+        }
+
+        unset($data['quotation_prefix'], $data['next_number'], $data['padding'], $data['default_validity_days']);
+
+        return $data;
     }
 }

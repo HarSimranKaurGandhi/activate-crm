@@ -8,9 +8,9 @@ class QuotationCalculator
 {
     public function buildItemSnapshot(array $item, array $defaults): array
     {
-        $product = Product::findOrFail($item['product_id']);
+        $product = Product::query()->with('images')->findOrFail($item['product_id']);
         $quantity = (float) ($item['quantity'] ?? 1);
-        $basePrice = (float) ($product->usual_selling_price ?? $product->mrp);
+        $basePrice = (float) ($product->mrp ?? $product->usual_selling_price);
         $editedPrice = (float) ($item['edited_price'] ?? $basePrice);
         $discountPercent = (float) ($item['discount_percent'] ?? $defaults['default_discount_percent'] ?? 0);
         $discountAmount = (float) ($item['discount_amount'] ?? $defaults['default_discount_amount'] ?? 0);
@@ -35,17 +35,21 @@ class QuotationCalculator
             $tax = round(($taxable * $gstPercent) / 100, 2);
         }
 
+        $primaryImagePath = $product->images->firstWhere('is_primary', true)?->image_path
+            ?? $product->images->first()?->image_path
+            ?? $product->image_path;
+
         return [
             'product_id' => $product->id,
             'sort_order' => (int) ($item['sort_order'] ?? 0),
             'product_name' => $product->product_name,
             'model_number' => $product->model_number,
             'specifications' => $product->specifications,
-            'product_image_path' => $product->image_path,
+            'product_image_path' => $primaryImagePath,
             'unit' => $product->unit ?? 'nos',
             'quantity' => $quantity,
             'mrp' => $product->mrp,
-            'base_price' => $product->usual_selling_price ?? $product->mrp,
+            'base_price' => $product->mrp ?? $product->usual_selling_price,
             'edited_price' => $editedPrice,
             'gst_percent' => $gstPercent,
             'discount_percent' => $discountPercent,
