@@ -23,6 +23,8 @@ class QuotationService extends CrudService
 
     protected array $relations = ['customer', 'items.discountOverrides', 'adjustments', 'terms'];
 
+    private ?array $discountOverrideColumns = null;
+
     public function __construct(private QuotationCalculator $calculator)
     {
     }
@@ -193,12 +195,23 @@ class QuotationService extends CrudService
             return;
         }
 
-        $quotationItem->discountOverrides()->create([
+        $overrideData = Arr::only([
             'discount_percent' => $snapshot['discount_percent'],
             'discount_amount' => $snapshot['discount_amount'],
             'reason' => $hasEditedPrice ? 'Edited price / discount captured during quotation save.' : 'Discount captured during quotation save.',
             'created_by' => $quotation->created_by,
-        ]);
+        ], $this->getDiscountOverrideColumns());
+
+        if ($overrideData === []) {
+            return;
+        }
+
+        $quotationItem->discountOverrides()->create($overrideData);
+    }
+
+    private function getDiscountOverrideColumns(): array
+    {
+        return $this->discountOverrideColumns ??= Schema::getColumnListing('quotation_item_discount_overrides');
     }
 
     private function buildAdjustmentSnapshot(array $input, float $subtotalAfterDiscount): array

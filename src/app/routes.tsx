@@ -5,6 +5,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { QuotationList } from "./pages/QuotationList";
 import { QuotationBuilder } from "./pages/QuotationBuilder";
 import { QuotationPreview } from "./pages/QuotationPreview";
+import { QuotationApprovals } from "./pages/QuotationApprovals";
 import { CustomerList } from "./pages/CustomerList";
 import { CustomerForm } from "./pages/CustomerForm";
 import { ProductList } from "./pages/ProductList";
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
           { path: "quotations/new", Component: QuotationBuilder },
           { path: "quotations/:id/edit", Component: QuotationBuilder },
           { path: "quotations/:id/preview", Component: QuotationPreview },
+          { path: "quotations/approvals", Component: QuotationApprovals },
           { path: "customers", Component: CustomerList },
           { path: "customers/new", Component: CustomerForm },
           { path: "customers/:id/edit", Component: CustomerForm },

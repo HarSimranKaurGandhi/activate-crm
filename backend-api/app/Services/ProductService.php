@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Category;
 use App\Models\Brand;
+use App\Models\MeasurementUnit;
 use App\Models\Product;
 use App\Models\ProductImage;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -34,12 +35,14 @@ class ProductService extends CrudService
     public function selectable(Request $request): LengthAwarePaginator
     {
         return Product::query()
+            ->with('brand')
             ->when($request->filled('search'), function (Builder $query) use ($request): void {
                 $search = $request->string('search')->toString();
                 $query->where(function (Builder $builder) use ($search): void {
                     $builder
                         ->where('product_name', 'like', "%{$search}%")
-                        ->orWhere('model_number', 'like', "%{$search}%");
+                        ->orWhere('model_number', 'like', "%{$search}%")
+                        ->orWhereHas('brand', fn (Builder $brandQuery) => $brandQuery->where('name', 'like', "%{$search}%"));
                 });
             })
             ->when($request->filled('category_id'), fn (Builder $q) => $q->where('category_id', $request->integer('category_id')))
@@ -57,6 +60,9 @@ class ProductService extends CrudService
                 'mrp',
                 'usual_selling_price',
                 'gst_percent',
+                'brand_id',
+                'unit',
+                'hsn_code',
             ])
             ->orderBy('product_name')
             ->paginate((int) $request->integer('per_page', 15));
@@ -71,7 +77,7 @@ class ProductService extends CrudService
 
             $data = $this->applyCategoryAttributes($data);
             $data['is_active'] = $data['is_active'] ?? true;
-            $data['unit'] = $data['unit'] ?? '1';
+            $data['unit'] = $this->normalizeMeasurementUnitCode($data['unit'] ?? 'NOS');
 
             $product = Product::create($data);
             $this->syncImages($product, $this->normalizeUploadFiles($imageFiles), $primaryToken);
@@ -88,6 +94,9 @@ class ProductService extends CrudService
             unset($data['product_images'], $data['primary_image_token']);
 
             $data = $this->applyCategoryAttributes($data, $model);
+            if (array_key_exists('unit', $data)) {
+                $data['unit'] = $this->normalizeMeasurementUnitCode($data['unit']);
+            }
             $model->update($data);
             $this->syncImages($model, $this->normalizeUploadFiles($imageFiles), $primaryToken);
 
@@ -177,7 +186,7 @@ class ProductService extends CrudService
                     'model_number' => trim((string) ($payload['model_number'] ?? '')),
                     'category_id' => $category->id,
                     'brand_id' => $brand->id,
-                    'unit' => trim((string) ($payload['unit'] ?? 'Nos')) ?: 'Nos',
+                    'unit' => $this->normalizeMeasurementUnitCode($payload['unit'] ?? 'NOS'),
                     'mrp' => (float) ($payload['mrp'] ?? 0),
                     'usual_selling_price' => (float) ($payload['usual_selling_price'] ?? 0),
                     'least_selling_price' => (float) ($payload['least_selling_price'] ?? 0),
@@ -300,5 +309,22 @@ class ProductService extends CrudService
         }
 
         return null;
+    }
+
+    private function normalizeMeasurementUnitCode(mixed $value): string
+    {
+        $code = strtoupper(trim((string) $value));
+
+        if ($code === '') {
+            $code = 'NOS';
+        }
+
+        if (! MeasurementUnit::query()->where('code', $code)->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages([
+                'unit' => ['The selected measurement unit is invalid.'],
+            ]);
+        }
+
+        return $code;
     }
 }

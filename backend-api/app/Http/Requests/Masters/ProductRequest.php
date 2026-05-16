@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Masters;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class ProductRequest extends FormRequest
 {
@@ -18,7 +19,7 @@ class ProductRequest extends FormRequest
             'model_number' => ['required', 'string', 'max:255'],
             'category_id' => ['required', 'exists:categories,id'],
             'brand_id' => ['required', 'exists:brands,id'],
-            'unit' => ['nullable', 'string', 'max:50'],
+            'unit' => ['required', 'string', 'max:50', Rule::exists('measurement_units', 'code')->where(fn ($query) => $query->where('is_active', true))],
             'mrp' => ['required', 'numeric', 'min:0'],
             'usual_selling_price' => ['required', 'numeric', 'min:0'],
             'least_selling_price' => ['required', 'numeric', 'min:0', 'lte:usual_selling_price'],

@@ -8,7 +8,6 @@ import { mapQuotation } from '../../services/mappers';
 import { useAuth } from '../auth/AuthContext';
 import { LoadingState } from '../components/common/AsyncState';
 import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
-import { useReactToPrint } from 'react-to-print';
 
 export const QuotationPreview = () => {
   const navigate = useNavigate();
@@ -17,7 +16,7 @@ export const QuotationPreview = () => {
     quotations,
     submitQuotationForApproval,
     approveQuotation,
-    rejectQuotation,
+    reviseQuotation,
     settings,
     adjustments: masterAdjustments,
     terms: masterTerms,
@@ -75,7 +74,7 @@ export const QuotationPreview = () => {
     toast.success('Quotation submitted for approval');
   };
 
-  const handleApproval = async (status: 'approved' | 'rejected') => {
+  const handleApproval = async (status: 'approved' | 'revised') => {
     if (status === 'approved') {
       await approveQuotation(quotation.id);
       setPreviewQuotation({ ...quotation, status: 'approved' });
@@ -83,11 +82,11 @@ export const QuotationPreview = () => {
       return;
     }
 
-    const remarks = prompt('Reject reason');
+    const remarks = prompt('What changes should be requested?');
     if (!remarks) return;
-    await rejectQuotation(quotation.id, remarks);
-    setPreviewQuotation({ ...quotation, status: 'rejected' });
-    toast.success('Quotation rejected');
+    await reviseQuotation(quotation.id, remarks);
+    setPreviewQuotation({ ...quotation, status: 'revised' });
+    toast.success('Changes requested');
   };
 
   const handlePrint = () => window.print();
@@ -149,83 +148,36 @@ export const QuotationPreview = () => {
     },
     0,
   );
-  const handleDownloadPdf = useReactToPrint({
-    contentRef: quotationDocumentRef,
-  
-    documentTitle: quotation.number || 'quotation',
-  
-    pageStyle: `
-      @page {
-        size: A4;
-        margin: 8mm;
-      }
-  
-      html, body {
-        background: white !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-  
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-  
-      * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        box-sizing: border-box;
-      }
-  
-      .quotation-print-root {
-        width: 100% !important;
-        overflow: visible !important;
-        box-shadow: none !important;
-        border-radius: 0 !important;
-        transform: scale(1) !important;
-      }
-  
-      img {
-        max-width: 100%;
-        object-fit: contain;
-      }
-  
-      table {
-        page-break-inside: auto;
-      }
-  
-      tr {
-        page-break-inside: avoid;
-        page-break-after: auto;
-      }
-  
-      .print-hidden {
-        display: none !important;
-      }
-    `,
-  
-    onBeforePrint: async () => {
-      toast.loading('Preparing PDF...', {
-        id: 'pdf-download',
-      });
-  
-      // wait for images/fonts
-      await new Promise((resolve) =>
-        setTimeout(resolve, 300)
-      );
-    },
-  
-    onAfterPrint: () => {
+  const handleDownloadPdf = async () => {
+    toast.loading('Preparing PDF...', {
+      id: 'pdf-download',
+    });
+
+    try {
+      const blob = await quotationService.downloadPdf(quotation.id);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${quotation.number || 'quotation'}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+
       toast.success('PDF ready', {
         id: 'pdf-download',
       });
-    },
-  });
+    } catch {
+      toast.error('Unable to generate PDF', {
+        id: 'pdf-download',
+      });
+    }
+  };
   const beforeTaxTotal = quotation.subtotal + totalAdjustments;
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6 print:bg-white print:p-0">
-      <div className="mx-auto max-w-[1180px] space-y-5">
+    <div className="min-h-screen bg-slate-100 p-3 print:bg-white print:p-0">
+      <div className="mx-auto max-w-[1160px] space-y-3">
         {/* Action Bar - Hidden in print */}
         <div className="flex items-center justify-between print:hidden">
           <button
@@ -257,11 +209,11 @@ export const QuotationPreview = () => {
                   Approve
                 </button>
                 <button
-                  onClick={() => handleApproval('rejected')}
-                  className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-white shadow-sm hover:bg-red-700"
+                  onClick={() => handleApproval('revised')}
+                  className="flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-white shadow-sm hover:bg-amber-700"
                 >
                   <X className="h-5 w-5" />
-                  Reject
+                  Request Changes
                 </button>
               </>
             )}
@@ -280,13 +232,6 @@ export const QuotationPreview = () => {
               <Download className="h-5 w-5" />
               Download PDF
             </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              <Download className="h-5 w-5" />
-              Print
-            </button>
           </div>
         </div>
 
@@ -304,7 +249,7 @@ export const QuotationPreview = () => {
           )}
 
           {hasLetterhead && (
-            <div className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white">
+            <div className="bg-gradient-to-b from-slate-50 to-white pb-2">
               {isPdfLetterhead ? (
                 <div className="space-y-3 p-4">
                   <iframe
@@ -387,55 +332,55 @@ export const QuotationPreview = () => {
             </div> */}
 
             {/* Brand Ribbon */}
-            <div className="relative flex items-center justify-between bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-10 py-5 text-white print:px-8 print:py-4">
-              <div className="text-5xl font-black uppercase tracking-[0.28em] text-white print:text-4xl">
+            <div className="relative mx-3 flex items-center justify-between bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-4 py-2 text-white print:mx-0 print:px-6 print:py-3">
+              <div className="text-[2.35rem] font-black uppercase tracking-[0.22em] text-white print:text-[2rem]">
                 Matrix
               </div>
               <div className="absolute left-[62%] top-0 h-full w-px rotate-[28deg] bg-red-600" />
-              <div className="text-2xl font-semibold uppercase tracking-[0.45em] text-white print:text-xl">Quotation</div>
+              <div className="text-xl font-semibold uppercase tracking-[0.35em] text-white print:text-lg">Quotation</div>
             </div>
 
-            <div className="px-10 py-8 print:px-8 print:py-6">
+            <div className="px-5 py-3 print:px-7 print:py-5">
               {/* Customer + Quotation Meta */}
-              <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-[1fr_360px]">
+              <div className="mb-5 grid grid-cols-1 gap-5 md:grid-cols-[1fr_320px]">
                 <div>
                   <div className="border-l-4 border-red-600 pl-4">
                     <p className="text-xs font-black uppercase tracking-[0.25em] text-red-600">To</p>
-                    <p className="mt-2 text-xl font-black text-slate-950">{quotation.customer.company || quotation.customer.name}</p>
+                    <p className="mt-1.5 text-lg font-black text-slate-950">{quotation.customer.company || quotation.customer.name}</p>
                     {quotation.customer.company && <p className="text-sm font-semibold text-slate-700">{quotation.customer.name}</p>}
                     <p className="mt-1 text-sm font-medium text-slate-600">{quotation.customer.address}</p>
-                    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs font-semibold text-slate-500">
+                    <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
                       {quotation.customer.phone && <span>Phone: {quotation.customer.phone}</span>}
                       {quotation.customer.email && <span>Email: {quotation.customer.email}</span>}
                       {quotation.customer.gstNumber && <span>GSTIN: {quotation.customer.gstNumber}</span>}
                     </div>
                   </div>
 
-                  <div className="mt-8 max-w-2xl text-sm leading-6 text-slate-700">
+                  <div className="mt-4 max-w-2xl text-sm leading-5 text-slate-700">
                     <p className="font-bold text-slate-950">Dear Sir,</p>
                     <p>We are indeed thankful to you for showing interest in our products.</p>
                     <p>As per the discussion, please find here our most technically viable offer for your consideration.</p>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 shadow-sm">
-                  <div className="grid grid-cols-[46px_1fr_1fr] items-center border-b border-slate-200 pb-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-red-600 shadow-sm">
-                      <FileText className="h-5 w-5" />
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 shadow-sm">
+                  <div className="grid grid-cols-[38px_1fr_1fr] items-center border-b border-slate-200 pb-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm">
+                      <FileText className="h-4.5 w-4.5" />
                     </div>
                     <p className="text-xs font-black uppercase tracking-wide text-slate-700">Quote No.</p>
                     <p className="text-right text-sm font-black text-slate-950">{quotation.number}</p>
                   </div>
-                  <div className="grid grid-cols-[46px_1fr_1fr] items-center border-b border-slate-200 py-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-red-600 shadow-sm">
-                      <CalendarDays className="h-5 w-5" />
+                  <div className="grid grid-cols-[38px_1fr_1fr] items-center border-b border-slate-200 py-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm">
+                      <CalendarDays className="h-4.5 w-4.5" />
                     </div>
                     <p className="text-xs font-black uppercase tracking-wide text-slate-700">Date</p>
                     <p className="text-right text-sm font-black text-slate-950">{formatDate(quotation.date)}</p>
                   </div>
-                  <div className="grid grid-cols-[46px_1fr_1fr] items-center pt-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-red-600 shadow-sm">
-                      <BadgeIndianRupee className="h-5 w-5" />
+                  <div className="grid grid-cols-[38px_1fr_1fr] items-center pt-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm">
+                      <BadgeIndianRupee className="h-4.5 w-4.5" />
                     </div>
                     <p className="text-xs font-black uppercase tracking-wide text-slate-700">Status</p>
                     <div className="text-right">
@@ -448,18 +393,18 @@ export const QuotationPreview = () => {
               </div>
 
               {/* Product Table */}
-              <div className="mb-8 overflow-hidden rounded-2xl border border-slate-200">
+              <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200">
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="bg-gradient-to-r from-slate-950 to-slate-900 text-white">
-                      <th className="w-14 px-3 py-3 text-center text-xs font-black uppercase tracking-wide">No.</th>
-                      <th className="w-56 px-4 py-3 text-center text-xs font-black uppercase tracking-wide">Product / Picture</th>
-                      <th className="px-5 py-3 text-left text-xs font-black uppercase tracking-wide">Specifications</th>
-                      <th className="w-28 px-4 py-3 text-right text-xs font-black uppercase tracking-wide">Price</th>
-                      <th className="w-20 px-4 py-3 text-center text-xs font-black uppercase tracking-wide">Qty</th>
-                      {quotation.showDiscount && <th className="w-20 px-4 py-3 text-center text-xs font-black uppercase tracking-wide">Disc%</th>}
-                      <th className="w-28 px-4 py-3 text-right text-xs font-black uppercase tracking-wide">GST</th>
-                      <th className="w-32 px-4 py-3 text-right text-xs font-black uppercase tracking-wide">Net Amount</th>
+                      <th className="w-12 px-3 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">No.</th>
+                      <th className="w-52 px-4 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Product / Picture</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-black uppercase tracking-wide">Specifications</th>
+                      <th className="w-24 px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">Price</th>
+                      <th className="w-16 px-3 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Qty</th>
+                      {quotation.showDiscount && <th className="w-16 px-3 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Disc%</th>}
+                      <th className="w-24 px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">GST</th>
+                      <th className="w-28 px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">Net Amount</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -469,13 +414,13 @@ export const QuotationPreview = () => {
 
                       return (
                         <tr key={item.id} className="border-b border-slate-200 align-middle last:border-b-0">
-                          <td className="border-r border-slate-200 px-3 py-6 text-center font-black text-slate-950">{index + 1}</td>
-                          <td className="border-r border-slate-200 px-4 py-6 text-center">
+                          <td className="border-r border-slate-200 px-3 py-4 text-center font-black text-slate-950">{index + 1}</td>
+                          <td className="border-r border-slate-200 px-4 py-4 text-center">
                             <div className="mx-auto flex max-w-[190px] flex-col items-center">
                               {productImage ? (
-                                <img src={productImage} alt={item.product.name} className="mb-4 h-32 w-full object-contain" />
+                                <img src={productImage} alt={item.product.name} className="mb-3 h-24 w-full object-contain" />
                               ) : (
-                                <div className="mb-4 flex h-32 w-full items-center justify-center rounded-xl bg-slate-100 text-xs font-semibold text-slate-400">
+                                <div className="mb-3 flex h-24 w-full items-center justify-center rounded-xl bg-slate-100 text-xs font-semibold text-slate-400">
                                   Product Image
                                 </div>
                               )}
@@ -485,23 +430,23 @@ export const QuotationPreview = () => {
                               )}
                             </div>
                           </td>
-                          <td className="border-r border-slate-200 px-5 py-6 align-top text-xs leading-5 text-slate-700">
+                          <td className="border-r border-slate-200 px-4 py-4 align-top text-xs leading-5 text-slate-700">
                             <div className="font-medium [&_b]:font-black [&_li]:mb-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-black [&_ul]:list-disc [&_ul]:pl-5 [&_ul_li::marker]:text-red-600">
                               <div dangerouslySetInnerHTML={renderHtml(item.specifications || item.product.description || '')} />
                             </div>
                           </td>
-                          <td className="border-r border-slate-200 px-4 py-6 text-right font-black text-slate-950">{formatMoney(item.price)}</td>
-                          <td className="border-r border-slate-200 px-4 py-6 text-center font-black text-slate-950">{item.quantity}</td>
+                          <td className="border-r border-slate-200 px-4 py-4 text-right font-black text-slate-950">{formatMoney(item.price)}</td>
+                          <td className="border-r border-slate-200 px-4 py-4 text-center font-black text-slate-950">{item.quantity}</td>
                           {quotation.showDiscount && (
-                            <td className="border-r border-slate-200 px-4 py-6 text-center font-bold text-slate-700">
+                            <td className="border-r border-slate-200 px-4 py-4 text-center font-bold text-slate-700">
                               {item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'}
                             </td>
                           )}
-                          <td className="border-r border-slate-200 px-4 py-6 text-right font-bold text-slate-700">
+                          <td className="border-r border-slate-200 px-4 py-4 text-right font-bold text-slate-700">
                             <div>{item.product.gstPercent}%</div>
                             <div className="mt-1 text-xs text-slate-500">{formatMoney(gstAmount)}</div>
                           </td>
-                          <td className="px-4 py-6 text-right text-base font-black text-slate-950">{formatMoney(total)}</td>
+                          <td className="px-4 py-4 text-right text-base font-black text-slate-950">{formatMoney(total)}</td>
                         </tr>
                       );
                     })}
@@ -510,9 +455,9 @@ export const QuotationPreview = () => {
               </div>
 
               {/* Totals */}
-              <div className="mb-8 flex justify-end">
-                <div className="w-full max-w-[390px] overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between border-b border-slate-200 bg-slate-50 px-6 py-3 text-sm font-bold text-slate-700">
+              <div className="mb-5 flex justify-end">
+                <div className="w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-sm font-bold text-slate-700">
                     <span>Sub Total</span>
                     <span>{formatMoney(quotation.subtotal)}</span>
                   </div>
@@ -525,7 +470,7 @@ export const QuotationPreview = () => {
                     const amount = adjustment.type === 'percentage' ? quotation.subtotal * (adj.amount / 100) : adj.amount;
 
                     return (
-                      <div key={adjId} className="flex justify-between border-b border-slate-200 px-6 py-3 text-sm font-bold text-slate-700">
+                      <div key={adjId} className="flex justify-between border-b border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700">
                         <span>{adjustment.name}</span>
                         <span>{formatMoney(amount)}</span>
                       </div>
@@ -534,18 +479,18 @@ export const QuotationPreview = () => {
 
                   {!quotation.gstInclusive && quotation.taxAmount > 0 && (
                     <>
-                      <div className="flex justify-between border-b border-slate-200 px-6 py-3 text-sm font-bold text-slate-700">
+                      <div className="flex justify-between border-b border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700">
                         <span>Total Before Tax</span>
                         <span>{formatMoney(beforeTaxTotal)}</span>
                       </div>
-                      <div className="flex justify-between border-b border-slate-200 px-6 py-3 text-sm font-bold text-slate-700">
+                      <div className="flex justify-between border-b border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700">
                         <span>GST</span>
                         <span>{formatMoney(quotation.taxAmount)}</span>
                       </div>
                     </>
                   )}
 
-                  <div className="flex items-center justify-between bg-red-600 px-6 py-4 text-white">
+                  <div className="flex items-center justify-between bg-red-600 px-5 py-3.5 text-white">
                     <span className="text-sm font-black uppercase tracking-wide">Grand Total</span>
                     <span className="text-2xl font-black">{formatMoney(quotation.grandTotal)}</span>
                   </div>
@@ -553,20 +498,20 @@ export const QuotationPreview = () => {
               </div>
 
               {/* Terms + Company Details */}
-              <div className="mb-8 grid grid-cols-1 gap-7 md:grid-cols-2">
+              <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                 {quotation.terms.length > 0 && (
                   <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="inline-flex -translate-y-px items-center gap-3 rounded-br-xl rounded-tl-2xl bg-slate-950 px-5 py-3 text-white">
+                    <div className="inline-flex -translate-y-px items-center gap-2 rounded-br-xl rounded-tl-2xl bg-slate-950 px-3.5 py-2 text-white">
                       <FileText className="h-4 w-4 text-red-500" />
-                      <h3 className="text-sm font-black uppercase tracking-wide">Terms and Conditions</h3>
+                      <h3 className="text-xs font-black uppercase tracking-wide">Terms and Conditions</h3>
                     </div>
-                    <div className="space-y-3 px-6 pb-6 pt-3 text-sm text-slate-700">
+                    <div className="space-y-1.5 px-3.5 pb-3.5 pt-2 text-xs text-slate-700">
                       {quotation.terms.map((termId: string, index: number) => (
-                        <div key={termId} className="flex gap-3 border-b border-dashed border-slate-200 pb-3 last:border-b-0 last:pb-0">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-red-500 text-[10px] font-black text-red-600">
+                        <div key={termId} className="flex gap-2 border-b border-dashed border-slate-200 pb-1.5 last:border-b-0 last:pb-0">
+                          <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-red-500 text-[9px] font-black text-red-600">
                             {index + 1}
                           </span>
-                          <span className="font-medium leading-5">{getTermContent(termId)}</span>
+                          <span className="font-medium leading-4.5">{getTermContent(termId)}</span>
                         </div>
                       ))}
                     </div>
@@ -574,48 +519,46 @@ export const QuotationPreview = () => {
                 )}
 
                 <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <div className="inline-flex -translate-y-px items-center gap-3 rounded-br-xl rounded-tl-2xl bg-slate-950 px-5 py-3 text-white">
+                  <div className="inline-flex -translate-y-px items-center gap-2 rounded-br-xl rounded-tl-2xl bg-slate-950 px-3.5 py-2 text-white">
                     <Building2 className="h-4 w-4 text-red-500" />
-                    <h3 className="text-sm font-black uppercase tracking-wide">Company Details</h3>
+                    <h3 className="text-xs font-black uppercase tracking-wide">Company Details</h3>
                   </div>
-                  <div className="grid gap-2 px-6 pb-6 pt-3 text-sm">
+                  <div className="grid gap-1 px-3.5 pb-3.5 pt-2 text-sm">
                     <DetailRow label="Company Name" value={settings.name} />
                     <DetailRow label="Account No." value={settings.bankDetails.accountNumber} />
                     <DetailRow label="IFSC Code" value={settings.bankDetails.ifsc} />
                     <DetailRow label="Branch" value={settings.bankDetails.branch} />
                     <DetailRow label="Bank Name" value={settings.bankDetails.bankName} />
-                    <DetailRow label="Email" value={settings.email} />
-                    <DetailRow label="Mobile" value={settings.phone} />
-                    <DetailRow label="GST" value={settings.gstNumber} />
                   </div>
                 </section>
               </div>
 
               {/* Footer */}
-              <div className="border-t border-slate-200 pt-6">
-                <div className="grid grid-cols-1 items-end gap-8 md:grid-cols-[1fr_320px]">
-                  <div className="flex items-center gap-5">
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-700">
+              <div className="border-t border-slate-200 pt-3.5">
+                <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-[1fr_300px]">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-700">
                       <UserRound className="h-10 w-10" />
                     </div>
                     <div>
-                      <p className="max-w-xl text-sm leading-6 text-slate-700">
+                      <p className="max-w-xl text-sm leading-5 text-slate-700">
                         Thank you again for showing your interest with us. Looking forward for a healthy and long term relationship with you.
                         <br />
                         Assuring you the best quality and services all the times.
                       </p>
-                      <p className="mt-3 text-base font-black uppercase text-slate-950">{quotation.salesperson.name}</p>
-                      <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm font-medium text-slate-600">
-                        {quotation.salesperson.phone && <span>Phone: {quotation.salesperson.phone}</span>}
-                        {quotation.salesperson.email && <span>Email: {quotation.salesperson.email}</span>}
-                      </div>
+                      
                     </div>
                   </div>
 
                   <div className="text-center">
-                    <div className="mx-auto mt-14 w-64 border-t-2 border-slate-950 pt-3">
+                  <p className="mt-3 text-base font-black uppercase text-slate-950">{quotation.salesperson.name}</p>
+                      <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm font-medium text-slate-600">
+                        {quotation.salesperson.phone && <span>Phone: {quotation.salesperson.phone}</span>}
+                        {quotation.salesperson.email && <span>Email: {quotation.salesperson.email}</span>}
+                      </div>
+                    {/* <div className="mx-auto mt-14 w-64 border-t-2 border-slate-950 pt-3">
                       <p className="text-sm font-black uppercase tracking-wide text-slate-950">Authorized Signature</p>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </div>

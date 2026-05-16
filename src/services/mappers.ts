@@ -80,7 +80,7 @@ export const mapProduct = (product: any) => ({
   brandId: product.brand_id ? String(product.brand_id) : '',
   category: product.category?.name || '',
   brand: product.brand?.name || '',
-  unit: product.unit || '',
+  unit: product.unit || 'NOS',
   mrp: asNumber(product.mrp),
   sellingPrice: asNumber(product.usual_selling_price),
   usualSellingPrice: asNumber(product.usual_selling_price),
@@ -101,7 +101,7 @@ export const productPayload = (product: any, categories: any[] = [], brands: any
   payload.append('model_number', product.modelNumber || '');
   if (categoryId) payload.append('category_id', String(Number(categoryId)));
   if (brandId) payload.append('brand_id', String(Number(brandId)));
-  payload.append('unit', product.unit || 'Nos');
+  payload.append('unit', product.unit || 'NOS');
   payload.append('mrp', String(asNumber(product.mrp)));
   payload.append('usual_selling_price', String(asNumber(product.usualSellingPrice)));
   payload.append('least_selling_price', String(asNumber(product.leastSellingPrice)));

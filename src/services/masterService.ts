@@ -45,6 +45,10 @@ export const brandService = {
   },
 };
 
+export const measurementUnitService = {
+  ...crud('measurement-units'),
+};
+
 export const adjustmentService = {
   ...crud('adjustments'),
   async active() {

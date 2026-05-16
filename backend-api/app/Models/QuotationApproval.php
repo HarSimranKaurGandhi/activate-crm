@@ -9,11 +9,11 @@ class QuotationApproval extends Model
 {
     protected $table = 'quotation_approvals';
 
-    protected $fillable = ['quotation_id', 'action', 'remarks', 'acted_by', 'acted_at'];
+    protected $fillable = ['quotation_id', 'action', 'remarks', 'acted_by', 'acted_at', 'action_by', 'action_at'];
 
     protected function casts(): array
     {
-        return ['acted_at' => 'datetime'];
+        return ['acted_at' => 'datetime', 'action_at' => 'datetime'];
     }
 
     public function quotation(): BelongsTo
@@ -23,6 +23,6 @@ class QuotationApproval extends Model
 
     public function actor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'acted_by');
+        return $this->belongsTo(User::class, 'action_by');
     }
 }

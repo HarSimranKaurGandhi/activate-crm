@@ -4,6 +4,7 @@ import { ArrowLeft, Bold, ImagePlus, Italic, List, Save, Underline } from 'lucid
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../components/common/AsyncState';
+import { measurementUnitService } from '../../services/masterService';
 
 const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -14,6 +15,7 @@ export const ProductForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const specsEditorRef = useRef<HTMLDivElement | null>(null);
+  const [measurementUnits, setMeasurementUnits] = useState<Array<{ id: string; code: string; name: string }>>([]);
 
   const [formData, setFormData] = useState({
     image: '',
@@ -25,12 +27,34 @@ export const ProductForm = () => {
     category: '',
     categoryId: '',
     brand: '',
+    unit: 'NOS',
     mrp: 0,
     usualSellingPrice: 0,
     leastSellingPrice: 0,
     specifications: '',
     status: 'active' as 'active' | 'inactive',
   });
+
+  useEffect(() => {
+    measurementUnitService
+      .list({ is_active: true })
+      .then((response) => {
+        const list = Array.isArray(response.data) ? response.data : [];
+        setMeasurementUnits(list.map((unit: any) => ({
+          id: String(unit.id),
+          code: unit.code || '',
+          name: unit.name || unit.code || '',
+        })));
+      })
+      .catch(() => {
+        setMeasurementUnits([
+          { id: '1', code: 'NOS', name: 'NOS' },
+          { id: '2', code: 'SQFT', name: 'SQFT' },
+          { id: '3', code: 'SET', name: 'SET' },
+          { id: '4', code: 'KG', name: 'KG' },
+        ]);
+      });
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -87,7 +111,7 @@ export const ProductForm = () => {
     e.preventDefault();
     setErrors({});
 
-    if (!formData.name || !formData.modelNumber || (!formData.category && !formData.categoryId) || !formData.brand || formData.mrp < 0 || formData.usualSellingPrice < 0 || formData.leastSellingPrice < 0) {
+    if (!formData.name || !formData.modelNumber || (!formData.category && !formData.categoryId) || !formData.brand || !formData.unit || formData.mrp < 0 || formData.usualSellingPrice < 0 || formData.leastSellingPrice < 0) {
       toast.error('Please complete the required product fields');
       return;
     }
@@ -234,6 +258,24 @@ export const ProductForm = () => {
                 ))}
               </select>
               {errors.brand_id?.[0] && <p className="text-sm text-red-600 mt-1">{errors.brand_id[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Measurement Unit *
+              </label>
+              <select
+                required
+                value={formData.unit}
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select Measurement Unit</option>
+                {measurementUnits.map((unit) => (
+                  <option key={unit.id} value={unit.code}>{unit.name}</option>
+                ))}
+              </select>
+              {errors.unit?.[0] && <p className="text-sm text-red-600 mt-1">{errors.unit[0]}</p>}
             </div>
 
             <div>

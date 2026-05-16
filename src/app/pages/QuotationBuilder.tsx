@@ -11,6 +11,7 @@ import { LoadingState } from '../components/common/AsyncState';
 const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 const getQuotationBasePrice = (product: any) => Number(product?.mrp ?? product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
+const normalizeDiscount = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
 
 const calculateItemAmounts = (item: QuotationItem, gstInclusive: boolean) => {
   const basePrice = item.price * item.quantity;
@@ -49,6 +50,8 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
     },
   });
 
+  const productMrp = getQuotationBasePrice(item.product);
+  const discountedUnitPrice = Math.max(item.price - (item.price * item.discount) / 100, 0);
   const { gstAmount, lineTotal } = calculateItemAmounts(item, gstInclusive);
 
   return (
@@ -76,40 +79,37 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
         />
       </td>
       <td className="px-4 py-3">
-        <input
-          type="number"
-          value={item.price}
-          onChange={(e) => {
-            const newPrice = parseFloat(e.target.value) || 0;
-            const basePrice = getQuotationBasePrice(item.product);
-            const newDiscount = ((basePrice - newPrice) / basePrice) * 100;
-            onUpdate(item.id, { price: newPrice, discount: Math.max(0, newDiscount) });
-          }}
-          className="w-28 px-2 py-1 border border-gray-200 rounded-lg"
-        />
+        <div className="font-medium text-gray-900">
+          ₹{productMrp.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+        </div>
       </td>
+      <td className="px-4 py-3">
+        <div className="font-medium text-gray-900">
+          ₹{discountedUnitPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+        </div>
+      </td>
+      {showDiscount && (
+        <td className="px-4 py-3">
+          <input
+            type="number"
+            value={item.discount}
+            onChange={(e) => {
+              const newDiscount = parseInt(e.target.value, 10) || 0;
+              onUpdate(item.id, { discount: normalizeDiscount(newDiscount) });
+            }}
+            className="w-20 px-2 py-1 border border-gray-200 rounded-lg"
+            min="0"
+            max="100"
+            step="1"
+          />
+        </td>
+      )}
       <td className="px-4 py-3 text-sm text-gray-600">
         {item.product.gstPercent}%
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">
         ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
       </td>
-      {showDiscount && (
-        <td className="px-4 py-3">
-          <input
-            type="number"
-            value={item.discount.toFixed(2)}
-            onChange={(e) => {
-              const newDiscount = parseFloat(e.target.value) || 0;
-              const basePrice = getQuotationBasePrice(item.product);
-              const newPrice = basePrice * (1 - newDiscount / 100);
-              onUpdate(item.id, { discount: newDiscount, price: newPrice });
-            }}
-            className="w-20 px-2 py-1 border border-gray-200 rounded-lg"
-            step="0.01"
-          />
-        </td>
-      )}
       <td className="px-4 py-3 font-semibold text-gray-900">
         ₹{lineTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
       </td>
@@ -192,13 +192,12 @@ export const QuotationBuilder = () => {
   }, [products, showProductModal]);
 
   useEffect(() => {
-    if (globalDiscount > 0) {
-      setItems(items.map(item => ({
+    setItems((currentItems) =>
+      currentItems.map((item) => ({
         ...item,
-        discount: globalDiscount,
-        price: getQuotationBasePrice(item.product) * (1 - globalDiscount / 100),
-      })));
-    }
+        discount: normalizeDiscount(globalDiscount),
+      })),
+    );
   }, [globalDiscount]);
 
   const moveRow = (fromIndex: number, toIndex: number) => {
@@ -222,11 +221,13 @@ export const QuotationBuilder = () => {
   };
 
   const updateItem = (itemId: string, updates: Partial<QuotationItem>) => {
-    setItems(items.map(item => item.id === itemId ? { ...item, ...updates } : item));
+    setItems((currentItems) =>
+      currentItems.map((item) => (item.id === itemId ? { ...item, ...updates } : item)),
+    );
   };
 
   const deleteItem = (itemId: string) => {
-    setItems(items.filter(item => item.id !== itemId));
+    setItems((currentItems) => currentItems.filter((item) => item.id !== itemId));
   };
 
   const calculateTotals = () => {
@@ -452,11 +453,12 @@ export const QuotationBuilder = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Qty</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">MRP</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST%</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST Amt</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Discounted Price</th>
                     {showDiscount && (
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Disc%</th>
                     )}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST%</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST Amt</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Total</th>
                     <th className="px-4 py-3"></th>
                   </tr>
@@ -493,10 +495,12 @@ export const QuotationBuilder = () => {
                 <input
                   type="number"
                   value={globalDiscount}
-                  onChange={(e) => setGlobalDiscount(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setGlobalDiscount(normalizeDiscount(parseInt(e.target.value, 10) || 0))}
                   className="flex-1 px-4 py-2 border border-gray-200 rounded-lg"
                   placeholder="0"
-                  step="0.01"
+                  min="0"
+                  max="100"
+                  step="1"
                 />
                 <span className="text-gray-600">%</span>
               </div>

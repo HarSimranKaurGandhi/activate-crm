@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Masters\AdjustmentController;
 use App\Http\Controllers\Api\Masters\BrandController;
 use App\Http\Controllers\Api\Masters\CategoryController;
 use App\Http\Controllers\Api\Masters\CustomerFieldController;
+use App\Http\Controllers\Api\Masters\MeasurementUnitController;
 use App\Http\Controllers\Api\Masters\ProductController;
 use App\Http\Controllers\Api\Masters\TermController;
 use App\Http\Controllers\Api\Quotations\QuotationApprovalController;
@@ -52,6 +53,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::patch('brands/{id}/status', [BrandController::class, 'status']);
     Route::get('brands/{id}', [BrandController::class, 'show']);
     Route::put('brands/{id}', [BrandController::class, 'update']);
+
+    Route::get('measurement-units', [MeasurementUnitController::class, 'index']);
 
     Route::get('products/selectable', [ProductController::class, 'selectable']);
     Route::get('products/bulk-sample', [ProductController::class, 'bulkSample']);

@@ -15,8 +15,13 @@ class ProductSelectableResource extends JsonResource
             'product_name' => $this->product_name,
             'model_number' => $this->model_number,
             'image_path' => $this->image_path ? $request->getSchemeAndHttpHost().Storage::url($this->image_path) : null,
+            'brand' => $this->whenLoaded('brand', fn () => [
+                'id' => $this->brand?->id,
+                'name' => $this->brand?->name,
+            ]),
             'mrp' => $this->mrp,
             'usual_selling_price' => $this->usual_selling_price,
+            'unit' => $this->unit,
             'gst_percent' => $this->gst_percent,
             'hsn_code' => $this->hsn_code,
         ];

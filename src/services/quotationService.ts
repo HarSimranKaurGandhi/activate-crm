@@ -19,6 +19,10 @@ export const quotationService = {
   async preview(id: string) {
     return unwrap<any>(await apiClient.get(`/quotations/${id}/preview`));
   },
+  async downloadPdf(id: string) {
+    const response = await apiClient.get(`/quotations/${id}/pdf`, { responseType: 'blob' });
+    return response.data as Blob;
+  },
   async duplicate(id: string) {
     return unwrap<any>(await apiClient.post(`/quotations/${id}/duplicate`));
   },
@@ -41,4 +45,3 @@ export const quotationService = {
     return unwrap<any[]>(await apiClient.get(`/quotations/${id}/activity`));
   },
 };
-

@@ -7,13 +7,18 @@ use App\Http\Requests\Quotations\QuotationIndexRequest;
 use App\Http\Requests\Quotations\QuotationRequest;
 use App\Http\Requests\Quotations\QuotationStatusRequest;
 use App\Http\Resources\QuotationResource;
+use App\Services\QuotationPdfService;
 use App\Services\QuotationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class QuotationController extends ApiController
 {
-    public function __construct(private QuotationService $quotations)
+    public function __construct(
+        private QuotationService $quotations,
+        private QuotationPdfService $quotationPdf
+    )
     {
     }
 
@@ -67,13 +72,13 @@ class QuotationController extends ApiController
         ]);
     }
 
-    public function pdf(int|string $id): JsonResponse
+    public function pdf(int|string $id): BinaryFileResponse
     {
-        return $this->ok('Quotation PDF job prepared successfully', [
-            'quotation' => new QuotationResource($this->quotations->find($id)),
-            'pdf_url' => null,
-            'message' => 'Attach a PDF renderer such as DomPDF/Snappy here during PDF implementation.',
-        ]);
+        $result = $this->quotationPdf->render($this->quotations->find($id));
+
+        return response()->download($result['path'], $result['filename'], [
+            'Content-Type' => 'application/pdf',
+        ])->deleteFileAfterSend(true);
     }
 
     public function defaults(): JsonResponse

@@ -1,10 +1,10 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { LayoutDashboard, FileText, Users, Package, Database, BarChart3, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Package, Database, BarChart3, Settings, LogOut, ClipboardCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from './BrandLogo';
 
-const navigation = [
+const baseNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Quotations', href: '/quotations', icon: FileText },
   { name: 'Customers', href: '/customers', icon: Users },
@@ -29,6 +29,15 @@ export const Layout = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mastersOpen, setMastersOpen] = useState(true);
+  const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
+  const canManageApprovals = ['admin', 'operations'].includes(role);
+  const navigation = canManageApprovals
+    ? [
+        ...baseNavigation.slice(0, 2),
+        { name: 'Approvals', href: '/quotations/approvals', icon: ClipboardCheck },
+        ...baseNavigation.slice(2),
+      ]
+    : baseNavigation;
 
   const isActive = (href: string) => {
     if (href === '/') return location.pathname === '/';
