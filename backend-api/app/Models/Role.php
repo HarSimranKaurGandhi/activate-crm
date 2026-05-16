@@ -10,12 +10,7 @@ class Role extends Model
 {
     protected $table = 'roles';
 
-    protected $fillable = ['name', 'display_name', 'description', 'is_active'];
-
-    protected function casts(): array
-    {
-        return ['is_active' => 'boolean'];
-    }
+    protected $fillable = ['name', 'code', 'description'];
 
     public function users(): HasMany
     {

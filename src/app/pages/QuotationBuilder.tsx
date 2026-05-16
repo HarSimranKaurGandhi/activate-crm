@@ -8,6 +8,22 @@ import { productService } from '../../services/productService';
 import { mapProduct } from '../../services/mappers';
 import { LoadingState } from '../components/common/AsyncState';
 
+const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+const getSellingPrice = (product: any) => Number(product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
+
+const calculateItemAmounts = (item: QuotationItem, gstInclusive: boolean) => {
+  const basePrice = item.price * item.quantity;
+  const discountAmount = basePrice * (item.discount / 100);
+  const afterDiscount = basePrice - discountAmount;
+  const gstAmount = gstInclusive ? 0 : afterDiscount * (item.product.gstPercent / 100);
+
+  return {
+    gstAmount,
+    lineTotal: gstInclusive ? afterDiscount : afterDiscount + gstAmount,
+  };
+};
+
 interface QuotationItem {
   id: string;
   product: any;
@@ -33,18 +49,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
     },
   });
 
-  const calculateLineTotal = () => {
-    const basePrice = item.price * item.quantity;
-    const discountAmount = basePrice * (item.discount / 100);
-    const afterDiscount = basePrice - discountAmount;
-
-    if (gstInclusive) {
-      return afterDiscount;
-    } else {
-      const gstAmount = afterDiscount * (item.product.gstPercent / 100);
-      return afterDiscount + gstAmount;
-    }
-  };
+  const { gstAmount, lineTotal } = calculateItemAmounts(item, gstInclusive);
 
   return (
     <tr ref={(node) => { drag(drop(node)); }} className="border-b border-gray-200 hover:bg-gray-50">
@@ -58,7 +63,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
         <div>
           <div className="font-medium text-gray-900">{item.product.name}</div>
           <div className="text-sm text-gray-500">{item.product.modelNumber}</div>
-          {item.specifications && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{item.specifications}</div>}
+          {item.specifications && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{stripHtml(item.specifications)}</div>}
         </div>
       </td>
       <td className="px-4 py-3">
@@ -76,7 +81,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
           value={item.price}
           onChange={(e) => {
             const newPrice = parseFloat(e.target.value) || 0;
-            const basePrice = item.product.usualSellingPrice;
+            const basePrice = getSellingPrice(item.product);
             const newDiscount = ((basePrice - newPrice) / basePrice) * 100;
             onUpdate(item.id, { price: newPrice, discount: Math.max(0, newDiscount) });
           }}
@@ -86,6 +91,9 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
       <td className="px-4 py-3 text-sm text-gray-600">
         {item.product.gstPercent}%
       </td>
+      <td className="px-4 py-3 text-sm text-gray-600">
+        ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+      </td>
       {showDiscount && (
         <td className="px-4 py-3">
           <input
@@ -93,7 +101,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
             value={item.discount.toFixed(2)}
             onChange={(e) => {
               const newDiscount = parseFloat(e.target.value) || 0;
-              const basePrice = item.product.usualSellingPrice;
+              const basePrice = getSellingPrice(item.product);
               const newPrice = basePrice * (1 - newDiscount / 100);
               onUpdate(item.id, { discount: newDiscount, price: newPrice });
             }}
@@ -103,7 +111,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
         </td>
       )}
       <td className="px-4 py-3 font-semibold text-gray-900">
-        ₹{calculateLineTotal().toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+        ₹{lineTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
       </td>
       <td className="px-4 py-3">
         <button
@@ -136,6 +144,7 @@ export const QuotationBuilder = () => {
   const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
   const [selectableProducts, setSelectableProducts] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -186,7 +195,7 @@ export const QuotationBuilder = () => {
       setItems(items.map(item => ({
         ...item,
         discount: globalDiscount,
-        price: item.product.usualSellingPrice * (1 - globalDiscount / 100),
+        price: getSellingPrice(item.product) * (1 - globalDiscount / 100),
       })));
     }
   }, [globalDiscount]);
@@ -203,7 +212,7 @@ export const QuotationBuilder = () => {
       id: Date.now().toString(),
       product,
       quantity: 1,
-      price: product.usualSellingPrice,
+      price: getSellingPrice(product),
       discount: 0,
       specifications: product.specifications,
     };
@@ -257,6 +266,20 @@ export const QuotationBuilder = () => {
   };
 
   const totals = calculateTotals();
+  const filteredCustomers = customers.filter((customer) => {
+    const search = customerSearch.trim().toLowerCase();
+
+    if (!search) {
+      return true;
+    }
+
+    return (
+      customer.name.toLowerCase().includes(search) ||
+      customer.company.toLowerCase().includes(search) ||
+      customer.phone.toLowerCase().includes(search) ||
+      customer.email.toLowerCase().includes(search)
+    );
+  });
 
   if (loading && id) {
     return (
@@ -414,8 +437,9 @@ export const QuotationBuilder = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Image</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Qty</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Price</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Selling Price</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST%</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST Amt</th>
                     {showDiscount && (
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Disc%</th>
                     )}
@@ -606,7 +630,7 @@ export const QuotationBuilder = () => {
                     <p className="text-sm text-gray-500">{product.modelNumber}</p>
                     <div className="flex items-center gap-4 mt-2">
                       <span className="text-sm text-gray-500">MRP: ₹{product.mrp.toLocaleString('en-IN')}</span>
-                      <span className="text-sm font-semibold text-blue-600">₹{product.usualSellingPrice.toLocaleString('en-IN')}</span>
+                      <span className="text-sm font-semibold text-blue-600">₹{getSellingPrice(product).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
@@ -629,24 +653,42 @@ export const QuotationBuilder = () => {
                 ✕
               </button>
             </div>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                placeholder="Search by name, phone, or email"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
             <div className="space-y-3 mb-4">
-              {customers.map(customer => (
+              {filteredCustomers.map(customer => (
                 <div
                   key={customer.id}
                   onClick={() => {
                     setSelectedCustomer(customer);
+                    setCustomerSearch('');
                     setShowCustomerModal(false);
                   }}
                   className="p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
                 >
                   <p className="font-medium text-gray-900">{customer.company}</p>
                   <p className="text-sm text-gray-600">{customer.name}</p>
+                  <p className="text-sm text-gray-600">{customer.phone}</p>
                   <p className="text-sm text-gray-600">{customer.email}</p>
                 </div>
               ))}
+              {filteredCustomers.length === 0 && (
+                <div className="py-8 text-center text-sm text-gray-500">
+                  No customers matched your search.
+                </div>
+              )}
             </div>
             <button
               onClick={() => {
+                setCustomerSearch('');
                 setShowCustomerModal(false);
                 navigate('/customers/new');
               }}

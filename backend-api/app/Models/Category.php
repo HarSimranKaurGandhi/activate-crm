@@ -9,11 +9,15 @@ class Category extends Model
 {
     protected $table = 'categories';
 
-    protected $fillable = ['name', 'description', 'display_order', 'is_active'];
+    protected $fillable = ['name', 'description', 'hsn_code', 'gst_percent', 'display_order', 'is_active'];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean', 'display_order' => 'integer'];
+        return [
+            'gst_percent' => 'decimal:2',
+            'is_active' => 'boolean',
+            'display_order' => 'integer',
+        ];
     }
 
     public function products(): HasMany

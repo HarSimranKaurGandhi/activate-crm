@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Masters;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class BrandRequest extends FormRequest
 {
@@ -11,12 +12,24 @@ class BrandRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'name' => is_string($this->name) ? trim($this->name) : $this->name,
+            'supplier_name' => is_string($this->supplier_name) ? trim($this->supplier_name) : $this->supplier_name,
+        ]);
+    }
+
     public function rules(): array
     {
+        $brandId = $this->route('id');
+
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', Rule::unique('brands', 'name')->ignore($brandId)],
+            'supplier_name' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'logo_path' => ['nullable', 'string', 'max:500'],
+            'brand_logo' => ['nullable', 'file', 'image', 'max:5120'],
+            'brand_catalog' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
             'display_order' => ['sometimes', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
         ];

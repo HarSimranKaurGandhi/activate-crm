@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Throwable;
 
 class AuthService
@@ -19,7 +20,7 @@ class AuthService
             ->where('email', $credentials['email'])
             ->first();
 
-        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
+        if (! $user || ! $this->passwordMatches($user, $credentials['password'])) {
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
@@ -71,5 +72,29 @@ class AuthService
             ->first();
 
         $loginLog?->update(['log_out_at' => now()]);
+    }
+
+    private function passwordMatches(User $user, string $plainPassword): bool
+    {
+        $storedPassword = (string) $user->password;
+        $passwordInfo = password_get_info($storedPassword);
+
+        if (($passwordInfo['algoName'] ?? 'unknown') !== 'unknown') {
+            try {
+                return Hash::check($plainPassword, $storedPassword);
+            } catch (RuntimeException) {
+                return false;
+            }
+        }
+
+        if (! hash_equals($storedPassword, $plainPassword)) {
+            return false;
+        }
+
+        $user->forceFill([
+            'password' => Hash::make($plainPassword),
+        ])->save();
+
+        return true;
     }
 }

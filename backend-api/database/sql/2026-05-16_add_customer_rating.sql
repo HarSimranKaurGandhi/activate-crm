@@ -1,0 +1,2 @@
+ALTER TABLE customers
+ADD COLUMN rating TINYINT UNSIGNED NULL AFTER country;

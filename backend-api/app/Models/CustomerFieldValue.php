@@ -9,7 +9,7 @@ class CustomerFieldValue extends Model
 {
     protected $table = 'customer_field_values';
 
-    protected $fillable = ['customer_id', 'field_definition_id', 'value'];
+    protected $fillable = ['customer_id', 'field_definition_id', 'field_value'];
 
     public function customer(): BelongsTo
     {

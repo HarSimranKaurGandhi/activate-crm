@@ -32,7 +32,6 @@ export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || defaultBaseUrl,
   headers: {
     Accept: 'application/json',
-    'Content-Type': 'application/json',
   },
 });
 
@@ -41,6 +40,12 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  } else if (!config.headers['Content-Type']) {
+    config.headers['Content-Type'] = 'application/json';
   }
 
   return config;
@@ -75,4 +80,3 @@ apiClient.interceptors.response.use(
 export const unwrap = <T>(response: { data: ApiEnvelope<T> }) => response.data.data;
 
 export const unwrapEnvelope = <T>(response: { data: ApiEnvelope<T> }) => response.data;
-

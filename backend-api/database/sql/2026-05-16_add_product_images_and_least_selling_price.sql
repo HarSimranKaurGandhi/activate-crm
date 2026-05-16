@@ -1,0 +1,14 @@
+ALTER TABLE products
+ADD COLUMN least_selling_price DECIMAL(15,2) NULL AFTER usual_selling_price;
+
+CREATE TABLE product_images (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT UNSIGNED NOT NULL,
+    image_path VARCHAR(255) NOT NULL,
+    is_primary TINYINT(1) NOT NULL DEFAULT 0,
+    display_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT product_images_product_id_foreign
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);

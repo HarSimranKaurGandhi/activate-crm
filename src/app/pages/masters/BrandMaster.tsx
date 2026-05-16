@@ -8,25 +8,60 @@ export const BrandMaster = () => {
   const { brands, addBrand, updateBrand, deleteBrand, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', status: 'active' as 'active' | 'inactive' });
+  const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const [formData, setFormData] = useState({
+    name: '',
+    supplierName: '',
+    description: '',
+    logoPath: '',
+    catalogPath: '',
+    logoFile: null as File | null,
+    catalogFile: null as File | null,
+    status: 'active' as 'active' | 'inactive',
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-      await updateBrand(editingId, formData);
-      toast.success('Brand updated successfully');
-    } else {
-      await addBrand(formData);
-      toast.success('Brand added successfully');
+    setErrors({});
+
+    try {
+      if (editingId) {
+        await updateBrand(editingId, formData);
+        toast.success('Brand updated successfully');
+      } else {
+        await addBrand(formData);
+        toast.success('Brand added successfully');
+      }
+      setShowModal(false);
+      setEditingId(null);
+      setFormData({
+        name: '',
+        supplierName: '',
+        description: '',
+        logoPath: '',
+        catalogPath: '',
+        logoFile: null,
+        catalogFile: null,
+        status: 'active',
+      });
+    } catch (error: any) {
+      setErrors(error.errors || {});
     }
-    setShowModal(false);
-    setEditingId(null);
-    setFormData({ name: '', status: 'active' });
   };
 
   const handleEdit = (brand: any) => {
+    setErrors({});
     setEditingId(brand.id);
-    setFormData({ name: brand.name, status: brand.status });
+    setFormData({
+      name: brand.name,
+      supplierName: brand.supplierName || '',
+      description: brand.description || '',
+      logoPath: brand.logoPath || '',
+      catalogPath: brand.catalogPath || '',
+      logoFile: null,
+      catalogFile: null,
+      status: brand.status,
+    });
     setShowModal(true);
   };
 
@@ -42,7 +77,17 @@ export const BrandMaster = () => {
           <button
             onClick={() => {
               setEditingId(null);
-              setFormData({ name: '', status: 'active' });
+              setErrors({});
+              setFormData({
+                name: '',
+                supplierName: '',
+                description: '',
+                logoPath: '',
+                catalogPath: '',
+                logoFile: null,
+                catalogFile: null,
+                status: 'active',
+              });
               setShowModal(true);
             }}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
@@ -56,7 +101,10 @@ export const BrandMaster = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Logo</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Brand Name</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Supplier</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Catalog</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
@@ -64,7 +112,24 @@ export const BrandMaster = () => {
             <tbody className="divide-y divide-gray-200">
               {brands.map(brand => (
                 <tr key={brand.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    {brand.logoPath ? (
+                      <img src={brand.logoPath} alt={brand.name} className="h-12 w-12 rounded-xl object-cover border border-gray-200" />
+                    ) : (
+                      <div className="h-12 w-12 rounded-xl border border-dashed border-gray-300 bg-gray-50" />
+                    )}
+                  </td>
                   <td className="px-6 py-4 font-medium text-gray-900">{brand.name}</td>
+                  <td className="px-6 py-4 text-gray-700">{brand.supplierName || '-'}</td>
+                  <td className="px-6 py-4">
+                    {brand.catalogPath ? (
+                      <a href={brand.catalogPath} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                        View Catalog
+                      </a>
+                    ) : (
+                      <span className="text-sm text-gray-500">No catalog</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => toggleStatus(brand)}
@@ -109,7 +174,7 @@ export const BrandMaster = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-semibold text-gray-900 mb-4">
               {editingId ? 'Edit Brand' : 'Add Brand'}
             </h3>
@@ -123,6 +188,64 @@ export const BrandMaster = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {errors.name?.[0] && <p className="mt-1 text-sm text-red-600">{errors.name[0]}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Supplier Name</label>
+                <input
+                  type="text"
+                  value={formData.supplierName}
+                  onChange={(e) => setFormData({ ...formData, supplierName: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.supplier_name?.[0] && <p className="mt-1 text-sm text-red-600">{errors.supplier_name[0]}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Brand Description</label>
+                <textarea
+                  rows={4}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.description?.[0] && <p className="mt-1 text-sm text-red-600">{errors.description[0]}</p>}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Brand Logo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setFormData({ ...formData, logoFile: e.target.files?.[0] || null })}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {errors.brand_logo?.[0] && <p className="mt-1 text-sm text-red-600">{errors.brand_logo[0]}</p>}
+                  {(formData.logoFile || formData.logoPath) && (
+                    <img
+                      src={formData.logoFile ? URL.createObjectURL(formData.logoFile) : formData.logoPath}
+                      alt="Brand logo preview"
+                      className="mt-3 h-24 w-24 rounded-xl object-cover border border-gray-200"
+                    />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Brand Catalog</label>
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={(e) => setFormData({ ...formData, catalogFile: e.target.files?.[0] || null })}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {errors.brand_catalog?.[0] && <p className="mt-1 text-sm text-red-600">{errors.brand_catalog[0]}</p>}
+                  <div className="mt-3 text-sm text-gray-600">
+                    {formData.catalogFile?.name || (formData.catalogPath ? 'Existing catalog available' : 'No catalog selected')}
+                  </div>
+                  {formData.catalogPath && !formData.catalogFile && (
+                    <a href={formData.catalogPath} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-700">
+                      Open current catalog
+                    </a>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>

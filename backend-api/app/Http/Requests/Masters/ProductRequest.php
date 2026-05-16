@@ -15,15 +15,17 @@ class ProductRequest extends FormRequest
     {
         return [
             'product_name' => ['required', 'string', 'max:255'],
-            'model_number' => ['nullable', 'string', 'max:255'],
+            'model_number' => ['required', 'string', 'max:255'],
             'category_id' => ['required', 'exists:categories,id'],
-            'brand_id' => ['nullable', 'exists:brands,id'],
+            'brand_id' => ['required', 'exists:brands,id'],
             'unit' => ['nullable', 'string', 'max:50'],
             'mrp' => ['required', 'numeric', 'min:0'],
             'usual_selling_price' => ['required', 'numeric', 'min:0'],
-            'gst_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'least_selling_price' => ['required', 'numeric', 'min:0', 'lte:usual_selling_price'],
             'specifications' => ['nullable', 'string'],
-            'image_path' => ['nullable', 'string', 'max:500'],
+            'product_images' => ['sometimes', 'array'],
+            'product_images.*' => ['file', 'image', 'max:5120'],
+            'primary_image_token' => ['nullable', 'string', 'max:100'],
             'brochure_path' => ['nullable', 'string', 'max:500'],
             'is_active' => ['sometimes', 'boolean'],
         ];

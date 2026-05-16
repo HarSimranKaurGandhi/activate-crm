@@ -315,18 +315,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     settings,
     async updateSettings(nextSettings) {
-      const companyPayload = {
-        company_name: nextSettings.name,
-        address: nextSettings.address || null,
-        phone: nextSettings.phone || null,
-        email: nextSettings.email || null,
-        gst_number: nextSettings.gstNumber || null,
-        logo_path: nextSettings.logo || null,
-        letterhead_path: nextSettings.letterhead || null,
-        default_salesperson_name: nextSettings.defaultSalespersonName || null,
-        default_salesperson_phone: nextSettings.defaultSalespersonPhone || null,
-        default_salesperson_email: nextSettings.defaultSalespersonEmail || null,
-      };
+      const companyPayload = new FormData();
+      companyPayload.append('company_name', nextSettings.name);
+      companyPayload.append('address', nextSettings.address || '');
+      companyPayload.append('phone', nextSettings.phone || '');
+      companyPayload.append('email', nextSettings.email || '');
+      companyPayload.append('gst_number', nextSettings.gstNumber || '');
+      companyPayload.append('default_salesperson_name', nextSettings.defaultSalespersonName || '');
+      companyPayload.append('default_salesperson_phone', nextSettings.defaultSalespersonPhone || '');
+      companyPayload.append('default_salesperson_email', nextSettings.defaultSalespersonEmail || '');
+
+      if (nextSettings.logoFile instanceof File) {
+        companyPayload.append('logo_file', nextSettings.logoFile);
+      }
+
+      if (nextSettings.letterheadFile instanceof File) {
+        companyPayload.append('letterhead_file', nextSettings.letterheadFile);
+      }
 
       const bankPayload = {
         bank_name: nextSettings.bankDetails.bankName,

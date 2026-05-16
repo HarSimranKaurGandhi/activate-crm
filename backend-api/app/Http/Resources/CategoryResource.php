@@ -13,6 +13,8 @@ class CategoryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'description' => $this->description,
+            'hsn_code' => $this->hsn_code,
+            'gst_percent' => $this->gst_percent,
             'display_order' => $this->display_order,
             'is_active' => (bool) $this->is_active,
             'created_at' => $this->created_at,

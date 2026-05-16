@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api\Masters;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Common\StatusRequest;
+use App\Http\Requests\Masters\ProductBulkUploadRequest;
 use App\Http\Requests\Masters\ProductIndexRequest;
 use App\Http\Requests\Masters\ProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Http\Resources\ProductSelectableResource;
 use App\Services\ProductService;
 use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductController extends ApiController
 {
@@ -71,5 +73,23 @@ class ProductController extends ApiController
             $this->products->selectable($request),
             ProductSelectableResource::class
         );
+    }
+
+    public function bulkUpload(ProductBulkUploadRequest $request): JsonResponse
+    {
+        $result = $this->products->bulkUpsertFromCsv($request->file('file')->getRealPath());
+
+        return $this->ok('Products imported successfully', $result);
+    }
+
+    public function bulkSample(): StreamedResponse
+    {
+        $content = $this->products->sampleCsv();
+
+        return response()->streamDownload(function () use ($content): void {
+            echo $content;
+        }, 'product_bulk_upload_sample.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
     }
 }

@@ -29,6 +29,17 @@ export const categoryService = {
 
 export const brandService = {
   ...crud('brands'),
+  async create(payload: FormData | Record<string, unknown>) {
+    return unwrap<any>(await apiClient.post('/brands', payload));
+  },
+  async update(id: string, payload: FormData | Record<string, unknown>) {
+    if (payload instanceof FormData) {
+      payload.append('_method', 'PUT');
+      return unwrap<any>(await apiClient.post(`/brands/${id}`, payload));
+    }
+
+    return unwrap<any>(await apiClient.put(`/brands/${id}`, payload));
+  },
   async dropdown(params: Record<string, unknown> = {}) {
     return unwrap<any[]>(await apiClient.get('/brands/dropdown', { params }));
   },
@@ -63,4 +74,3 @@ export const customerFieldService = {
     return unwrap<any>(await apiClient.post('/customer-fields/reorder', { items }));
   },
 };
-

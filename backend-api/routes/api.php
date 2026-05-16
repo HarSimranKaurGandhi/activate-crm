@@ -54,6 +54,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::put('brands/{id}', [BrandController::class, 'update']);
 
     Route::get('products/selectable', [ProductController::class, 'selectable']);
+    Route::get('products/bulk-sample', [ProductController::class, 'bulkSample']);
+    Route::post('products/bulk-upload', [ProductController::class, 'bulkUpload']);
     Route::get('products', [ProductController::class, 'index']);
     Route::post('products', [ProductController::class, 'store']);
     Route::patch('products/{id}/status', [ProductController::class, 'status']);

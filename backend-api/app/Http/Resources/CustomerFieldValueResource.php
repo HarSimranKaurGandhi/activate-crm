@@ -21,12 +21,14 @@ class CustomerFieldValueResource extends JsonResource
 
     private function normalizedValue(): mixed
     {
-        if (! is_string($this->value)) {
-            return $this->value;
+        $value = $this->field_value;
+
+        if (! is_string($value)) {
+            return $value;
         }
 
-        $decoded = json_decode($this->value, true);
+        $decoded = json_decode($value, true);
 
-        return json_last_error() === JSON_ERROR_NONE ? $decoded : $this->value;
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
     }
 }

@@ -19,6 +19,8 @@ export const mapCategory = (category: any) => ({
   id: String(category.id),
   name: category.name || '',
   description: category.description || '',
+  hsnCode: category.hsn_code || '',
+  gstPercent: asNumber(category.gst_percent, 18),
   displayOrder: category.display_order || 0,
   status: toStatus(category.is_active),
 });
@@ -26,6 +28,8 @@ export const mapCategory = (category: any) => ({
 export const categoryPayload = (category: any) => ({
   name: category.name,
   description: category.description || null,
+  hsn_code: category.hsnCode || category.hsn_code || null,
+  gst_percent: asNumber(category.gstPercent, 18),
   display_order: category.displayOrder || category.display_order || 0,
   is_active: toIsActive(category.status),
 });
@@ -33,23 +37,43 @@ export const categoryPayload = (category: any) => ({
 export const mapBrand = (brand: any) => ({
   id: String(brand.id),
   name: brand.name || '',
+  supplierName: brand.supplier_name || '',
   description: brand.description || '',
   logoPath: brand.logo_path || '',
+  catalogPath: brand.catalog_path || '',
   displayOrder: brand.display_order || 0,
   status: toStatus(brand.is_active),
 });
 
-export const brandPayload = (brand: any) => ({
-  name: brand.name,
-  description: brand.description || null,
-  logo_path: brand.logoPath || brand.logo_path || null,
-  display_order: brand.displayOrder || brand.display_order || 0,
-  is_active: toIsActive(brand.status),
-});
+export const brandPayload = (brand: any) => {
+  const payload = new FormData();
+
+  payload.append('name', brand.name || '');
+  payload.append('supplier_name', brand.supplierName || brand.supplier_name || '');
+  payload.append('description', brand.description || '');
+  payload.append('display_order', String(brand.displayOrder || brand.display_order || 0));
+  payload.append('is_active', String(toIsActive(brand.status) ? 1 : 0));
+
+  if (brand.logoFile instanceof File) {
+    payload.append('brand_logo', brand.logoFile);
+  }
+
+  if (brand.catalogFile instanceof File) {
+    payload.append('brand_catalog', brand.catalogFile);
+  }
+
+  return payload;
+};
 
 export const mapProduct = (product: any) => ({
   id: String(product.id),
   image: product.image_path || '',
+  images: (product.images || []).map((image: any) => ({
+    id: String(image.id),
+    imagePath: image.image_path || '',
+    isPrimary: Boolean(image.is_primary),
+    displayOrder: asNumber(image.display_order),
+  })),
   name: product.product_name || '',
   modelNumber: product.model_number || '',
   categoryId: product.category_id ? String(product.category_id) : '',
@@ -58,8 +82,11 @@ export const mapProduct = (product: any) => ({
   brand: product.brand?.name || '',
   unit: product.unit || '',
   mrp: asNumber(product.mrp),
+  sellingPrice: asNumber(product.usual_selling_price),
   usualSellingPrice: asNumber(product.usual_selling_price),
+  leastSellingPrice: asNumber(product.least_selling_price),
   gstPercent: asNumber(product.gst_percent),
+  hsnCode: product.hsn_code || product.category?.hsn_code || '',
   specifications: product.specifications || '',
   brochurePath: product.brochure_path || '',
   status: toStatus(product.is_active ?? true),
@@ -68,21 +95,28 @@ export const mapProduct = (product: any) => ({
 export const productPayload = (product: any, categories: any[] = [], brands: any[] = []) => {
   const categoryId = product.categoryId || categories.find((category) => category.name === product.category)?.id;
   const brandId = product.brandId || brands.find((brand) => brand.name === product.brand)?.id || null;
+  const payload = new FormData();
 
-  return {
-    product_name: product.name,
-    model_number: product.modelNumber || null,
-    category_id: categoryId ? Number(categoryId) : undefined,
-    brand_id: brandId ? Number(brandId) : null,
-    unit: product.unit || null,
-    mrp: asNumber(product.mrp),
-    usual_selling_price: asNumber(product.usualSellingPrice),
-    gst_percent: asNumber(product.gstPercent, 18),
-    specifications: product.specifications || null,
-    image_path: product.image || null,
-    brochure_path: product.brochurePath || null,
-    is_active: toIsActive(product.status),
-  };
+  payload.append('product_name', product.name || '');
+  payload.append('model_number', product.modelNumber || '');
+  if (categoryId) payload.append('category_id', String(Number(categoryId)));
+  if (brandId) payload.append('brand_id', String(Number(brandId)));
+  payload.append('unit', product.unit || 'Nos');
+  payload.append('mrp', String(asNumber(product.mrp)));
+  payload.append('usual_selling_price', String(asNumber(product.usualSellingPrice)));
+  payload.append('least_selling_price', String(asNumber(product.leastSellingPrice)));
+  payload.append('specifications', product.specifications || '');
+  payload.append('is_active', String(toIsActive(product.status) ? 1 : 0));
+
+  if (product.primaryImageToken) {
+    payload.append('primary_image_token', product.primaryImageToken);
+  }
+
+  (product.newImageFiles || []).forEach((file: File) => {
+    payload.append('product_images[]', file);
+  });
+
+  return payload;
 };
 
 export const mapCustomerField = (field: any) => ({
@@ -114,13 +148,30 @@ export const mapCustomer = (customer: any) => {
     return acc;
   }, {});
 
+  const addressParts = [
+    customer.address_line_1,
+    customer.address_line_2,
+    customer.city,
+    customer.state,
+    customer.pincode,
+    customer.country,
+  ].filter(Boolean);
+
   return {
     id: String(customer.id),
     name: customer.primary_name || '',
     company: customer.company_name || '',
     email: customer.email || '',
     phone: customer.phone || '',
-    address: customer.address || '',
+    addressLine1: customer.address_line_1 || '',
+    addressLine2: customer.address_line_2 || '',
+    city: customer.city || '',
+    state: customer.state || '',
+    pincode: customer.pincode || '',
+    country: customer.country || 'India',
+    rating: asNumber(customer.rating),
+    notes: customer.notes || '',
+    address: addressParts.join(', '),
     gstNumber: customer.gst_number || '',
     panNumber: customer.pan_number || '',
     status: toStatus(customer.is_active ?? true),
@@ -132,10 +183,15 @@ export const customerPayload = (customer: any, definitions: any[] = []) => ({
   primary_name: customer.name,
   company_name: customer.company || null,
   email: customer.email || null,
-  phone: customer.phone || null,
-  address: customer.address || null,
-  gst_number: customer.gstNumber || null,
-  pan_number: customer.panNumber || null,
+  phone: customer.phone,
+  address_line_1: customer.addressLine1 || null,
+  address_line_2: customer.addressLine2 || null,
+  city: customer.city || null,
+  state: customer.state || null,
+  pincode: customer.pincode || null,
+  country: customer.country || 'India',
+  rating: customer.rating ? asNumber(customer.rating) : null,
+  notes: customer.notes || null,
   is_active: toIsActive(customer.status),
   custom_fields: definitions.map((field) => ({
     field_definition_id: Number(field.id),
@@ -210,6 +266,7 @@ export const mapQuotation = (quotation: any) => ({
       name: item.product_name || '',
       modelNumber: item.model_number || '',
       mrp: asNumber(item.mrp),
+      sellingPrice: asNumber(item.base_price),
       usualSellingPrice: asNumber(item.base_price),
       gstPercent: asNumber(item.gst_percent),
       specifications: item.specifications || '',

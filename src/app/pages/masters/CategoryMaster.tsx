@@ -8,7 +8,7 @@ export const CategoryMaster = () => {
   const { categories, addCategory, updateCategory, deleteCategory, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', status: 'active' as 'active' | 'inactive' });
+  const [formData, setFormData] = useState({ name: '', hsnCode: '', gstPercent: 18, status: 'active' as 'active' | 'inactive' });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,12 +21,12 @@ export const CategoryMaster = () => {
     }
     setShowModal(false);
     setEditingId(null);
-    setFormData({ name: '', status: 'active' });
+    setFormData({ name: '', hsnCode: '', gstPercent: 18, status: 'active' });
   };
 
   const handleEdit = (category: any) => {
     setEditingId(category.id);
-    setFormData({ name: category.name, status: category.status });
+    setFormData({ name: category.name, hsnCode: category.hsnCode || '', gstPercent: category.gstPercent ?? 18, status: category.status });
     setShowModal(true);
   };
 
@@ -42,7 +42,7 @@ export const CategoryMaster = () => {
           <button
             onClick={() => {
               setEditingId(null);
-              setFormData({ name: '', status: 'active' });
+              setFormData({ name: '', hsnCode: '', gstPercent: 18, status: 'active' });
               setShowModal(true);
             }}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
@@ -57,6 +57,8 @@ export const CategoryMaster = () => {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Category Name</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">HSN Code</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">GST %</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
@@ -65,6 +67,8 @@ export const CategoryMaster = () => {
               {categories.map(category => (
                 <tr key={category.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">{category.name}</td>
+                  <td className="px-6 py-4 text-gray-700">{category.hsnCode || '-'}</td>
+                  <td className="px-6 py-4 text-gray-700">{category.gstPercent}%</td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => toggleStatus(category)}
@@ -121,6 +125,28 @@ export const CategoryMaster = () => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">HSN Code</label>
+                <input
+                  type="text"
+                  value={formData.hsnCode}
+                  onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">GST Percentage</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  required
+                  value={formData.gstPercent}
+                  onChange={(e) => setFormData({ ...formData, gstPercent: Number(e.target.value) })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

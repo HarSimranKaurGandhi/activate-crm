@@ -4,11 +4,13 @@ import { Plus, Search, Edit, Trash2, Package } from 'lucide-react';
 import { useState } from 'react';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { toast } from 'sonner';
+import { productService } from '../../services/productService';
 
 export const ProductList = () => {
   const navigate = useNavigate();
-  const { products, deleteProduct, loading } = useData();
+  const { products, deleteProduct, loading, refreshAll } = useData();
   const [searchTerm, setSearchTerm] = useState('');
+  const [bulkUploading, setBulkUploading] = useState(false);
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -16,18 +18,64 @@ export const ProductList = () => {
     p.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleBulkUpload = async (file: File | null) => {
+    if (!file) return;
+
+    setBulkUploading(true);
+    try {
+      const result = await productService.bulkUpload(file);
+      await refreshAll();
+      toast.success(`Bulk upload complete: ${result.created} created, ${result.updated} updated`);
+    } catch (error: any) {
+      toast.error(error.message || 'Bulk upload failed');
+    } finally {
+      setBulkUploading(false);
+    }
+  };
+
+  const handleSampleDownload = async () => {
+    try {
+      const blob = await productService.downloadSample();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'product_bulk_upload_sample.csv';
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast.error(error.message || 'Sample download failed');
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-semibold text-gray-900">Products</h2>
-          <button
-            onClick={() => navigate('/products/new')}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
-          >
-            <Plus className="w-5 h-5" />
-            Add Product
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSampleDownload}
+              className="px-4 py-3 border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
+            >
+              Download Sample
+            </button>
+            <label className="px-4 py-3 border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all cursor-pointer">
+              {bulkUploading ? 'Uploading...' : 'Bulk Upload / Update'}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => handleBulkUpload(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+            </label>
+            <button
+              onClick={() => navigate('/products/new')}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
+            >
+              <Plus className="w-5 h-5" />
+              Add Product
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
@@ -92,8 +140,16 @@ export const ProductList = () => {
                       <span className="font-semibold text-blue-600">₹{product.usualSellingPrice.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-gray-600">Least Price:</span>
+                      <span className="font-semibold text-amber-600">₹{product.leastSellingPrice.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-gray-600">GST:</span>
                       <span className="font-semibold text-gray-900">{product.gstPercent}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">HSN:</span>
+                      <span className="font-semibold text-gray-900">{product.hsnCode || '-'}</span>
                     </div>
                   </div>
                 </div>

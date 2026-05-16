@@ -30,7 +30,7 @@ class BrandController extends ApiController
     {
         return $this->ok(
             'Brand created successfully',
-            new BrandResource($this->brands->create($request->validated())),
+            new BrandResource($this->brands->create($request->all())),
             [],
             201
         );
@@ -50,7 +50,7 @@ class BrandController extends ApiController
 
         return $this->ok(
             'Brand updated successfully',
-            new BrandResource($this->brands->update($brand, $request->validated()))
+            new BrandResource($this->brands->update($brand, $request->all()))
         );
     }
 

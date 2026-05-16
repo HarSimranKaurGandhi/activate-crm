@@ -1,9 +1,11 @@
 import { useNavigate, useParams } from 'react-router';
 import { useData } from '../context/DataContext';
-import { ArrowLeft, Save } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { ArrowLeft, Bold, ImagePlus, Italic, List, Save, Underline } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../components/common/AsyncState';
+
+const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 export const ProductForm = () => {
   const navigate = useNavigate();
@@ -11,16 +13,21 @@ export const ProductForm = () => {
   const { products, addProduct, updateProduct, categories, brands, loading } = useData();
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const specsEditorRef = useRef<HTMLDivElement | null>(null);
 
   const [formData, setFormData] = useState({
     image: '',
+    images: [] as Array<{ id: string; imagePath: string; isPrimary: boolean; displayOrder: number }>,
+    newImageFiles: [] as File[],
+    primaryImageToken: '',
     name: '',
     modelNumber: '',
     category: '',
+    categoryId: '',
     brand: '',
     mrp: 0,
     usualSellingPrice: 0,
-    gstPercent: 18,
+    leastSellingPrice: 0,
     specifications: '',
     status: 'active' as 'active' | 'inactive',
   });
@@ -29,16 +36,58 @@ export const ProductForm = () => {
     if (id) {
       const product = products.find(p => p.id === id);
       if (product) {
-        setFormData(product);
+        const matchingCategory = categories.find((category) => category.id === product.categoryId || category.name === product.category);
+        setFormData({
+          ...product,
+          categoryId: product.categoryId || matchingCategory?.id || '',
+          images: product.images || [],
+          primaryImageToken: product.images?.find((image: any) => image.isPrimary)?.id ? `existing:${product.images.find((image: any) => image.isPrimary)?.id}` : '',
+          newImageFiles: [],
+        });
       }
     }
-  }, [id, products]);
+  }, [categories, id, products]);
+
+  useEffect(() => {
+    if (specsEditorRef.current && specsEditorRef.current.innerHTML !== formData.specifications) {
+      specsEditorRef.current.innerHTML = formData.specifications || '';
+    }
+  }, [formData.specifications]);
+
+  const syncCategory = (categoryIdOrName: string) => {
+    const selectedCategory = categories.find((category) => category.id === categoryIdOrName || category.name === categoryIdOrName);
+
+    setFormData((current) => ({
+      ...current,
+      category: selectedCategory?.name || '',
+      categoryId: selectedCategory?.id || '',
+    }));
+  };
+
+  const applySpecFormat = (command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList') => {
+    specsEditorRef.current?.focus();
+    document.execCommand(command);
+    setFormData((current) => ({
+      ...current,
+      specifications: specsEditorRef.current?.innerHTML || '',
+    }));
+  };
+
+  const handleImageSelection = (files: FileList | null) => {
+    const selectedFiles = Array.from(files || []);
+
+    setFormData((current) => ({
+      ...current,
+      newImageFiles: [...current.newImageFiles, ...selectedFiles],
+      primaryImageToken: current.primaryImageToken || (selectedFiles.length > 0 ? `new:${current.newImageFiles.length}` : current.primaryImageToken),
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
 
-    if (!formData.name || (!formData.category && !(formData as any).categoryId) || formData.mrp < 0 || formData.usualSellingPrice < 0) {
+    if (!formData.name || !formData.modelNumber || (!formData.category && !formData.categoryId) || !formData.brand || formData.mrp < 0 || formData.usualSellingPrice < 0 || formData.leastSellingPrice < 0) {
       toast.error('Please complete the required product fields');
       return;
     }
@@ -80,19 +129,45 @@ export const ProductForm = () => {
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-8 space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Product Image URL
+              Product Images
             </label>
-            <div className="flex gap-4">
-              <input
-                type="url"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder="https://example.com/image.jpg"
-                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              {formData.image && (
-                <img src={formData.image} alt="" className="w-16 h-16 object-cover rounded-lg" />
-              )}
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                <ImagePlus className="h-4 w-4" />
+                Upload multiple images
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handleImageSelection(e.target.files)}
+                  className="hidden"
+                />
+              </label>
+              {errors['product_images.0']?.[0] && <p className="mt-2 text-sm text-red-600">{errors['product_images.0'][0]}</p>}
+              <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+                {formData.images.map((image) => (
+                  <button
+                    type="button"
+                    key={`existing-${image.id}`}
+                    onClick={() => setFormData({ ...formData, primaryImageToken: `existing:${image.id}` })}
+                    className={`rounded-2xl border p-2 text-left ${formData.primaryImageToken === `existing:${image.id}` ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}
+                  >
+                    <img src={image.imagePath} alt="" className="h-28 w-full rounded-xl object-cover" />
+                    <div className="mt-2 text-xs font-medium text-gray-700">{formData.primaryImageToken === `existing:${image.id}` ? 'Primary image' : 'Set as primary'}</div>
+                  </button>
+                ))}
+                {formData.newImageFiles.map((file, index) => (
+                  <button
+                    type="button"
+                    key={`new-${index}-${file.name}`}
+                    onClick={() => setFormData({ ...formData, primaryImageToken: `new:${index}` })}
+                    className={`rounded-2xl border p-2 text-left ${formData.primaryImageToken === `new:${index}` ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}
+                  >
+                    <img src={URL.createObjectURL(file)} alt="" className="h-28 w-full rounded-xl object-cover" />
+                    <div className="mt-2 text-xs font-medium text-gray-700">{formData.primaryImageToken === `new:${index}` ? 'Primary image' : 'Set as primary'}</div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -113,10 +188,11 @@ export const ProductForm = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Model Number
+                Model Number *
               </label>
               <input
                 type="text"
+                required
                 value={formData.modelNumber}
                 onChange={(e) => setFormData({ ...formData, modelNumber: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -130,13 +206,13 @@ export const ProductForm = () => {
               </label>
               <select
                 required
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                value={formData.categoryId || formData.category}
+                onChange={(e) => syncCategory(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select Category</option>
                 {categories.filter(c => c.status === 'active').map(cat => (
-                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
               {errors.category_id?.[0] && <p className="text-sm text-red-600 mt-1">{errors.category_id[0]}</p>}
@@ -144,9 +220,10 @@ export const ProductForm = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Brand
+                Brand *
               </label>
               <select
+                required
                 value={formData.brand}
                 onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -156,6 +233,7 @@ export const ProductForm = () => {
                   <option key={brand.id} value={brand.name}>{brand.name}</option>
                 ))}
               </select>
+              {errors.brand_id?.[0] && <p className="text-sm text-red-600 mt-1">{errors.brand_id[0]}</p>}
             </div>
 
             <div>
@@ -186,12 +264,37 @@ export const ProductForm = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                GST Percentage *
+                Least Selling Price (₹) *
               </label>
               <input
                 type="number"
                 required
-                value={formData.gstPercent}
+                value={formData.leastSellingPrice}
+                onChange={(e) => setFormData({ ...formData, leastSellingPrice: parseFloat(e.target.value) || 0 })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {errors.least_selling_price?.[0] && <p className="text-sm text-red-600 mt-1">{errors.least_selling_price[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                GST %
+              </label>
+              <input
+                type="number"
+                value={categories.find((category) => category.id === formData.categoryId)?.gstPercent ?? 0}
+                readOnly
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                HSN Code
+              </label>
+              <input
+                type="text"
+                value={categories.find((category) => category.id === formData.categoryId)?.hsnCode ?? ''}
                 readOnly
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-600"
               />
@@ -216,13 +319,22 @@ export const ProductForm = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Specifications
               </label>
-              <textarea
-                rows={4}
-                value={formData.specifications}
-                onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
-                placeholder="Enter detailed product specifications..."
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div className="overflow-hidden rounded-2xl border border-gray-200">
+                <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2">
+                  <button type="button" onClick={() => applySpecFormat('bold')} className="rounded-lg p-2 text-gray-600 hover:bg-white"><Bold className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => applySpecFormat('italic')} className="rounded-lg p-2 text-gray-600 hover:bg-white"><Italic className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => applySpecFormat('underline')} className="rounded-lg p-2 text-gray-600 hover:bg-white"><Underline className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => applySpecFormat('insertUnorderedList')} className="rounded-lg p-2 text-gray-600 hover:bg-white"><List className="h-4 w-4" /></button>
+                </div>
+                <div
+                  ref={specsEditorRef}
+                  contentEditable
+                  onInput={(e) => setFormData({ ...formData, specifications: (e.target as HTMLDivElement).innerHTML })}
+                  className="min-h-40 w-full px-4 py-3 outline-none"
+                  suppressContentEditableWarning
+                />
+              </div>
+              <p className="mt-2 text-xs text-gray-500">These formatted specs will be shown in the quotation in the same style.</p>
             </div>
           </div>
 

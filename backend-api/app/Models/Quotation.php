@@ -16,8 +16,7 @@ class Quotation extends Model
         'show_discount_to_customer', 'default_discount_percent', 'default_discount_amount',
         'intro_text', 'remarks', 'internal_notes', 'subtotal_before_discount',
         'total_line_discount', 'subtotal_after_discount', 'total_adjustments',
-        'total_tax', 'subtotal', 'discount_total', 'taxable_total', 'tax_total', 'adjustment_total',
-        'grand_total', 'status', 'internal_remarks', 'created_by', 'approved_by',
+        'total_tax', 'grand_total', 'status', 'internal_remarks', 'created_by', 'approved_by',
         'approved_at', 'rejected_reason',
     ];
 
@@ -34,11 +33,6 @@ class Quotation extends Model
             'subtotal_after_discount' => 'decimal:2',
             'total_adjustments' => 'decimal:2',
             'total_tax' => 'decimal:2',
-            'subtotal' => 'decimal:2',
-            'discount_total' => 'decimal:2',
-            'taxable_total' => 'decimal:2',
-            'tax_total' => 'decimal:2',
-            'adjustment_total' => 'decimal:2',
             'grand_total' => 'decimal:2',
             'approved_at' => 'datetime',
         ];

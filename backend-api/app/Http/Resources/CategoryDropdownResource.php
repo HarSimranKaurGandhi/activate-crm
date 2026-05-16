@@ -12,6 +12,8 @@ class CategoryDropdownResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'hsn_code' => $this->hsn_code,
+            'gst_percent' => $this->gst_percent,
         ];
     }
 }

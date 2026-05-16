@@ -14,6 +14,7 @@ import { BrandMaster } from "./pages/masters/BrandMaster";
 import { AdjustmentMaster } from "./pages/masters/AdjustmentMaster";
 import { TermsMaster } from "./pages/masters/TermsMaster";
 import { CustomFieldBuilder } from "./pages/masters/CustomFieldBuilder";
+import { UserMaster } from "./pages/masters/UserMaster";
 import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
           { path: "products/new", Component: ProductForm },
           { path: "products/:id/edit", Component: ProductForm },
           { path: "masters/categories", Component: CategoryMaster },
+          { path: "masters/users", Component: UserMaster },
           { path: "masters/brands", Component: BrandMaster },
           { path: "masters/adjustments", Component: AdjustmentMaster },
           { path: "masters/terms", Component: TermsMaster },

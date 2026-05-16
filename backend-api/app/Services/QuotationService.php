@@ -179,15 +179,7 @@ class QuotationService extends CrudService
             $quotation->terms()->create($this->buildTermSnapshot($term));
         }
 
-        $quotation->update($totals + [
-            'subtotal' => $totals['subtotal_before_discount'],
-            'discount_total' => $totals['total_line_discount'],
-            'taxable_total' => $quotation->pricing_mode === 'inclusive_gst'
-                ? max($totals['grand_total'] - $totals['total_tax'] - $totals['total_adjustments'], 0)
-                : $totals['subtotal_after_discount'],
-            'tax_total' => $totals['total_tax'],
-            'adjustment_total' => $totals['total_adjustments'],
-        ]);
+        $quotation->update($totals);
     }
 
     private function recordDiscountOverride($quotationItem, array $snapshot, Quotation $quotation): void

@@ -4,7 +4,12 @@ export const settingsService = {
   async company() {
     return unwrap<any>(await apiClient.get('/settings/company'));
   },
-  async updateCompany(payload: Record<string, unknown>) {
+  async updateCompany(payload: Record<string, unknown> | FormData) {
+    if (payload instanceof FormData) {
+      payload.set('_method', 'PUT');
+      return unwrap<any>(await apiClient.post('/settings/company', payload));
+    }
+
     return unwrap<any>(await apiClient.put('/settings/company', payload));
   },
   async bankDetails() {
@@ -26,4 +31,3 @@ export const settingsService = {
     return unwrap<any>(await apiClient.put('/settings/quotation-numbering', payload));
   },
 };
-

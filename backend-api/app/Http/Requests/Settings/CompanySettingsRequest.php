@@ -23,6 +23,8 @@ class CompanySettingsRequest extends FormRequest
             'logo_path' => ['nullable', 'string', 'max:500'],
             'letterhead_path' => ['nullable', 'string', 'max:500'],
             'signature_path' => ['nullable', 'string', 'max:500'],
+            'logo_file' => ['nullable', 'file', 'image', 'max:5120'],
+            'letterhead_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
             'default_salesperson_name' => ['nullable', 'string', 'max:255'],
             'default_salesperson_phone' => ['nullable', 'string', 'max:30'],
             'default_salesperson_email' => ['nullable', 'email', 'max:255'],

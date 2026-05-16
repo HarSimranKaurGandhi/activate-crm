@@ -13,6 +13,7 @@ const navigation = [
     icon: Database,
     children: [
       { name: 'Categories', href: '/masters/categories' },
+      { name: 'Users', href: '/masters/users' },
       { name: 'Brands', href: '/masters/brands' },
       { name: 'Adjustments', href: '/masters/adjustments' },
       { name: 'Terms & Conditions', href: '/masters/terms' },

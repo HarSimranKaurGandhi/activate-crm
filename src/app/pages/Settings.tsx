@@ -58,16 +58,23 @@ export const Settings = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Logo URL
+                  Company Logo
                 </label>
                 <input
-                  type="url"
-                  value={formData.logo}
-                  onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-                  placeholder="https://example.com/logo.png"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setFormData({
+                      ...formData,
+                      logoFile: file,
+                      logo: file ? URL.createObjectURL(file) : formData.logo,
+                    });
+                  }}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {formData.logo && <img src={formData.logo} alt="Logo preview" className="mt-3 h-14 object-contain" />}
+                <FieldError message={errors.logo_file?.[0]} />
               </div>
 
               <div>
@@ -122,16 +129,27 @@ export const Settings = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Letterhead URL
+                  Letterhead
                 </label>
                 <input
-                  type="url"
-                  value={formData.letterhead}
-                  onChange={(e) => setFormData({ ...formData, letterhead: e.target.value })}
-                  placeholder="https://example.com/letterhead.jpg"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp,.pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setFormData({
+                      ...formData,
+                      letterheadFile: file,
+                      letterhead: file ? URL.createObjectURL(file) : formData.letterhead,
+                    });
+                  }}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {formData.letterhead && <img src={formData.letterhead} alt="Letterhead preview" className="mt-3 h-16 w-full object-cover rounded-lg border border-gray-200" />}
+                {formData.letterhead && (
+                  formData.letterheadFile?.type === 'application/pdf' || formData.letterhead.toLowerCase().endsWith('.pdf')
+                    ? <a href={formData.letterhead} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-blue-600 hover:underline">View current letterhead</a>
+                    : <img src={formData.letterhead} alt="Letterhead preview" className="mt-3 h-16 w-full object-cover rounded-lg border border-gray-200" />
+                )}
+                <FieldError message={errors.letterhead_file?.[0]} />
               </div>
 
               <div>

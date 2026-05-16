@@ -1,0 +1,2 @@
+ALTER TABLE brands
+ADD COLUMN catalog_path VARCHAR(255) NULL AFTER logo;

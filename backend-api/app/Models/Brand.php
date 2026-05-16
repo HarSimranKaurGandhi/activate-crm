@@ -9,7 +9,15 @@ class Brand extends Model
 {
     protected $table = 'brands';
 
-    protected $fillable = ['name', 'description', 'logo_path', 'display_order', 'is_active'];
+    protected $fillable = [
+        'name',
+        'brand_owner',
+        'description',
+        'logo',
+        'catalog_path',
+        'display_order',
+        'is_active',
+    ];
 
     protected function casts(): array
     {

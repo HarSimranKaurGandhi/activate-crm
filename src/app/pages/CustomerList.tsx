@@ -77,9 +77,8 @@ export const CustomerList = () => {
                 <div className="space-y-1 text-sm text-gray-600">
                   <p>{customer.email}</p>
                   <p>{customer.phone}</p>
-                  {customer.gstNumber && (
-                    <p className="text-xs text-gray-500 mt-2">GST: {customer.gstNumber}</p>
-                  )}
+                  {customer.rating > 0 && <p className="text-xs text-amber-600 mt-2">Rating: {customer.rating}/5</p>}
+                  {customer.address && <p className="text-xs text-gray-500 mt-2">{customer.address}</p>}
                 </div>
               </div>
             ))}

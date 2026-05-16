@@ -5,6 +5,18 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../components/common/AsyncState';
 
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa',
+  'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala',
+  'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland',
+  'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
+  'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+];
+
+const COUNTRIES = ['India', 'United Arab Emirates', 'United States', 'United Kingdom', 'Australia', 'Canada', 'Singapore'];
+
 export const CustomerForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -17,8 +29,14 @@ export const CustomerForm = () => {
     company: '',
     email: '',
     phone: '',
-    address: '',
-    gstNumber: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: 'India',
+    rating: 0,
+    notes: '',
     customFields: {} as Record<string, any>,
   });
 
@@ -35,8 +53,8 @@ export const CustomerForm = () => {
     e.preventDefault();
     setErrors({});
 
-    if (!formData.name) {
-      toast.error('Please enter the contact person name');
+    if (!formData.name || !formData.phone || !formData.addressLine1 || !formData.state || !formData.country) {
+      toast.error('Please complete the required customer fields');
       return;
     }
 
@@ -179,39 +197,136 @@ export const CustomerForm = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone
+                Phone *
               </label>
               <input
                 type="tel"
+                required
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Address
-              </label>
-              <textarea
-                rows={3}
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              {errors.phone?.[0] && <p className="text-sm text-red-600 mt-1">{errors.phone[0]}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                GST Number
+                Address Line 1
               </label>
               <input
                 type="text"
-                value={formData.gstNumber}
-                onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                value={formData.addressLine1}
+                onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              {errors.gst_number?.[0] && <p className="text-sm text-red-600 mt-1">{errors.gst_number[0]}</p>}
+              {errors.address_line_1?.[0] && <p className="text-sm text-red-600 mt-1">{errors.address_line_1[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Address Line 2
+              </label>
+              <input
+                type="text"
+                value={formData.addressLine2}
+                onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {errors.address_line_2?.[0] && <p className="text-sm text-red-600 mt-1">{errors.address_line_2[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                City
+              </label>
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {errors.city?.[0] && <p className="text-sm text-red-600 mt-1">{errors.city[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                State
+              </label>
+              <select
+                required
+                value={formData.state}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select state</option>
+                {INDIAN_STATES.map((state) => (
+                  <option key={state} value={state}>{state}</option>
+                ))}
+              </select>
+              {errors.state?.[0] && <p className="text-sm text-red-600 mt-1">{errors.state[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Pincode
+              </label>
+              <input
+                type="text"
+                value={formData.pincode}
+                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {errors.pincode?.[0] && <p className="text-sm text-red-600 mt-1">{errors.pincode[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Country
+              </label>
+              <select
+                required
+                value={formData.country}
+                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select country</option>
+                {COUNTRIES.map((country) => (
+                  <option key={country} value={country}>{country}</option>
+                ))}
+              </select>
+              {errors.country?.[0] && <p className="text-sm text-red-600 mt-1">{errors.country[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer Rating
+              </label>
+              <select
+                value={formData.rating}
+                onChange={(e) => setFormData({ ...formData, rating: Number(e.target.value) })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value={0}>Not rated</option>
+                <option value={1}>1 / 5</option>
+                <option value={2}>2 / 5</option>
+                <option value={3}>3 / 5</option>
+                <option value={4}>4 / 5</option>
+                <option value={5}>5 / 5</option>
+              </select>
+              {errors.rating?.[0] && <p className="text-sm text-red-600 mt-1">{errors.rating[0]}</p>}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notes
+              </label>
+              <textarea
+                rows={3}
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {errors.notes?.[0] && <p className="text-sm text-red-600 mt-1">{errors.notes[0]}</p>}
             </div>
           </div>
 

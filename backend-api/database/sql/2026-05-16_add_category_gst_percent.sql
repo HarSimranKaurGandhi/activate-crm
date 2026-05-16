@@ -1,0 +1,2 @@
+ALTER TABLE categories
+ADD COLUMN gst_percent DECIMAL(5,2) NOT NULL DEFAULT 18.00 AFTER description;

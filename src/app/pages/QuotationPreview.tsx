@@ -84,6 +84,18 @@ export const QuotationPreview = () => {
     return term?.content || termId;
   };
 
+  const calculateItemAmounts = (item: any) => {
+    const basePrice = item.price * item.quantity;
+    const discountAmount = basePrice * (item.discount / 100);
+    const afterDiscount = basePrice - discountAmount;
+    const gstAmount = quotation.gstInclusive ? 0 : afterDiscount * (item.product.gstPercent / 100);
+
+    return {
+      gstAmount,
+      total: afterDiscount + gstAmount,
+    };
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-[1200px] mx-auto space-y-6">
@@ -227,16 +239,13 @@ export const QuotationPreview = () => {
                       <th className="px-4 py-3 text-center text-sm font-semibold">Disc%</th>
                     )}
                     <th className="px-4 py-3 text-center text-sm font-semibold">GST%</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold">GST Amt</th>
                     <th className="px-4 py-3 text-right text-sm font-semibold">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {quotation.items.map((item: any, index: number) => {
-                    const basePrice = item.price * item.quantity;
-                    const discountAmount = basePrice * (item.discount / 100);
-                    const afterDiscount = basePrice - discountAmount;
-                    const gstAmount = quotation.gstInclusive ? 0 : afterDiscount * (item.product.gstPercent / 100);
-                    const total = afterDiscount + gstAmount;
+                    const { gstAmount, total } = calculateItemAmounts(item);
 
                     return (
                       <tr key={item.id} className="border-b border-gray-200">
@@ -245,7 +254,10 @@ export const QuotationPreview = () => {
                           <div>
                             <p className="font-semibold text-gray-900">{item.product.name}</p>
                             <p className="text-sm text-gray-600">Model: {item.product.modelNumber}</p>
-                            <p className="text-sm text-gray-600 mt-1">{item.specifications}</p>
+                            <div
+                              className="mt-1 text-sm text-gray-600 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                              dangerouslySetInnerHTML={renderHtml(item.specifications || '')}
+                            />
                           </div>
                         </td>
                         <td className="px-4 py-4 text-center text-gray-900">{item.quantity}</td>
@@ -258,6 +270,9 @@ export const QuotationPreview = () => {
                           </td>
                         )}
                         <td className="px-4 py-4 text-center text-gray-900">{item.product.gstPercent}%</td>
+                        <td className="px-4 py-4 text-right text-gray-900">
+                          ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </td>
                         <td className="px-4 py-4 text-right font-semibold text-gray-900">
                           ₹{total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                         </td>
@@ -398,3 +413,4 @@ export const QuotationPreview = () => {
     </div>
   );
 };
+const renderHtml = (value: string) => ({ __html: value });

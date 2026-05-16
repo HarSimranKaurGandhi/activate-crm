@@ -36,6 +36,20 @@ class User extends Authenticatable
 
     public function hasAnyRole(array $roles): bool
     {
-        return $this->role && in_array($this->role->name, $roles, true);
+        if (! $this->role) {
+            return false;
+        }
+
+        $allowedRoles = array_map(
+            static fn (string $role): string => strtolower(trim($role)),
+            $roles
+        );
+
+        $roleIdentifiers = array_filter([
+            strtolower((string) $this->role->name),
+            strtolower((string) ($this->role->code ?? '')),
+        ]);
+
+        return count(array_intersect($allowedRoles, $roleIdentifiers)) > 0;
     }
 }

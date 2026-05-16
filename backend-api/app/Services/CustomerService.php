@@ -79,7 +79,7 @@ class CustomerService extends CrudService
 
             $customer->fieldValues()->updateOrCreate(
                 ['field_definition_id' => $definitionId],
-                ['value' => $this->normalizeValue($field['value'] ?? null)]
+                ['field_value' => $this->normalizeValue($field['value'] ?? null)]
             );
         }
     }
@@ -108,7 +108,7 @@ class CustomerService extends CrudService
             });
 
         if ($customer) {
-            $existing = $customer->fieldValues()->pluck('value', 'field_definition_id');
+            $existing = $customer->fieldValues()->pluck('field_value', 'field_definition_id');
             $provided = $existing->merge($provided);
         }
 

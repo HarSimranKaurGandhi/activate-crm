@@ -9,6 +9,15 @@ class QuotationResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $subtotalBeforeDiscount = (float) ($this->subtotal_before_discount ?? 0);
+        $totalLineDiscount = (float) ($this->total_line_discount ?? 0);
+        $subtotalAfterDiscount = (float) ($this->subtotal_after_discount ?? 0);
+        $totalAdjustments = (float) ($this->total_adjustments ?? 0);
+        $totalTax = (float) ($this->total_tax ?? 0);
+        $taxableTotal = $this->pricing_mode === 'inclusive_gst'
+            ? max((float) ($this->grand_total ?? 0) - $totalTax - $totalAdjustments, 0)
+            : $subtotalAfterDiscount;
+
         return [
             'id' => $this->id,
             'quotation_number' => $this->quotation_number,
@@ -27,16 +36,16 @@ class QuotationResource extends JsonResource
             'remarks' => $this->remarks,
             'internal_notes' => $this->internal_notes,
             'status' => $this->status,
-            'subtotal_before_discount' => $this->subtotal_before_discount,
-            'total_line_discount' => $this->total_line_discount,
-            'subtotal_after_discount' => $this->subtotal_after_discount,
-            'total_adjustments' => $this->total_adjustments,
-            'total_tax' => $this->total_tax,
-            'subtotal' => $this->subtotal,
-            'discount_total' => $this->discount_total,
-            'taxable_total' => $this->taxable_total,
-            'tax_total' => $this->tax_total,
-            'adjustment_total' => $this->adjustment_total,
+            'subtotal_before_discount' => $subtotalBeforeDiscount,
+            'total_line_discount' => $totalLineDiscount,
+            'subtotal_after_discount' => $subtotalAfterDiscount,
+            'total_adjustments' => $totalAdjustments,
+            'total_tax' => $totalTax,
+            'subtotal' => $subtotalAfterDiscount,
+            'discount_total' => $totalLineDiscount,
+            'taxable_total' => $taxableTotal,
+            'tax_total' => $totalTax,
+            'adjustment_total' => $totalAdjustments,
             'grand_total' => $this->grand_total,
             'requires_watermark' => $this->status !== 'approved',
             'items' => QuotationItemResource::collection($this->whenLoaded('items')),
