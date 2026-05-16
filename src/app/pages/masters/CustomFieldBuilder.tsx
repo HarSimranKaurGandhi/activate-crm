@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
+import { PaginationControls, usePagination } from '../../components/common/Pagination';
 
 export const CustomFieldBuilder = () => {
   const { customFields, addCustomField, updateCustomField, deleteCustomField, loading } = useData();
@@ -15,6 +16,7 @@ export const CustomFieldBuilder = () => {
     required: false,
   });
   const [optionInput, setOptionInput] = useState('');
+  const pagination = usePagination(customFields, 10);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +91,7 @@ export const CustomFieldBuilder = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {customFields.map(field => (
+              {pagination.pageItems.map(field => (
                 <tr key={field.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">{field.name}</td>
                   <td className="px-6 py-4">
@@ -139,6 +141,14 @@ export const CustomFieldBuilder = () => {
               )}
             </tbody>
           </table>
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
           {loading && <LoadingState label="Loading custom fields..." />}
         </div>
       </div>

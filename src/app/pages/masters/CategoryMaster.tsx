@@ -3,12 +3,14 @@ import { Plus, Edit, Trash2, Power } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
+import { PaginationControls, usePagination } from '../../components/common/Pagination';
 
 export const CategoryMaster = () => {
   const { categories, addCategory, updateCategory, deleteCategory, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', hsnCode: '', gstPercent: 18, status: 'active' as 'active' | 'inactive' });
+  const pagination = usePagination(categories, 10);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +66,7 @@ export const CategoryMaster = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {categories.map(category => (
+              {pagination.pageItems.map(category => (
                 <tr key={category.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">{category.name}</td>
                   <td className="px-6 py-4 text-gray-700">{category.hsnCode || '-'}</td>
@@ -107,6 +109,14 @@ export const CategoryMaster = () => {
               ))}
             </tbody>
           </table>
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
           {loading && <LoadingState label="Loading categories..." />}
         </div>
       </div>

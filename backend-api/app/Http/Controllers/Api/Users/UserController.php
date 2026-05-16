@@ -7,9 +7,11 @@ use App\Http\Requests\Common\StatusRequest;
 use App\Http\Requests\Users\StoreUserRequest;
 use App\Http\Requests\Users\UserIndexRequest;
 use App\Http\Requests\Users\UpdateUserRequest;
+use App\Http\Resources\UserDropdownResource;
 use App\Http\Resources\UserResource;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class UserController extends ApiController
 {
@@ -23,6 +25,14 @@ class UserController extends ApiController
             'Users fetched successfully',
             $this->users->paginate($request),
             UserResource::class
+        );
+    }
+
+    public function dropdown(Request $request): JsonResponse
+    {
+        return $this->ok(
+            'Users dropdown fetched successfully',
+            UserDropdownResource::collection($this->users->dropdown($request))
         );
     }
 

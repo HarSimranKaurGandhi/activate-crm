@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, Power } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
+import { PaginationControls, usePagination } from '../../components/common/Pagination';
 
 export const BrandMaster = () => {
   const { brands, addBrand, updateBrand, deleteBrand, loading } = useData();
@@ -19,6 +20,7 @@ export const BrandMaster = () => {
     catalogFile: null as File | null,
     status: 'active' as 'active' | 'inactive',
   });
+  const pagination = usePagination(brands, 10);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +112,7 @@ export const BrandMaster = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {brands.map(brand => (
+              {pagination.pageItems.map(brand => (
                 <tr key={brand.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     {brand.logoPath ? (
@@ -168,6 +170,14 @@ export const BrandMaster = () => {
               ))}
             </tbody>
           </table>
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
           {loading && <LoadingState label="Loading brands..." />}
         </div>
       </div>

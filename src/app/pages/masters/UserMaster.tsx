@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { Edit, Plus, Power, Trash2, UserCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
+import { PaginationControls, usePagination } from '../../components/common/Pagination';
 import { userService } from '../../../services/userService';
 
 const emptyForm = {
   name: '',
   email: '',
   phone: '',
+  designation: '',
   password: '',
   roleId: '',
   status: 'active' as 'active' | 'inactive',
@@ -18,6 +20,7 @@ const mapUser = (user: any) => ({
   name: user.name || '',
   email: user.email || '',
   phone: user.phone || '',
+  designation: user.designation || '',
   roleId: user.role_id ? String(user.role_id) : '',
   roleName: user.role?.display_name || user.role?.name || '',
   status: user.is_active ? 'active' : 'inactive',
@@ -31,6 +34,7 @@ export const UserMaster = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [formData, setFormData] = useState(emptyForm);
+  const pagination = usePagination(users, 10);
 
   const loadData = async () => {
     setLoading(true);
@@ -66,6 +70,7 @@ export const UserMaster = () => {
       name: formData.name,
       email: formData.email,
       phone: formData.phone || null,
+      designation: formData.designation || null,
       role_id: formData.roleId ? Number(formData.roleId) : null,
       is_active: formData.status === 'active',
     };
@@ -98,6 +103,7 @@ export const UserMaster = () => {
       name: user.name,
       email: user.email,
       phone: user.phone,
+      designation: user.designation,
       password: '',
       roleId: user.roleId,
       status: user.status,
@@ -134,13 +140,14 @@ export const UserMaster = () => {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">User</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Role</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Designation</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Phone</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {users.map((user) => (
+              {pagination.pageItems.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -154,6 +161,7 @@ export const UserMaster = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-gray-700">{user.roleName || '-'}</td>
+                  <td className="px-6 py-4 text-gray-700">{user.designation || '-'}</td>
                   <td className="px-6 py-4 text-gray-700">{user.phone || '-'}</td>
                   <td className="px-6 py-4">
                     <button
@@ -188,13 +196,21 @@ export const UserMaster = () => {
               ))}
             </tbody>
           </table>
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
           {loading && <LoadingState label="Loading users..." />}
         </div>
       </div>
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-semibold text-gray-900 mb-4">
               {editingId ? 'Edit User' : 'Add User'}
             </h3>
@@ -230,6 +246,16 @@ export const UserMaster = () => {
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {errors.phone?.[0] && <p className="mt-1 text-sm text-red-600">{errors.phone[0]}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Designation</label>
+                <input
+                  type="text"
+                  value={formData.designation}
+                  onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.designation?.[0] && <p className="mt-1 text-sm text-red-600">{errors.designation[0]}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

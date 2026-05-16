@@ -45,28 +45,31 @@ export const Layout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="crm-shell flex h-screen bg-slate-50">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-gray-200">
-          <BrandLogo imageClassName="h-8" textClassName="text-sm tracking-[0.22em]" />
+      <aside className="crm-sidebar w-60 bg-white border-r border-slate-200 flex flex-col">
+        <div className="h-14 flex items-center justify-center px-4 border-b border-slate-200">
+          <BrandLogo
+            className="w-full justify-center"
+            imageClassName="h-11 w-auto max-w-[10rem]"
+          />
         </div>
 
-        <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          <div className="space-y-1">
+        <nav className="flex-1 px-2.5 py-3 overflow-y-auto">
+          <div className="space-y-0.5">
             {navigation.map((item) => {
               if (item.children) {
                 return (
                   <div key={item.name}>
                     <button
                       onClick={() => setMastersOpen(!mastersOpen)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                      className={`crm-nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
                         location.pathname.startsWith('/masters')
-                          ? 'bg-blue-50 text-blue-600'
-                          : 'text-gray-700 hover:bg-gray-50'
+                          ? 'crm-nav-active bg-blue-50 text-blue-700'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
                       }`}
                     >
-                      <item.icon className="w-5 h-5" />
+                      <item.icon className="w-4 h-4" />
                       <span className="flex-1 text-left">{item.name}</span>
                       <svg
                         className={`w-4 h-4 transition-transform ${mastersOpen ? 'rotate-90' : ''}`}
@@ -78,15 +81,15 @@ export const Layout = () => {
                       </svg>
                     </button>
                     {mastersOpen && (
-                      <div className="mt-1 ml-11 space-y-1">
+                      <div className="mt-1 ml-7 border-l border-slate-200 pl-3 space-y-0.5">
                         {item.children.map((child) => (
                           <Link
                             key={child.href}
                             to={child.href}
-                            className={`block px-3 py-2 text-sm rounded-lg transition-all ${
+                            className={`block px-3 py-1.5 text-sm rounded-md transition-all ${
                               isActive(child.href)
-                                ? 'bg-blue-50 text-blue-600 font-medium'
-                                : 'text-gray-600 hover:bg-gray-50'
+                                ? 'bg-blue-50 text-blue-700 font-medium'
+                                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
                             }`}
                           >
                             {child.name}
@@ -102,13 +105,13 @@ export const Layout = () => {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  className={`crm-nav-item flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
                     isActive(item.href)
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      ? 'crm-nav-active bg-blue-50 text-blue-700'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
                   }`}
                 >
-                  <item.icon className="w-5 h-5" />
+                  <item.icon className="w-4 h-4" />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -116,12 +119,12 @@ export const Layout = () => {
           </div>
         </nav>
 
-        <div className="p-3 border-t border-gray-200">
+        <div className="p-2.5 border-t border-slate-200">
           <button
             onClick={() => logout()}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-xl transition-all"
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950 rounded-lg transition-all"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4" />
             <span>Logout</span>
           </button>
         </div>
@@ -130,29 +133,25 @@ export const Layout = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-          <div className="flex items-center gap-5">
-            <BrandLogo imageClassName="h-10" textClassName="text-base tracking-[0.22em]" />
-            <div className="h-10 w-px bg-gray-200" />
-            <h1 className="text-xl font-semibold text-gray-900">
-              {navigation.find(n => isActive(n.href || ''))?.name || 'Masters'}
-            </h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">{String(user?.name || 'U').slice(0, 2).toUpperCase()}</span>
+        <header className="h-14 bg-white/90 backdrop-blur border-b border-slate-200 flex items-center justify-between px-5">
+          <h1 className="text-lg font-semibold text-slate-950">
+            {navigation.find(n => isActive(n.href || ''))?.name || 'Masters'}
+          </h1>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 shadow-sm">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-semibold">{String(user?.name || 'U').slice(0, 2).toUpperCase()}</span>
               </div>
-              <div className="text-sm">
-                <div className="font-medium text-gray-900">{user?.name || 'User'}</div>
-                <div className="text-gray-500">{user?.email || ''}</div>
+              <div className="text-sm leading-tight">
+                <div className="font-semibold text-slate-900">{user?.name || 'User'}</div>
+                <div className="text-xs text-slate-500">{user?.email || ''}</div>
               </div>
             </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="crm-main flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>

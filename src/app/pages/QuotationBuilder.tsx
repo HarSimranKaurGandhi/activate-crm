@@ -5,8 +5,10 @@ import { useState, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { toast } from 'sonner';
 import { productService } from '../../services/productService';
+import { userService } from '../../services/userService';
 import { mapProduct } from '../../services/mappers';
 import { LoadingState } from '../components/common/AsyncState';
+import { PaginationControls, usePagination } from '../components/common/Pagination';
 
 const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -55,41 +57,41 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
   const { gstAmount, lineTotal } = calculateItemAmounts(item, gstInclusive);
 
   return (
-    <tr ref={(node) => { drag(drop(node)); }} className="border-b border-gray-200 hover:bg-gray-50">
-      <td className="px-4 py-3">
-        <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
+    <tr ref={(node) => { drag(drop(node)); }} className="border-b border-gray-200 last:border-0 hover:bg-gray-50">
+      <td className="w-8 px-2 py-2 align-middle">
+        <GripVertical className="w-4 h-4 text-gray-400 cursor-move" />
       </td>
-      <td className="px-4 py-3">
-        <img src={item.product.image} alt="" className="w-16 h-16 object-cover rounded-lg" />
-      </td>
-      <td className="px-4 py-3">
-        <div>
-          <div className="font-medium text-gray-900">{item.product.name}</div>
-          <div className="text-sm text-gray-500">{item.product.modelNumber}</div>
-          {item.specifications && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{stripHtml(item.specifications)}</div>}
+      <td className="px-2 py-2 align-middle">
+        <div className="flex items-center gap-3 min-w-0">
+          <img src={item.product.image} alt="" className="w-12 h-12 shrink-0 object-cover rounded-md border border-gray-100" />
+          <div className="min-w-0">
+            <div className="font-medium text-sm text-gray-900 leading-tight truncate">{item.product.name}</div>
+            <div className="text-xs text-gray-500 truncate">{item.product.modelNumber}</div>
+            {item.specifications && <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{stripHtml(item.specifications)}</div>}
+          </div>
         </div>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-2 py-2 align-middle">
         <input
           type="number"
           value={item.quantity}
           onChange={(e) => onUpdate(item.id, { quantity: parseInt(e.target.value) || 1 })}
-          className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-center"
+          className="w-14 px-2 py-1.5 border border-gray-200 rounded-md text-center text-sm"
           min="1"
         />
       </td>
-      <td className="px-4 py-3">
+      <td className="px-2 py-2 align-middle">
         <div className="font-medium text-gray-900">
           ₹{productMrp.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
         </div>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-2 py-2 align-middle">
         <div className="font-medium text-gray-900">
           ₹{discountedUnitPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
         </div>
       </td>
       {showDiscount && (
-        <td className="px-4 py-3">
+       <td className="px-2 py-2 align-middle">
           <input
             type="number"
             value={item.discount}
@@ -97,26 +99,42 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
               const newDiscount = parseInt(e.target.value, 10) || 0;
               onUpdate(item.id, { discount: normalizeDiscount(newDiscount) });
             }}
-            className="w-20 px-2 py-1 border border-gray-200 rounded-lg"
+            className="w-24 px-2 py-1.5 border border-gray-200 rounded-md text-sm"
             min="0"
             max="100"
             step="1"
           />
         </td>
       )}
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td className="px-2 py-2 align-middle text-sm text-gray-600">
         {item.product.gstPercent}%
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td className="px-2 py-2 align-middle text-sm text-gray-600 whitespace-nowrap">
         ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
       </td>
+      {showDiscount && (
       <td className="px-4 py-3 font-semibold text-gray-900">
+          <input
+            type="number"
+            value={item.discount.toFixed(2)}
+            onChange={(e) => {
+              const newDiscount = parseFloat(e.target.value) || 0;
+              const basePrice = getQuotationBasePrice(item.product);
+              const newPrice = basePrice * (1 - newDiscount / 100);
+              onUpdate(item.id, { discount: newDiscount, price: newPrice });
+            }}
+            className="w-16 px-2 py-1.5 border border-gray-200 rounded-md text-sm"
+            step="0.01"
+          />
+        </td>
+      )}
+      <td className="px-2 py-2 align-middle font-semibold text-sm text-gray-900 whitespace-nowrap">
         ₹{lineTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
       </td>
-      <td className="px-4 py-3">
+      <td className="w-9 px-2 py-2 align-middle">
         <button
           onClick={() => onDelete(item.id)}
-          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+          className="p-1.5 text-red-600 hover:bg-red-50 rounded-md"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -128,7 +146,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
 export const QuotationBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { products, customers, quotations, addQuotation, updateQuotation, adjustments, terms: masterTerms, settings, loading } = useData();
+  const { products, customers, quotations, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
 
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [salesperson, setSalesperson] = useState({
@@ -136,9 +154,10 @@ export const QuotationBuilder = () => {
     phone: '',
     email: '',
   });
+  const [selectedSalespersonId, setSelectedSalespersonId] = useState('');
+  const [salesUsers, setSalesUsers] = useState<any[]>([]);
   const [items, setItems] = useState<QuotationItem[]>([]);
   const [globalDiscount, setGlobalDiscount] = useState(0);
-  const [selectedAdjustments, setSelectedAdjustments] = useState<Record<string, { enabled: boolean; amount: number }>>({});
   const [gstInclusive, setGstInclusive] = useState(false);
   const [showDiscount, setShowDiscount] = useState(true);
   const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
@@ -150,6 +169,13 @@ export const QuotationBuilder = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    userService
+      .dropdown()
+      .then((users) => setSalesUsers(Array.isArray(users) ? users : []))
+      .catch(() => setSalesUsers([]));
+  }, []);
+
+  useEffect(() => {
     const quotation = id ? quotations.find(q => q.id === id) : null;
     if (id) {
       if (quotation) {
@@ -157,7 +183,6 @@ export const QuotationBuilder = () => {
         setSalesperson(quotation.salesperson);
         setItems(quotation.items);
         setGlobalDiscount(quotation.globalDiscount);
-        setSelectedAdjustments(quotation.adjustments);
         setGstInclusive(quotation.gstInclusive);
         setShowDiscount(quotation.showDiscount);
         setSelectedTerms(quotation.terms);
@@ -170,14 +195,24 @@ export const QuotationBuilder = () => {
       });
     }
 
-    if (!quotation) {
-      const adjMap: Record<string, { enabled: boolean; amount: number }> = {};
-      adjustments.forEach(adj => {
-        adjMap[adj.id] = { enabled: false, amount: adj.defaultValue };
-      });
-      setSelectedAdjustments(adjMap);
+  }, [id, quotations, settings]);
+
+  useEffect(() => {
+    if (selectedSalespersonId || salesUsers.length === 0 || (!salesperson.email && !salesperson.name)) {
+      return;
     }
-  }, [id, quotations, adjustments, settings]);
+
+    const matchedUser = salesUsers.find((user) => {
+      return (
+        (salesperson.email && user.email === salesperson.email) ||
+        (salesperson.name && user.name === salesperson.name)
+      );
+    });
+
+    if (matchedUser) {
+      setSelectedSalespersonId(String(matchedUser.id));
+    }
+  }, [salesUsers, salesperson.email, salesperson.name, selectedSalespersonId]);
 
   useEffect(() => {
     if (!showProductModal) return;
@@ -230,26 +265,32 @@ export const QuotationBuilder = () => {
     setItems((currentItems) => currentItems.filter((item) => item.id !== itemId));
   };
 
+  const handleSalespersonSelect = (userId: string) => {
+    setSelectedSalespersonId(userId);
+    const user = salesUsers.find((salesUser) => String(salesUser.id) === userId);
+
+    if (!user) {
+      setSalesperson({
+        name: '',
+        phone: '',
+        email: '',
+      });
+      return;
+    }
+
+    setSalesperson({
+      name: user.name || '',
+      phone: user.phone || '',
+      email: user.email || '',
+    });
+  };
+
   const calculateTotals = () => {
     let subtotal = 0;
     items.forEach(item => {
       const basePrice = item.price * item.quantity;
       const discountAmount = basePrice * (item.discount / 100);
       subtotal += basePrice - discountAmount;
-    });
-
-    let adjustmentsTotal = 0;
-    Object.entries(selectedAdjustments).forEach(([adjId, adj]) => {
-      if (adj.enabled) {
-        const adjustment = adjustments.find(a => a.id === adjId);
-        if (adjustment) {
-          if (adjustment.type === 'percentage') {
-            adjustmentsTotal += subtotal * (adj.amount / 100);
-          } else {
-            adjustmentsTotal += adj.amount;
-          }
-        }
-      }
     });
 
     let taxAmount = 0;
@@ -262,12 +303,13 @@ export const QuotationBuilder = () => {
       });
     }
 
-    const grandTotal = subtotal + adjustmentsTotal + taxAmount;
+    const grandTotal = subtotal + taxAmount;
 
-    return { subtotal, adjustmentsTotal, taxAmount, grandTotal };
+    return { subtotal, taxAmount, grandTotal };
   };
 
   const totals = calculateTotals();
+  const itemPagination = usePagination(items, 10);
   const filteredCustomers = customers.filter((customer) => {
     const search = customerSearch.trim().toLowerCase();
 
@@ -298,7 +340,7 @@ export const QuotationBuilder = () => {
 
   if (loading && id) {
     return (
-      <div className="p-8">
+      <div className="p-4">
         <LoadingState label="Loading quotation..." />
       </div>
     );
@@ -320,7 +362,6 @@ export const QuotationBuilder = () => {
       salesperson,
       items,
       globalDiscount,
-      adjustments: selectedAdjustments,
       gstInclusive,
       showDiscount,
       terms: selectedTerms,
@@ -346,24 +387,24 @@ export const QuotationBuilder = () => {
   };
 
   return (
-    <div className="p-8">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+    <div className="p-4">
+      <div className="w-full max-w-none space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/quotations')} className="p-2 hover:bg-gray-100 rounded-lg">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => navigate('/quotations')} className="p-2 hover:bg-gray-100 rounded-lg shrink-0">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div>
-              <h2 className="text-2xl font-semibold text-gray-900">
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold text-gray-900 leading-tight">
                 {id ? 'Edit Quotation' : 'Create New Quotation'}
               </h2>
-              <p className="text-gray-600 mt-1">Build your quotation with products and pricing</p>
+              <p className="text-sm text-gray-600">Build your quotation with products and pricing</p>
             </div>
           </div>
           <button
             onClick={handleSave}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
+            className="flex shrink-0 items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
           >
             <Save className="w-5 h-5" />
             {saving ? 'Saving...' : 'Save Quotation'}
@@ -371,104 +412,126 @@ export const QuotationBuilder = () => {
         </div>
 
         {/* Customer & Salesperson */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Customer Details</h3>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(280px,0.85fr)_minmax(520px,1.15fr)] gap-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="font-semibold text-gray-900 mb-3">Customer Details</h3>
             {selectedCustomer ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900">{selectedCustomer.company}</p>
-                    <p className="text-sm text-gray-600">{selectedCustomer.name}</p>
-                    <p className="text-sm text-gray-600">{selectedCustomer.email}</p>
-                    <p className="text-sm text-gray-600">{selectedCustomer.phone}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 leading-tight truncate">{selectedCustomer.company}</p>
+                  <div className="mt-1 grid gap-x-4 gap-y-0.5 text-sm text-gray-600 sm:grid-cols-2">
+                    <span className="truncate">{selectedCustomer.name}</span>
+                    <span className="truncate">{selectedCustomer.phone}</span>
+                    <span className="truncate sm:col-span-2">{selectedCustomer.email}</span>
                   </div>
-                  <button
-                    onClick={() => setShowCustomerModal(true)}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    Change
-                  </button>
                 </div>
+                <button
+                  onClick={() => setShowCustomerModal(true)}
+                  className="shrink-0 text-sm text-blue-600 hover:underline"
+                >
+                  Change
+                </button>
               </div>
             ) : (
               <button
                 onClick={() => setShowCustomerModal(true)}
-                className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-all"
+                className="w-full py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-all"
               >
                 Select Customer
               </button>
             )}
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Salesperson Details</h3>
-            <div className="space-y-3">
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="font-semibold text-gray-900 mb-3">Salesperson Details</h3>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <select
+                value={selectedSalespersonId}
+                onChange={(e) => handleSalespersonSelect(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+              >
+                <option value="">Select salesperson</option>
+                {salesUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {[user.name, user.designation].filter(Boolean).join(' - ')}
+                  </option>
+                ))}
+              </select>
               <input
                 type="text"
                 value={salesperson.name}
                 onChange={(e) => setSalesperson({ ...salesperson, name: e.target.value })}
                 placeholder="Name"
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
               />
               <input
                 type="text"
                 value={salesperson.phone}
                 onChange={(e) => setSalesperson({ ...salesperson, phone: e.target.value })}
                 placeholder="Phone"
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
               />
               <input
                 type="email"
                 value={salesperson.email}
                 onChange={(e) => setSalesperson({ ...salesperson, email: e.target.value })}
                 placeholder="Email"
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg"
               />
             </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
           {/* Products Table */}
-          <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="min-w-0 bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-900">Products</h3>
               <button
                 onClick={() => setShowProductModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 <Plus className="w-4 h-4" />
                 Add Product
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-hidden">
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-8" />
+                  <col />
+                  <col className="w-16" />
+                  <col className="w-28" />
+                  <col className="w-16" />
+                  <col className="w-28" />
+                  {showDiscount && <col className="w-20" />}
+                  <col className="w-32" />
+                  <col className="w-10" />
+                </colgroup>
                 <thead>
                   <tr className="border-b-2 border-gray-200">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase"></th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Image</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Qty</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">MRP</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Discounted Price</th>
+                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase"></th>
+                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Product</th>
+                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Qty</th>
+                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">MRP</th>
+                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Discounted Price</th>
+                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">GST%</th>
+                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">GST Amt</th>
                     {showDiscount && (
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Disc%</th>
+                      <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Disc%</th>
                     )}
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST%</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">GST Amt</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Total</th>
-                    <th className="px-4 py-3"></th>
+                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Total</th>
+                    <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item, index) => (
+                  {itemPagination.pageItems.map((item, index) => (
                     <DraggableRow
                       key={item.id}
                       item={item}
-                      index={index}
+                      index={(itemPagination.page - 1) * itemPagination.pageSize + index}
                       moveRow={moveRow}
                       onUpdate={updateItem}
                       onDelete={deleteItem}
@@ -479,24 +542,34 @@ export const QuotationBuilder = () => {
                 </tbody>
               </table>
               {items.length === 0 && (
-                <div className="py-12 text-center text-gray-500">
+                <div className="py-8 text-center text-sm text-gray-500">
                   No products added yet. Click "Add Product" to get started.
                 </div>
+              )}
+              {items.length > 0 && (
+                <PaginationControls
+                  page={itemPagination.page}
+                  pageSize={itemPagination.pageSize}
+                  totalItems={itemPagination.totalItems}
+                  totalPages={itemPagination.totalPages}
+                  onPageChange={itemPagination.setPage}
+                  onPageSizeChange={itemPagination.setPageSize}
+                />
               )}
             </div>
           </div>
 
           {/* Right Panel */}
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-4">
             {/* Global Discount */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Global Discount</h3>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <h3 className="font-semibold text-gray-900 mb-3">Global Discount</h3>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   value={globalDiscount}
                   onChange={(e) => setGlobalDiscount(normalizeDiscount(parseInt(e.target.value, 10) || 0))}
-                  className="flex-1 px-4 py-2 border border-gray-200 rounded-lg"
+                  className="min-w-0 flex-1 px-3 py-2 border border-gray-200 rounded-lg"
                   placeholder="0"
                   min="0"
                   max="100"
@@ -507,42 +580,8 @@ export const QuotationBuilder = () => {
               <p className="text-xs text-gray-500 mt-2">Overrides individual product discounts</p>
             </div>
 
-            {/* Adjustments */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Adjustments</h3>
-              <div className="space-y-3">
-                {adjustments.filter(a => a.status === 'active').map(adj => (
-                  <div key={adj.id} className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedAdjustments[adj.id]?.enabled || false}
-                        onChange={(e) => setSelectedAdjustments({
-                          ...selectedAdjustments,
-                          [adj.id]: { ...selectedAdjustments[adj.id], enabled: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-blue-600 rounded"
-                      />
-                      <span className="text-sm text-gray-700">{adj.name}</span>
-                    </label>
-                    {selectedAdjustments[adj.id]?.enabled && (
-                      <input
-                        type="number"
-                        value={selectedAdjustments[adj.id].amount}
-                        onChange={(e) => setSelectedAdjustments({
-                          ...selectedAdjustments,
-                          [adj.id]: { ...selectedAdjustments[adj.id], amount: parseFloat(e.target.value) || 0 }
-                        })}
-                        className="w-24 px-2 py-1 border border-gray-200 rounded text-sm"
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* Settings */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
               <label className="flex items-center justify-between cursor-pointer">
                 <span className="text-sm font-medium text-gray-700">GST Inclusive Pricing</span>
                 <input
@@ -567,8 +606,8 @@ export const QuotationBuilder = () => {
             </div>
 
             {/* Terms */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Terms & Conditions</h3>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <h3 className="font-semibold text-gray-900 mb-3">Terms & Conditions</h3>
               <div className="space-y-2">
                 {masterTerms.filter(t => t.status === 'active').map(term => (
                   <label key={term.id} className="flex items-start gap-2 cursor-pointer">
@@ -591,19 +630,13 @@ export const QuotationBuilder = () => {
             </div>
 
             {/* Totals */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Summary</h3>
-              <div className="space-y-3">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4">
+              <h3 className="font-semibold text-gray-900 mb-3">Summary</h3>
+              <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium text-gray-900">₹{totals.subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                 </div>
-                {totals.adjustmentsTotal > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Adjustments</span>
-                    <span className="font-medium text-gray-900">₹{totals.adjustmentsTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                  </div>
-                )}
                 {!gstInclusive && totals.taxAmount > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">GST</span>
@@ -613,7 +646,7 @@ export const QuotationBuilder = () => {
                 <div className="pt-3 border-t-2 border-blue-200">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-gray-900">Grand Total</span>
-                    <span className="text-2xl font-bold text-blue-600">₹{totals.grandTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                    <span className="text-xl font-bold text-blue-600">₹{totals.grandTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </div>

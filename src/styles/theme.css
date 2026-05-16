@@ -1,26 +1,26 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --font-size: 16px;
-  --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
+  --font-size: 15px;
+  --background: #f6f8fb;
+  --foreground: #172033;
   --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: #172033;
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
+  --popover-foreground: #172033;
+  --primary: #2563eb;
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.0058 264.53);
-  --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #e9ebef;
-  --accent-foreground: #030213;
+  --secondary: #eef4ff;
+  --secondary-foreground: #172033;
+  --muted: #e8edf5;
+  --muted-foreground: #64748b;
+  --accent: #edf3fb;
+  --accent-foreground: #172033;
   --destructive: #d4183d;
   --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
+  --border: #dbe3ee;
   --input: transparent;
-  --input-background: #f3f3f5;
+  --input-background: #f8fafc;
   --switch-background: #cbced4;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -126,6 +126,10 @@
 
   body {
     @apply bg-background text-foreground;
+    color: #172033;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   /**
@@ -177,5 +181,138 @@
     font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
+  }
+}
+
+@layer components {
+  .crm-shell {
+    background:
+      linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(241, 245, 249, 0.96) 100%);
+  }
+
+  .crm-sidebar {
+    box-shadow: 12px 0 32px rgba(15, 23, 42, 0.035);
+  }
+
+  .crm-nav-item {
+    position: relative;
+  }
+
+  .crm-nav-active {
+    box-shadow: inset 3px 0 0 #2563eb, 0 1px 2px rgba(37, 99, 235, 0.08);
+  }
+
+  .crm-main {
+    background:
+      linear-gradient(180deg, #f7f9fc 0%, #eef3f8 100%);
+  }
+
+  .crm-main > div:not(.min-h-screen) {
+    padding: 1rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) > div[class*="max-w-"] {
+    width: 100%;
+    max-width: none;
+  }
+
+  .crm-main > div:not(.min-h-screen) .space-y-8 > :not([hidden]) ~ :not([hidden]),
+  .crm-main > div:not(.min-h-screen) .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) .gap-8,
+  .crm-main > div:not(.min-h-screen) .gap-6 {
+    gap: 1rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) .bg-white {
+    background: rgba(255, 255, 255, 0.94);
+  }
+
+  .crm-main > div:not(.min-h-screen) .border-gray-200,
+  .crm-main > div:not(.min-h-screen) .border-slate-200 {
+    border-color: #dbe3ee;
+  }
+
+  .crm-main > div:not(.min-h-screen) .rounded-2xl {
+    border-radius: 0.85rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) .rounded-xl {
+    border-radius: 0.65rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) .p-8 {
+    padding: 1.25rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) .p-6 {
+    padding: 1rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) .px-6 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) .py-4 {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) table {
+    font-size: 0.9rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) thead tr {
+    background: #f4f7fb;
+  }
+
+  .crm-main > div:not(.min-h-screen) tbody tr {
+    transition: background-color 140ms ease, box-shadow 140ms ease;
+  }
+
+  .crm-main > div:not(.min-h-screen) tbody tr:hover {
+    background: #f8fbff;
+  }
+
+  .crm-main > div:not(.min-h-screen) input,
+  .crm-main > div:not(.min-h-screen) select,
+  .crm-main > div:not(.min-h-screen) textarea {
+    background-color: #fbfdff;
+    border-color: #dbe3ee;
+    color: #172033;
+    min-height: 2.35rem;
+  }
+
+  .crm-main > div:not(.min-h-screen) input:focus,
+  .crm-main > div:not(.min-h-screen) select:focus,
+  .crm-main > div:not(.min-h-screen) textarea:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+
+  .crm-main > div:not(.min-h-screen) button,
+  .crm-main > div:not(.min-h-screen) a {
+    letter-spacing: 0;
+  }
+
+  .crm-main > div:not(.min-h-screen) .shadow-lg {
+    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.16);
+  }
+
+  .crm-main > div:not(.min-h-screen) .hover\:shadow-lg:hover {
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.09);
+  }
+
+  .crm-main > div:not(.min-h-screen) h2 {
+    color: #0f172a;
+    line-height: 1.2;
+  }
+
+  .crm-main > div:not(.min-h-screen) h3 {
+    color: #0f172a;
+    line-height: 1.25;
   }
 }

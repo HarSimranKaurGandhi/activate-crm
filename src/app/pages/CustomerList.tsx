@@ -1,20 +1,55 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Edit, Trash2, Building } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, Search, Edit, Trash2, Power } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
+import { PaginationControls, usePagination } from '../components/common/Pagination';
 
 export const CustomerList = () => {
   const navigate = useNavigate();
   const { customers, deleteCustomer, loading } = useData();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    company: '',
+    name: '',
+    email: '',
+    phone: '',
+    city: '',
+    status: 'all',
+    rating: 'all',
+  });
 
-  const filteredCustomers = customers.filter(c =>
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCustomers = useMemo(() => {
+    return customers.filter((customer) => {
+      const companyMatch = customer.company.toLowerCase().includes(filters.company.trim().toLowerCase());
+      const nameMatch = customer.name.toLowerCase().includes(filters.name.trim().toLowerCase());
+      const emailMatch = customer.email.toLowerCase().includes(filters.email.trim().toLowerCase());
+      const phoneMatch = customer.phone.toLowerCase().includes(filters.phone.trim().toLowerCase());
+      const cityMatch = (customer.city || '').toLowerCase().includes(filters.city.trim().toLowerCase());
+      const statusMatch = filters.status === 'all' || customer.status === filters.status;
+      const ratingMatch = filters.rating === 'all' || Number(customer.rating || 0) === Number(filters.rating);
+
+      return companyMatch && nameMatch && emailMatch && phoneMatch && cityMatch && statusMatch && ratingMatch;
+    });
+  }, [customers, filters]);
+
+  const pagination = usePagination(filteredCustomers, 10);
+
+  const updateFilter = (key: keyof typeof filters, value: string) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      company: '',
+      name: '',
+      email: '',
+      phone: '',
+      city: '',
+      status: 'all',
+      rating: 'all',
+    });
+  };
 
   return (
     <div className="p-8">
@@ -31,57 +66,142 @@ export const CustomerList = () => {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-8">
+            <div className="relative md:col-span-2 xl:col-span-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Company"
+                value={filters.company}
+                onChange={(event) => updateFilter('company', event.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
             <input
               type="text"
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Contact name"
+              value={filters.name}
+              onChange={(event) => updateFilter('name', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+            <input
+              type="text"
+              placeholder="Email"
+              value={filters.email}
+              onChange={(event) => updateFilter('email', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              placeholder="Phone"
+              value={filters.phone}
+              onChange={(event) => updateFilter('phone', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              placeholder="City"
+              value={filters.city}
+              onChange={(event) => updateFilter('city', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <select
+              value={filters.status}
+              onChange={(event) => updateFilter('status', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <div className="flex gap-2 md:col-span-3 xl:col-span-1">
+              <select
+                value={filters.rating}
+                onChange={(event) => updateFilter('rating', event.target.value)}
+                className="min-w-0 flex-1 px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Ratings</option>
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <option key={rating} value={rating}>{rating} Star</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="px-3 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredCustomers.map((customer) => (
-              <div
-                key={customer.id}
-                className="border border-gray-200 rounded-xl p-6 hover:shadow-lg hover:border-blue-500 transition-all"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-                    <Building className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => navigate(`/customers/${customer.id}/edit`)}
-                      className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (confirm('Deactivate this customer?')) {
-                          await deleteCustomer(customer.id);
-                          toast.success('Customer deactivated');
-                        }
-                      }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <h3 className="font-semibold text-gray-900 mb-1">{customer.company}</h3>
-                <p className="text-sm text-gray-600 mb-3">{customer.name}</p>
-                <div className="space-y-1 text-sm text-gray-600">
-                  <p>{customer.email}</p>
-                  <p>{customer.phone}</p>
-                  {customer.rating > 0 && <p className="text-xs text-amber-600 mt-2">Rating: {customer.rating}/5</p>}
-                  {customer.address && <p className="text-xs text-gray-500 mt-2">{customer.address}</p>}
-                </div>
-              </div>
-            ))}
+          <div className="overflow-hidden rounded-xl border border-gray-200">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Company</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Contact</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Phone</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Location</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Rating</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {pagination.pageItems.map((customer) => (
+                  <tr key={customer.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{customer.company || '-'}</div>
+                      <div className="text-sm text-gray-500">{customer.email || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-700">{customer.name || '-'}</td>
+                    <td className="px-6 py-4 text-gray-700">{customer.phone || '-'}</td>
+                    <td className="px-6 py-4 text-gray-700">{[customer.city, customer.state].filter(Boolean).join(', ') || '-'}</td>
+                    <td className="px-6 py-4 text-gray-700">{customer.rating ? `${customer.rating}/5` : '-'}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                        customer.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-700'
+                      }`}>
+                        <Power className="h-3 w-3" />
+                        {customer.status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => navigate(`/customers/${customer.id}/edit`)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm('Deactivate this customer?')) {
+                              await deleteCustomer(customer.id);
+                              toast.success('Customer deactivated');
+                            }
+                          }}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Deactivate"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <PaginationControls
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              totalItems={pagination.totalItems}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+            />
           </div>
 
           {loading && <LoadingState label="Loading customers..." />}

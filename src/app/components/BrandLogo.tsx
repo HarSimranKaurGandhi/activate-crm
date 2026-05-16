@@ -19,17 +19,14 @@ export const BrandLogo = ({
     <img
       src={activateLogo}
       alt="Activate"
-      className={`h-10 w-auto object-contain ${imageClassName}`.trim()}
+      className={`h-10 w-auto max-w-full object-contain ${imageClassName}`.trim()}
     />
-    <div>
-      {/* <h1 className={`text-xl font-semibold tracking-[0.18em] text-gray-900 ${textClassName}`.trim()}>
-        CRM
-      </h1> */}
-      {showSubtitle && (
+    {showSubtitle && (
+      <div>
         <p className={`text-sm text-gray-500 ${subtitleClassName}`.trim()}>
           Quotation Management
         </p>
-      )}
-    </div>
+      </div>
+    )}
   </div>
 );

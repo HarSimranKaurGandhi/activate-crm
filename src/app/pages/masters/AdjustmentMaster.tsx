@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, Power } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
+import { PaginationControls, usePagination } from '../../components/common/Pagination';
 
 export const AdjustmentMaster = () => {
   const { adjustments, addAdjustment, updateAdjustment, deleteAdjustment, loading } = useData();
@@ -14,6 +15,7 @@ export const AdjustmentMaster = () => {
     defaultValue: 0,
     status: 'active' as 'active' | 'inactive'
   });
+  const pagination = usePagination(adjustments, 10);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +76,7 @@ export const AdjustmentMaster = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {adjustments.map(adjustment => (
+              {pagination.pageItems.map(adjustment => (
                 <tr key={adjustment.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">{adjustment.name}</td>
                   <td className="px-6 py-4">
@@ -123,6 +125,14 @@ export const AdjustmentMaster = () => {
               ))}
             </tbody>
           </table>
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
           {loading && <LoadingState label="Loading adjustments..." />}
         </div>
       </div>

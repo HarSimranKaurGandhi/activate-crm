@@ -4,6 +4,7 @@ import { Plus, Search, Calendar, Eye, Edit } from 'lucide-react';
 import { useState } from 'react';
 import { LoadingState } from '../components/common/AsyncState';
 import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
+import { PaginationControls, usePagination } from '../components/common/Pagination';
 
 export const QuotationList = () => {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ export const QuotationList = () => {
 
     return matchesSearch && matchesStatus && matchesDate;
   });
+  const pagination = usePagination(filteredQuotations, 10);
 
   return (
     <div className="p-8">
@@ -128,7 +130,7 @@ export const QuotationList = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredQuotations.map((quotation) => (
+                {pagination.pageItems.map((quotation) => (
                   <tr key={quotation.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <span className="font-medium text-gray-900">{quotation.number}</span>
@@ -190,6 +192,14 @@ export const QuotationList = () => {
               </tbody>
             </table>
           </div>
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </div>
       </div>
     </div>

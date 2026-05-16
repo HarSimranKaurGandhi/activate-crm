@@ -1,22 +1,64 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Edit, Trash2, Package } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, Search, Edit, Trash2, Power, ImageIcon } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { toast } from 'sonner';
 import { productService } from '../../services/productService';
+import { PaginationControls, usePagination } from '../components/common/Pagination';
 
 export const ProductList = () => {
   const navigate = useNavigate();
-  const { products, deleteProduct, loading, refreshAll } = useData();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { products, categories, brands, deleteProduct, loading, refreshAll } = useData();
+  const [filters, setFilters] = useState({
+    search: '',
+    category: 'all',
+    brand: 'all',
+    status: 'all',
+    gst: 'all',
+  });
   const [bulkUploading, setBulkUploading] = useState(false);
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.modelNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = useMemo(() => {
+    const search = filters.search.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchesSearch = !search || [
+        product.name,
+        product.modelNumber,
+        product.category,
+        product.brand,
+        product.hsnCode,
+      ].some((value) => String(value || '').toLowerCase().includes(search));
+      const matchesCategory = filters.category === 'all' || product.category === filters.category;
+      const matchesBrand = filters.brand === 'all' || product.brand === filters.brand;
+      const matchesStatus = filters.status === 'all' || product.status === filters.status;
+      const matchesGst = filters.gst === 'all' || Number(product.gstPercent) === Number(filters.gst);
+
+      return matchesSearch && matchesCategory && matchesBrand && matchesStatus && matchesGst;
+    });
+  }, [filters, products]);
+
+  const pagination = usePagination(filteredProducts, 10);
+
+  const gstOptions = useMemo(() => {
+    return Array.from(new Set(products.map((product) => Number(product.gstPercent)).filter((value) => !Number.isNaN(value))))
+      .sort((a, b) => a - b);
+  }, [products]);
+
+  const updateFilter = (key: keyof typeof filters, value: string) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      category: 'all',
+      brand: 'all',
+      status: 'all',
+      gst: 'all',
+    });
+  };
 
   const handleBulkUpload = async (file: File | null) => {
     if (!file) return;
@@ -79,82 +121,152 @@ export const ProductList = () => {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <div className="relative md:col-span-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search name, model, HSN..."
+                value={filters.search}
+                onChange={(event) => updateFilter('search', event.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <select
+              value={filters.category}
+              onChange={(event) => updateFilter('category', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.name}>{category.name}</option>
+              ))}
+            </select>
+            <select
+              value={filters.brand}
+              onChange={(event) => updateFilter('brand', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Brands</option>
+              {brands.map((brand) => (
+                <option key={brand.id} value={brand.name}>{brand.name}</option>
+              ))}
+            </select>
+            <select
+              value={filters.status}
+              onChange={(event) => updateFilter('status', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <div className="flex gap-2">
+              <select
+                value={filters.gst}
+                onChange={(event) => updateFilter('gst', event.target.value)}
+                className="min-w-0 flex-1 px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All GST</option>
+                {gstOptions.map((gst) => (
+                  <option key={gst} value={gst}>{gst}%</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="px-3 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-500 transition-all"
-              >
-                <img src={product.image} alt="" className="w-full h-48 object-cover" />
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      product.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-700'
-                    }`}>
-                      {product.status}
-                    </span>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => navigate(`/products/${product.id}/edit`)}
-                        className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                      onClick={async () => {
-                          if (confirm('Deactivate this product?')) {
-                            await deleteProduct(product.id);
-                            toast.success('Product deactivated');
-                          }
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
-                  <p className="text-sm text-gray-600 mb-2">{product.modelNumber}</p>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-                    <span className="px-2 py-1 bg-gray-100 rounded">{product.category}</span>
-                    <span className="px-2 py-1 bg-gray-100 rounded">{product.brand}</span>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">MRP:</span>
-                      <span className="font-semibold text-gray-900">₹{product.mrp.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Selling Price:</span>
-                      <span className="font-semibold text-blue-600">₹{product.usualSellingPrice.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Least Price:</span>
-                      <span className="font-semibold text-amber-600">₹{product.leastSellingPrice.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">GST:</span>
-                      <span className="font-semibold text-gray-900">{product.gstPercent}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">HSN:</span>
-                      <span className="font-semibold text-gray-900">{product.hsnCode || '-'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-hidden rounded-xl border border-gray-200">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Category</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Brand</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">MRP</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Selling</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Least</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">GST / HSN</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {pagination.pageItems.map((product) => (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {product.image ? (
+                          <img src={product.image} alt="" className="h-12 w-12 rounded-lg border border-gray-200 object-cover" />
+                        ) : (
+                          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50">
+                            <ImageIcon className="h-5 w-5 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-medium text-gray-900">{product.name}</div>
+                          <div className="text-sm text-gray-500">{product.modelNumber || '-'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-700">{product.category || '-'}</td>
+                    <td className="px-6 py-4 text-gray-700">{product.brand || '-'}</td>
+                    <td className="px-6 py-4 text-right font-medium text-gray-900">₹{product.mrp.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 text-right font-medium text-blue-600">₹{product.usualSellingPrice.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 text-right font-medium text-amber-600">₹{product.leastSellingPrice.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900">{product.gstPercent}%</div>
+                      <div className="text-sm text-gray-500">{product.hsnCode || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                        product.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-700'
+                      }`}>
+                        <Power className="h-3 w-3" />
+                        {product.status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => navigate(`/products/${product.id}/edit`)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm('Deactivate this product?')) {
+                              await deleteProduct(product.id);
+                              toast.success('Product deactivated');
+                            }
+                          }}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Deactivate"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <PaginationControls
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              totalItems={pagination.totalItems}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+            />
           </div>
 
           {loading && <LoadingState label="Loading products..." />}

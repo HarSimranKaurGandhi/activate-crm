@@ -4,6 +4,9 @@ export const userService = {
   async list(params: Record<string, unknown> = {}) {
     return unwrapEnvelope<any[]>(await apiClient.get('/users', { params: { per_page: 100, ...params } }));
   },
+  async dropdown() {
+    return unwrap<any[]>(await apiClient.get('/users/dropdown'));
+  },
   async get(id: string) {
     return unwrap<any>(await apiClient.get(`/users/${id}`));
   },

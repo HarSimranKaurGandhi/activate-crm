@@ -12,7 +12,7 @@ class UserService extends CrudService
 {
     protected string $modelClass = User::class;
 
-    protected array $searchColumns = ['name', 'email', 'phone'];
+    protected array $searchColumns = ['name', 'email', 'phone', 'designation'];
 
     protected array $relations = ['role'];
 
@@ -21,6 +21,13 @@ class UserService extends CrudService
         return $this->query($request)
             ->latest('id')
             ->paginate((int) $request->integer('per_page', 15));
+    }
+
+    public function dropdown(Request $request)
+    {
+        return $this->query($request)
+            ->orderBy('name')
+            ->get();
     }
 
     public function create(array $data): User

@@ -30,6 +30,7 @@ Route::prefix('auth')->group(function (): void {
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('dashboard/quotation-summary', [DashboardController::class, 'quotationSummary']);
+    Route::get('users/dropdown', [UserController::class, 'dropdown']);
 
     Route::middleware('role:admin')->group(function (): void {
         Route::get('users', [UserController::class, 'index']);
