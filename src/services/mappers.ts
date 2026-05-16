@@ -1,3 +1,5 @@
+import { apiOrigin } from './apiClient';
+
 export type Status = 'active' | 'inactive';
 export type QuotationStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'revised';
 
@@ -14,6 +16,25 @@ export const toFrontendQuotationStatus = (status: string): QuotationStatus =>
 
 export const toApiQuotationStatus = (status: QuotationStatus | string) =>
   status === 'pending' ? 'pending_approval' : status;
+
+const assetUrl = (path?: string | null) => {
+  if (!path) return '';
+
+  const value = String(path).trim();
+
+  if (!value) return '';
+  if (/^(https?:|blob:|data:)/i.test(value)) return value;
+
+  if (value.startsWith('/storage/')) {
+    return `${apiOrigin}${value}`;
+  }
+
+  if (value.startsWith('storage/')) {
+    return `${apiOrigin}/${value}`;
+  }
+
+  return `${apiOrigin}/storage/${value.replace(/^\/+/, '')}`;
+};
 
 export const mapCategory = (category: any) => ({
   id: String(category.id),
@@ -39,8 +60,8 @@ export const mapBrand = (brand: any) => ({
   name: brand.name || '',
   supplierName: brand.supplier_name || '',
   description: brand.description || '',
-  logoPath: brand.logo_path || '',
-  catalogPath: brand.catalog_path || '',
+  logoPath: assetUrl(brand.logo_path),
+  catalogPath: assetUrl(brand.catalog_path),
   displayOrder: brand.display_order || 0,
   status: toStatus(brand.is_active),
 });
@@ -67,10 +88,10 @@ export const brandPayload = (brand: any) => {
 
 export const mapProduct = (product: any) => ({
   id: String(product.id),
-  image: product.image_path || '',
+  image: assetUrl(product.image_path),
   images: (product.images || []).map((image: any) => ({
     id: String(image.id),
-    imagePath: image.image_path || '',
+    imagePath: assetUrl(image.image_path),
     isPrimary: Boolean(image.is_primary),
     displayOrder: asNumber(image.display_order),
   })),
@@ -88,7 +109,7 @@ export const mapProduct = (product: any) => ({
   gstPercent: asNumber(product.gst_percent),
   hsnCode: product.hsn_code || product.category?.hsn_code || '',
   specifications: product.specifications || '',
-  brochurePath: product.brochure_path || '',
+  brochurePath: assetUrl(product.brochure_path),
   status: toStatus(product.is_active ?? true),
 });
 
@@ -262,7 +283,7 @@ export const mapQuotation = (quotation: any) => ({
     id: String(item.id),
     product: {
       id: String(item.product_id),
-      image: item.product_image_path || '',
+      image: assetUrl(item.product_image_path),
       name: item.product_name || '',
       modelNumber: item.model_number || '',
       mrp: asNumber(item.mrp),
@@ -337,7 +358,7 @@ export const mapCompanySettings = (company: any, bank: any, numbering: any) => {
 
   return {
     name: company?.company_name || '',
-    logo: company?.logo_path || '',
+    logo: assetUrl(company?.logo_path),
     gstNumber: company?.gst_number || '',
     address: company?.address || addressParts.join(', '),
     phone: company?.phone || '',
@@ -357,6 +378,6 @@ export const mapCompanySettings = (company: any, bank: any, numbering: any) => {
     nextNumber: numbering?.next_number || 1,
     padding: numbering?.padding || 5,
     defaultValidityDays: company?.default_validity_days || numbering?.default_validity_days || 30,
-    letterhead: company?.letterhead_path || '',
+    letterhead: assetUrl(company?.letterhead_path),
   };
 };

@@ -26,10 +26,12 @@ export interface ApiErrorPayload {
   status?: number;
 }
 
-const defaultBaseUrl = 'http://localhost:8000/api';
+export const defaultBaseUrl = 'http://localhost:8000/api';
+export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || defaultBaseUrl;
+export const apiOrigin = new URL(apiBaseUrl).origin;
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || defaultBaseUrl,
+  baseURL: apiBaseUrl,
   headers: {
     Accept: 'application/json',
   },

@@ -1,0 +1,2 @@
+ALTER TABLE users
+ADD COLUMN designation VARCHAR(255) NULL AFTER phone;

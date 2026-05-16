@@ -3,6 +3,7 @@
 # Frontend dependencies and build output
 node_modules/
 dist/
+.playwright-browsers/
 
 # Laravel backend dependencies and runtime files
 backend-api/vendor/

@@ -20,12 +20,17 @@ class QuotationPdfService
 
         File::put($htmlPath, $this->buildHtml($quotation));
 
+        $frontendRoot = realpath(base_path('..')) ?: base_path('..');
+        $playwrightBrowsersPath = $frontendRoot.'/.playwright-browsers';
+
         $process = new Process([
             'node',
             base_path('scripts/render-quotation-pdf.mjs'),
             $htmlPath,
             $pdfPath,
-        ], base_path('..'));
+        ], $frontendRoot, [
+            'PLAYWRIGHT_BROWSERS_PATH' => $playwrightBrowsersPath,
+        ]);
         $process->setTimeout(120);
         $process->mustRun();
 
