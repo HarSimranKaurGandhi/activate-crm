@@ -11,7 +11,9 @@ use App\Models\TermMaster;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class QuotationService extends CrudService
 {
@@ -238,13 +240,33 @@ class QuotationService extends CrudService
 
     private function nextQuotationNumber(): string
     {
-        $setting = QuotationNumberSetting::first();
-        $prefix = $setting?->quotation_prefix ?? 'QT-';
-        $next = $setting?->next_number ?? 1;
-        $padding = $setting?->padding ?? 5;
+        $setting = QuotationNumberSetting::query()->firstOrNew(['id' => 1]);
+        $columns = Schema::getColumnListing('quotation_number_settings');
+        $prefix = in_array('quotation_prefix', $columns, true) ? ($setting->quotation_prefix ?: 'QT-') : 'QT-';
+        $padding = in_array('padding', $columns, true) ? ((int) ($setting->padding ?: 5)) : 5;
+        $next = in_array('next_number', $columns, true) ? max((int) ($setting->next_number ?: 1), 1) : 1;
 
-        if ($setting) {
-            $setting->increment('next_number');
+        while (Quotation::query()->where('quotation_number', $prefix.str_pad((string) $next, $padding, '0', STR_PAD_LEFT))->exists()) {
+            $next++;
+        }
+
+        $attributes = [];
+
+        if (in_array('quotation_prefix', $columns, true)) {
+            $attributes['quotation_prefix'] = $prefix;
+        }
+
+        if (in_array('padding', $columns, true)) {
+            $attributes['padding'] = $padding;
+        }
+
+        if (in_array('next_number', $columns, true)) {
+            $attributes['next_number'] = $next + 1;
+        }
+
+        if ($attributes !== []) {
+            $setting->fill(Arr::only($attributes, $columns));
+            $setting->save();
         }
 
         return $prefix.str_pad((string) $next, $padding, '0', STR_PAD_LEFT);

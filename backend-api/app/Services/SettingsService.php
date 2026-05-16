@@ -148,13 +148,17 @@ class SettingsService
 
     public function quotationNumbering(): ?QuotationNumberSetting
     {
-        return QuotationNumberSetting::first();
+        return QuotationNumberSetting::first() ?? new QuotationNumberSetting();
     }
 
     public function updateQuotationNumbering(array $data): QuotationNumberSetting
     {
         $settings = QuotationNumberSetting::query()->firstOrNew(['id' => 1]);
-        $settings->fill($this->filterQuotationNumberingColumns($data))->save();
+        $filtered = $this->filterQuotationNumberingColumns($data);
+
+        if ($filtered !== []) {
+            $settings->fill($filtered)->save();
+        }
 
         return $settings->refresh();
     }

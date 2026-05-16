@@ -84,6 +84,9 @@ export const QuotationPreview = () => {
     return term?.content || termId;
   };
 
+  const hasLetterhead = Boolean(settings.letterhead);
+  const isPdfLetterhead = hasLetterhead && settings.letterhead.toLowerCase().includes('.pdf');
+
   const calculateItemAmounts = (item: any) => {
     const basePrice = item.price * item.quantity;
     const discountAmount = basePrice * (item.discount / 100);
@@ -161,6 +164,38 @@ export const QuotationPreview = () => {
               <div className="text-[120px] font-bold text-gray-200 opacity-30 rotate-[-45deg] select-none">
                 PENDING FOR APPROVAL
               </div>
+            </div>
+          )}
+
+          {hasLetterhead && (
+            <div className="border-b border-gray-200 bg-gradient-to-b from-slate-50 to-white">
+              {isPdfLetterhead ? (
+                <div className="space-y-3 p-4">
+                  <iframe
+                    src={settings.letterhead}
+                    title="Company letterhead"
+                    className="h-64 w-full rounded-xl border border-slate-200"
+                  />
+                  <div className="text-center text-xs text-slate-500">
+                    If your browser blocks PDF previews,{' '}
+                    <a
+                      href={settings.letterhead}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      open the letterhead
+                    </a>
+                    .
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={settings.letterhead}
+                  alt="Company letterhead"
+                  className="block h-44 w-full object-cover object-top"
+                />
+              )}
             </div>
           )}
 
