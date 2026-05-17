@@ -6,6 +6,8 @@ use App\Models\CompanyBankDetail;
 use App\Models\CompanySetting;
 use App\Models\Quotation;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 class QuotationPdfService
@@ -15,13 +17,83 @@ class QuotationPdfService
         $baseDir = storage_path('app/pdf-temp');
         File::ensureDirectoryExists($baseDir);
 
-        $htmlPath = $baseDir.'/quotation_'.$quotation->getKey().'_'.uniqid('', true).'.html';
         $pdfPath = $baseDir.'/quotation_'.$quotation->getKey().'_'.uniqid('', true).'.pdf';
+        $html = $this->buildHtml($quotation);
 
-        File::put($htmlPath, $this->buildHtml($quotation));
+        $driver = $this->resolveDriver();
+
+        try {
+            if ($driver === 'playwright') {
+                $this->renderWithPlaywright($html, $pdfPath);
+            } else {
+                $this->renderWithDompdf($html, $pdfPath);
+            }
+        } catch (\Throwable $exception) {
+            Log::error('Quotation PDF generation failed', [
+                'quotation_id' => $quotation->getKey(),
+                'driver' => $driver,
+                'message' => $exception->getMessage(),
+            ]);
+
+            throw $exception;
+        }
+
+        return [
+            'path' => $pdfPath,
+            'filename' => ($quotation->quotation_number ?: 'quotation').'.pdf',
+        ];
+    }
+
+    private function resolveDriver(): string
+    {
+        $driver = strtolower((string) config('quotation-pdf.driver', 'auto'));
+
+        if ($driver !== 'auto') {
+            return $driver;
+        }
+
+        return $this->canUsePlaywright() ? 'playwright' : 'dompdf';
+    }
+
+    private function canUsePlaywright(): bool
+    {
+        if (! (new ExecutableFinder)->find('node')) {
+            return false;
+        }
 
         $frontendRoot = realpath(base_path('..')) ?: base_path('..');
-        $playwrightBrowsersPath = $frontendRoot.'/.playwright-browsers';
+        $browsersRoot = $frontendRoot.'/.playwright-browsers';
+
+        return is_dir($browsersRoot) && count(glob($browsersRoot.'/*')) > 0;
+    }
+
+    private function renderWithDompdf(string $html, string $pdfPath): void
+    {
+        if (! app()->bound('dompdf.wrapper')) {
+            throw new \RuntimeException(
+                'DomPDF is not installed. SSH to the server, run: composer install --no-dev --optimize-autoloader'
+            );
+        }
+
+        app('dompdf.wrapper')
+            ->loadHTML($html)
+            ->setPaper('a4', 'portrait')
+            ->setOption([
+                'isRemoteEnabled' => true,
+                'isHtml5ParserEnabled' => true,
+                'defaultFont' => 'DejaVu Sans',
+            ])
+            ->save($pdfPath);
+    }
+
+    private function renderWithPlaywright(string $html, string $pdfPath): void
+    {
+        $baseDir = dirname($pdfPath);
+        $htmlPath = $baseDir.'/'.basename($pdfPath, '.pdf').'.html';
+
+        File::put($htmlPath, $html);
+
+        $frontendRoot = realpath(base_path('..')) ?: base_path('..');
 
         $process = new Process([
             'node',
@@ -29,17 +101,12 @@ class QuotationPdfService
             $htmlPath,
             $pdfPath,
         ], $frontendRoot, [
-            'PLAYWRIGHT_BROWSERS_PATH' => $playwrightBrowsersPath,
+            'PLAYWRIGHT_BROWSERS_PATH' => $frontendRoot.'/.playwright-browsers',
         ]);
         $process->setTimeout(120);
         $process->mustRun();
 
         File::delete($htmlPath);
-
-        return [
-            'path' => $pdfPath,
-            'filename' => ($quotation->quotation_number ?: 'quotation').'.pdf',
-        ];
     }
 
     private function buildHtml(Quotation $quotation): string
@@ -186,7 +253,7 @@ class QuotationPdfService
         $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
 
         if ($extension === 'pdf') {
-            return 'file://'.str_replace(' ', '%20', $fullPath);
+            return null;
         }
 
         $mime = mime_content_type($fullPath) ?: 'application/octet-stream';

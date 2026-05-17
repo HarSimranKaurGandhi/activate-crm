@@ -15,10 +15,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class QuotationController extends ApiController
 {
-    public function __construct(
-        private QuotationService $quotations,
-        private QuotationPdfService $quotationPdf
-    )
+    public function __construct(private QuotationService $quotations)
     {
     }
 
@@ -72,9 +69,9 @@ class QuotationController extends ApiController
         ]);
     }
 
-    public function pdf(int|string $id): BinaryFileResponse
+    public function pdf(int|string $id, QuotationPdfService $quotationPdf): BinaryFileResponse
     {
-        $result = $this->quotationPdf->render($this->quotations->find($id));
+        $result = $quotationPdf->render($this->quotations->find($id));
 
         return response()->download($result['path'], $result['filename'], [
             'Content-Type' => 'application/pdf',

@@ -21,9 +21,11 @@ class QuotationService extends CrudService
 
     protected array $searchColumns = [];
 
-    protected array $relations = ['customer', 'items.discountOverrides', 'adjustments', 'terms'];
+    protected array $relations = ['customer', 'items', 'adjustments', 'terms'];
 
     private ?array $discountOverrideColumns = null;
+
+    private static ?array $customerColumns = null;
 
     public function __construct(private QuotationCalculator $calculator)
     {
@@ -44,7 +46,7 @@ class QuotationService extends CrudService
             $quotation = Quotation::create($data);
             $this->syncLines($quotation, $items, $adjustments, $terms);
 
-            return $quotation->refresh()->load($this->relations);
+            return $quotation->refresh()->load($this->detailRelations());
         });
     }
 
@@ -66,15 +68,23 @@ class QuotationService extends CrudService
                 $this->syncLines($model, $items, $adjustments ?? [], $terms ?? []);
             }
 
-            return $model->refresh()->load($this->relations);
+            return $model->refresh()->load($this->detailRelations());
         });
     }
 
     public function paginate(Request $request): LengthAwarePaginator
     {
-        return $this->query($request)
+        return $this->applyFilters(Quotation::query(), $request)
+            ->with($this->listRelations())
             ->latest('id')
             ->paginate((int) $request->integer('per_page', 15));
+    }
+
+    public function find(int|string $id): Quotation
+    {
+        return Quotation::query()
+            ->with($this->detailRelations())
+            ->findOrFail($id);
     }
 
     public function duplicate(Quotation $quotation, int $userId): Quotation
@@ -99,7 +109,7 @@ class QuotationService extends CrudService
                 $copy->terms()->create($term->replicate(['quotation_id', 'created_at', 'updated_at'])->toArray());
             }
 
-            return $copy->load($this->relations);
+            return $copy->load($this->detailRelations());
         });
     }
 
@@ -211,7 +221,42 @@ class QuotationService extends CrudService
 
     private function getDiscountOverrideColumns(): array
     {
+        if (! Schema::hasTable('quotation_item_discount_overrides')) {
+            return [];
+        }
+
         return $this->discountOverrideColumns ??= Schema::getColumnListing('quotation_item_discount_overrides');
+    }
+
+    private function listRelations(): array
+    {
+        return [
+            'customer' => fn ($query) => $query->select($this->customerColumns()),
+            'items',
+            'adjustments',
+            'terms',
+        ];
+    }
+
+    private function detailRelations(): array
+    {
+        return [
+            'customer' => fn ($query) => $query->select($this->customerColumns()),
+            Schema::hasTable('quotation_item_discount_overrides') ? 'items.discountOverrides' : 'items',
+            'adjustments',
+            'terms',
+        ];
+    }
+
+    private function customerColumns(): array
+    {
+        if (self::$customerColumns === null) {
+            self::$customerColumns = Schema::hasTable('customers')
+                ? Schema::getColumnListing('customers')
+                : ['*'];
+        }
+
+        return self::$customerColumns;
     }
 
     private function buildAdjustmentSnapshot(array $input, float $subtotalAfterDiscount): array
