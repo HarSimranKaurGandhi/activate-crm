@@ -29,6 +29,20 @@ class QuotationPdfService
                 $this->renderWithDompdf($html, $pdfPath);
             }
         } catch (\Throwable $exception) {
+            if ($driver === 'playwright' && $this->canFallbackToDompdf($exception)) {
+                Log::warning('Playwright PDF generation failed, falling back to DomPDF', [
+                    'quotation_id' => $quotation->getKey(),
+                    'message' => $exception->getMessage(),
+                ]);
+
+                $this->renderWithDompdf($html, $pdfPath);
+
+                return [
+                    'path' => $pdfPath,
+                    'filename' => ($quotation->quotation_number ?: 'quotation').'.pdf',
+                ];
+            }
+
             Log::error('Quotation PDF generation failed', [
                 'quotation_id' => $quotation->getKey(),
                 'driver' => $driver,
@@ -48,8 +62,12 @@ class QuotationPdfService
     {
         $driver = strtolower((string) config('quotation-pdf.driver', 'auto'));
 
-        if ($driver !== 'auto') {
-            return $driver;
+        if ($driver === 'playwright') {
+            return $this->canUsePlaywright() ? 'playwright' : 'dompdf';
+        }
+
+        if ($driver === 'dompdf') {
+            return 'dompdf';
         }
 
         return $this->canUsePlaywright() ? 'playwright' : 'dompdf';
@@ -65,6 +83,21 @@ class QuotationPdfService
         $browsersRoot = $frontendRoot.'/.playwright-browsers';
 
         return is_dir($browsersRoot) && count(glob($browsersRoot.'/*')) > 0;
+    }
+
+    private function canFallbackToDompdf(\Throwable $exception): bool
+    {
+        if (! app()->bound('dompdf.wrapper')) {
+            return false;
+        }
+
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'node: not found')
+            || str_contains($message, 'command not found')
+            || str_contains($message, 'exit code: 127')
+            || str_contains($message, 'playwright')
+            || str_contains($message, 'chromium');
     }
 
     private function renderWithDompdf(string $html, string $pdfPath): void
