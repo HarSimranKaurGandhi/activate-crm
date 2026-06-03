@@ -23,11 +23,11 @@ class QuotationPdfService
         $driver = $this->resolveDriver();
 
         try {
-            if ($driver === 'playwright') {
-                $this->renderWithPlaywright($html, $pdfPath);
-            } else {
+            // if ($driver === 'playwright') {
+            //     $this->renderWithPlaywright($html, $pdfPath);
+            // } else {
                 $this->renderWithDompdf($html, $pdfPath);
-            }
+            // }
         } catch (\Throwable $exception) {
             if ($driver === 'playwright' && $this->canFallbackToDompdf($exception)) {
                 Log::warning('Playwright PDF generation failed, falling back to DomPDF', [

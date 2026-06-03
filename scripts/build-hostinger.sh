@@ -9,7 +9,7 @@ npm ci
 npm run build
 
 echo ""
-echo "Build complete. Upload these to public_html on horizonfitness.in:"
+echo "Build complete. Upload these to public_html on crm.activatefitnessstore.com:"
 echo "  - dist/*"
 echo "  - deploy/hostinger/frontend.htaccess  → rename/copy to public_html/.htaccess"
 echo ""

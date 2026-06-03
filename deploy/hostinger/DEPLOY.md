@@ -4,8 +4,8 @@ This app has two parts:
 
 | Part | Stack | Hostinger location |
 |------|--------|-------------------|
-| Frontend | React (Vite) static build | `horizonfitness.in` → `public_html/` |
-| API | Laravel 11 (PHP 8.2+) | `api.horizonfitness.in` → document root = `backend-api/public` |
+| Frontend | React (Vite) static build | `crm.activatefitnessstore.com` → `public_html/` |
+| API | Laravel 11 (PHP 8.2+) | `crmapi.activatefitnessstore.com` → `public_html/index.php` loads Laravel from `../laravel` |
 
 Your database is already on Hostinger MySQL (`DB_HOST` in `.env`).
 
@@ -13,10 +13,10 @@ Your database is already on Hostinger MySQL (`DB_HOST` in `.env`).
 
 ## 1. Hostinger setup (hPanel)
 
-1. **SSL** — Websites → your domain → SSL → enable **Free SSL** for `horizonfitness.in` and `api.horizonfitness.in`.
+1. **SSL** — Websites → your domain → SSL → enable **Free SSL** for `crm.activatefitnessstore.com` and `crmapi.activatefitnessstore.com`.
 2. **PHP version** — Websites → PHP Configuration → select **PHP 8.2** or **8.3** for both domains.
-3. **Subdomain** — Domains → Subdomains → create `api` → `api.horizonfitness.in`.
-4. **API document root** — For `api.horizonfitness.in`, set document root to the Laravel `public` folder (see section 3). In hPanel: Websites → Manage → Domains → pencil icon on subdomain → change folder to e.g. `.../api.horizonfitness.in/laravel/public`.
+3. **Subdomains** — Domains → Subdomains → create `crm` → `crm.activatefitnessstore.com`, and `crmapi` → `crmapi.activatefitnessstore.com`.
+4. **API root** — Hostinger Web Hosting normally keeps the web root as `public_html`. Keep Laravel outside that folder and use the `public_html` front-controller files in section 3.
 
 Enable PHP extensions: `pdo_mysql`, `openssl`, `mbstring`, `tokenizer`, `ctype`, `json`, `fileinfo`, `curl`.
 
@@ -29,7 +29,7 @@ Enable PHP extensions: `pdo_mysql`, `openssl`, `mbstring`, `tokenizer`, `ctype`,
 3. Ensure **`personal_access_tokens`** exists (required for login). If missing, run on the server via SSH:
 
    ```bash
-   cd ~/domains/api.horizonfitness.in/laravel
+   cd ~/domains/crmapi.activatefitnessstore.com/laravel
    php artisan migrate --force
    ```
 
@@ -39,34 +39,39 @@ Enable PHP extensions: `pdo_mysql`, `openssl`, `mbstring`, `tokenizer`, `ctype`,
 
 ## 3. Deploy Laravel API
 
-### Folder layout (recommended)
+### Folder layout
 
 ```text
-~/domains/api.horizonfitness.in/
-  laravel/                 ← upload entire backend-api/ here (rename to laravel)
+~/domains/crmapi.activatefitnessstore.com/
+  laravel/                 ← upload entire backend-api/ here
     app/
     bootstrap/
     config/
-    public/                ← document root points HERE
+    public/
     routes/
     storage/
     vendor/
     .env
+  public_html/             ← Hostinger web root for crmapi.activatefitnessstore.com
+    .htaccess
+    index.php              ← loads ../laravel/bootstrap/app.php
 ```
 
-Do **not** put `.env` inside `public/`.
+Do **not** put `.env`, `vendor/`, `storage/`, or the Laravel app folders inside `public_html/`.
 
 ### Upload
 
 Via **File Manager**, **FTP**, or **Git** (Hostinger Git deploy on Premium):
 
-- Upload `activate-crm/backend-api/` → `laravel/` on the server.
+- Upload `activate-crm/backend-api/` → `~/domains/crmapi.activatefitnessstore.com/laravel/`.
+- Upload `deploy/hostinger/api-public-index.php` → `~/domains/crmapi.activatefitnessstore.com/public_html/index.php`.
+- Upload `deploy/hostinger/api-public-html.htaccess` → `~/domains/crmapi.activatefitnessstore.com/public_html/.htaccess`.
 - **Do not upload**: `node_modules`, `.git`, local `storage/logs/*`, `storage/app/pdf-temp/*`.
 
 ### On server (SSH — Premium includes SSH)
 
 ```bash
-cd ~/domains/api.horizonfitness.in/laravel
+cd ~/domains/crmapi.activatefitnessstore.com/laravel
 
 # Install PHP dependencies (if vendor/ was not uploaded)
 composer install --no-dev --optimize-autoloader
@@ -79,12 +84,15 @@ php artisan key:generate   # only if APP_KEY is empty
 chmod -R 775 storage bootstrap/cache
 
 # Public storage (uploads: logos, letterheads, product images)
-php artisan storage:link
+# Hostinger may disable PHP exec(), which can make `php artisan storage:link` fail.
+# This app has a Laravel /storage/* fallback, so you can skip storage:link.
 
-# If logos/images return 404, confirm files exist:
-#   storage/app/public/company-settings/logos/
-# Re-upload in Settings if you only copied the database from local.
-# This app also serves /storage/* via Laravel when the symlink is missing.
+# Optional faster direct symlink, if SSH allows it:
+ln -s ../laravel/storage/app/public ../public_html/storage
+
+# If the symlink command says the file already exists, continue.
+# If symlinks are not allowed, continue; Laravel serves /storage/* as a fallback.
+# If logos/images return 404, confirm files exist in storage/app/public/.
 
 # Cache config for production
 php artisan config:cache
@@ -92,13 +100,15 @@ php artisan route:cache
 php artisan view:cache
 ```
 
+If Composer says Symfony packages require PHP 8.4, upload the latest `backend-api/composer.json` and `backend-api/composer.lock` from this repo first, then run `composer install --no-dev --optimize-autoloader` again. This repo pins Composer resolution to Hostinger's PHP 8.2.30 so the lock file stays compatible with Premium Web Hosting.
+
 ### Production `.env` (API)
 
 ```env
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://api.horizonfitness.in
-FRONTEND_URL=https://horizonfitness.in
+APP_URL=https://crmapi.activatefitnessstore.com
+FRONTEND_URL=https://crm.activatefitnessstore.com
 
 DB_CONNECTION=mysql
 DB_HOST=localhost
@@ -107,19 +117,28 @@ DB_DATABASE=your_db_name
 DB_USERNAME=your_db_user
 DB_PASSWORD=your_db_password
 
-SANCTUM_STATEFUL_DOMAINS=horizonfitness.in,www.horizonfitness.in
-CORS_ALLOWED_ORIGINS=https://horizonfitness.in,https://www.horizonfitness.in
+SANCTUM_STATEFUL_DOMAINS=crm.activatefitnessstore.com
+CORS_ALLOWED_ORIGINS=https://crm.activatefitnessstore.com
 ```
 
 Use **`localhost`** for `DB_HOST` when PHP runs on the same Hostinger server as MySQL (typical). Use the remote IP only if connecting from outside Hostinger.
 
+If you get `SQLSTATE[HY000] [2002] Operation not permitted`, Laravel cannot reach MySQL with the current host value. In hPanel → Databases → Manage, copy the exact MySQL host shown there. If hPanel shows `localhost`, try `DB_HOST=127.0.0.1` to force TCP instead of a Unix socket. Then clear and rebuild cached config:
+
+```bash
+php artisan config:clear
+php artisan cache:clear
+php artisan config:cache
+php artisan migrate:status
+```
+
 ### Apache: Bearer token support
 
-`public/.htaccess` should pass the `Authorization` header (already included in this repo).
+The uploaded `public_html/.htaccess` should pass the `Authorization` header. Use `deploy/hostinger/api-public-html.htaccess`.
 
 ### Test API
 
-Open: `https://api.horizonfitness.in/up` — should return a health response.
+Open: `https://crmapi.activatefitnessstore.com/up` — should return a health response.
 
 ---
 
@@ -137,18 +156,20 @@ Or manually:
 
 ```bash
 npm ci
-npm run build   # uses .env.production → VITE_API_BASE_URL=https://api.horizonfitness.in/api
+npm run build   # uses .env.production → VITE_API_BASE_URL=https://crmapi.activatefitnessstore.com/api
 ```
 
-Upload to `~/domains/horizonfitness.in/public_html/`:
+Upload to `~/domains/crm.activatefitnessstore.com/public_html/`:
 
 - Everything inside `dist/` (`index.html`, `assets/`, …)
 - Copy `deploy/hostinger/frontend.htaccess` → `public_html/.htaccess`
 
+Do not upload the Laravel API into the frontend domain's `public_html`.
+
 ### Test frontend
 
-1. Open `https://horizonfitness.in`
-2. Log in — requests should go to `https://api.horizonfitness.in/api/...`
+1. Open `https://crm.activatefitnessstore.com`
+2. Log in — requests should go to `https://crmapi.activatefitnessstore.com/api/...`
 
 ---
 
@@ -168,8 +189,8 @@ For higher-fidelity PDFs locally, use `QUOTATION_PDF_DRIVER=playwright` with Nod
 
 ## 6. Post-deploy checklist
 
-- [ ] `https://horizonfitness.in` loads the app
-- [ ] `https://api.horizonfitness.in/up` is healthy
+- [ ] `https://crm.activatefitnessstore.com` loads the app
+- [ ] `https://crmapi.activatefitnessstore.com/up` is healthy
 - [ ] Login works (Sanctum token returned)
 - [ ] Upload logo/letterhead in Settings (check `storage/app/public` is writable)
 - [ ] CORS: no browser errors on API calls from frontend domain
