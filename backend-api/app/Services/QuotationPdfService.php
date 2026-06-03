@@ -213,8 +213,18 @@ class QuotationPdfService
 
         $companyPayload = [
             'company_name' => $company?->company_name ?: 'Quotation',
+            'logo_src' => $this->assetSource($company?->logo_path),
             'letterhead_type' => $this->assetType($company?->letterhead_path),
             'letterhead_src' => $this->assetSource($company?->letterhead_path),
+            'address_lines' => array_values(array_filter([
+                $company?->address_line_1,
+                $company?->address_line_2,
+                collect([$company?->city, $company?->state])->filter()->implode(', '),
+                collect([$company?->pincode, $company?->country])->filter()->implode(', '),
+            ])),
+            'phone' => $company?->phone ?: null,
+            'email' => $company?->email ?: null,
+            'gst_number' => $company?->gst_number ?: null,
             'details' => array_values(array_filter([
                 ['label' => 'Company Name', 'value' => $company?->company_name ?: null],
                 ['label' => 'Account No.', 'value' => $bank?->account_number ?: null],

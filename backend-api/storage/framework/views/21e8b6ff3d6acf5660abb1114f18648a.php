@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ $quotation['number'] }}</title>
+  <title><?php echo e($quotation['number']); ?></title>
   <style>
     @page { size: A4; margin: 6mm; }
     * { box-sizing: border-box; }
@@ -126,46 +126,46 @@
 </head>
 <body>
   <div class="page">
-    @if($quotation['requires_watermark'])
+    <?php if($quotation['requires_watermark']): ?>
       <div class="watermark"><span>PENDING APPROVAL</span></div>
-    @endif
+    <?php endif; ?>
     <div class="content">
-      @if($company['letterhead_type'] === 'image' && $company['letterhead_src'])
-        <div class="letterhead"><img src="{{ $company['letterhead_src'] }}" alt="Letterhead"></div>
-      @elseif($company['letterhead_type'] === 'pdf' && $company['letterhead_src'])
+      <?php if($company['letterhead_type'] === 'image' && $company['letterhead_src']): ?>
+        <div class="letterhead"><img src="<?php echo e($company['letterhead_src']); ?>" alt="Letterhead"></div>
+      <?php elseif($company['letterhead_type'] === 'pdf' && $company['letterhead_src']): ?>
         <div class="letterhead-fallback">A print-safe branded header is used below for PDF rendering.</div>
-      @endif
-      @if(!$company['letterhead_src'])
+      <?php endif; ?>
+      <?php if(!$company['letterhead_src']): ?>
       <table class="brand-header">
         <tr>
           <td class="brand-logo-cell">
-            @if($company['logo_src'])
-              <img class="brand-logo" src="{{ $company['logo_src'] }}" alt="{{ $company['company_name'] }}">
-            @else
-              <div class="brand-logo-fallback">{{ strtoupper(substr($company['company_name'] ?: 'CO', 0, 2)) }}</div>
-            @endif
+            <?php if($company['logo_src']): ?>
+              <img class="brand-logo" src="<?php echo e($company['logo_src']); ?>" alt="<?php echo e($company['company_name']); ?>">
+            <?php else: ?>
+              <div class="brand-logo-fallback"><?php echo e(strtoupper(substr($company['company_name'] ?: 'CO', 0, 2))); ?></div>
+            <?php endif; ?>
           </td>
           <td class="brand-info-cell">
-            <div class="brand-name">{{ $company['company_name'] }}</div>
+            <div class="brand-name"><?php echo e($company['company_name']); ?></div>
             <div class="brand-address">
-              @foreach($company['address_lines'] as $line)
-                <div>{{ $line }}</div>
-              @endforeach
+              <?php $__currentLoopData = $company['address_lines']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $line): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <div><?php echo e($line); ?></div>
+              <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
             </div>
           </td>
           <td class="brand-contact-cell">
             <div class="brand-contact">
-              @if($company['email'])<div><strong>Email:</strong> {{ $company['email'] }}</div>@endif
-              @if($company['phone'])<div><strong>Mobile:</strong> {{ $company['phone'] }}</div>@endif
-              @if($company['gst_number'])<div><strong>GST:</strong> {{ $company['gst_number'] }}</div>@endif
+              <?php if($company['email']): ?><div><strong>Email:</strong> <?php echo e($company['email']); ?></div><?php endif; ?>
+              <?php if($company['phone']): ?><div><strong>Mobile:</strong> <?php echo e($company['phone']); ?></div><?php endif; ?>
+              <?php if($company['gst_number']): ?><div><strong>GST:</strong> <?php echo e($company['gst_number']); ?></div><?php endif; ?>
             </div>
           </td>
         </tr>
       </table>
-      @endif
+      <?php endif; ?>
       <table class="ribbon">
         <tr>
-          <td class="ribbon-brand-cell"><div class="ribbon-brand">{{ $company['company_name'] ?: 'Quotation' }}</div></td>
+          <td class="ribbon-brand-cell"><div class="ribbon-brand"><?php echo e($company['company_name'] ?: 'Quotation'); ?></div></td>
           <td><div class="ribbon-title">Quotation</div></td>
         </tr>
       </table>
@@ -175,13 +175,13 @@
             <td class="top-left">
             <div class="to-block">
               <p class="eyebrow">To</p>
-              <p class="customer-title">{{ $quotation['customer']['company_name'] ?: $quotation['customer']['primary_name'] }}</p>
-              @if($quotation['customer']['company_name'])<p class="customer-subtitle">{{ $quotation['customer']['primary_name'] }}</p>@endif
-              <p class="customer-address">{{ $quotation['customer']['address'] }}</p>
+              <p class="customer-title"><?php echo e($quotation['customer']['company_name'] ?: $quotation['customer']['primary_name']); ?></p>
+              <?php if($quotation['customer']['company_name']): ?><p class="customer-subtitle"><?php echo e($quotation['customer']['primary_name']); ?></p><?php endif; ?>
+              <p class="customer-address"><?php echo e($quotation['customer']['address']); ?></p>
               <div class="customer-meta">
-                @if($quotation['customer']['phone']) <span>Phone: {{ $quotation['customer']['phone'] }}</span> @endif
-                @if($quotation['customer']['email']) <span>Email: {{ $quotation['customer']['email'] }}</span> @endif
-                @if($quotation['customer']['gst_number']) <span>GSTIN: {{ $quotation['customer']['gst_number'] }}</span> @endif
+                <?php if($quotation['customer']['phone']): ?> <span>Phone: <?php echo e($quotation['customer']['phone']); ?></span> <?php endif; ?>
+                <?php if($quotation['customer']['email']): ?> <span>Email: <?php echo e($quotation['customer']['email']); ?></span> <?php endif; ?>
+                <?php if($quotation['customer']['gst_number']): ?> <span>GSTIN: <?php echo e($quotation['customer']['gst_number']); ?></span> <?php endif; ?>
               </div>
             </div>
             <div class="intro">
@@ -196,7 +196,7 @@
                   <tr class="meta-row">
                     <td class="meta-icon-wrap"><div class="meta-icon">Dt</div></td>
                     <td class="meta-label">Date</td>
-                    <td class="meta-value">{{ $quotation['quote_date_label'] }}</td>
+                    <td class="meta-value"><?php echo e($quotation['quote_date_label']); ?></td>
                   </tr>
                 </table>
               </div>
@@ -212,75 +212,75 @@
                 <th class="col-specs">Specifications</th>
                 <th class="right col-price">Price</th>
                 <th class="center col-qty">Qty</th>
-                @if($quotation['show_discount']) <th class="center col-discount">Disc%</th> @endif
+                <?php if($quotation['show_discount']): ?> <th class="center col-discount">Disc%</th> <?php endif; ?>
                 <th class="right col-gst">GST</th>
                 <th class="right col-total">Net Amount</th>
               </tr>
             </thead>
             <tbody>
-              @foreach($quotation['items'] as $index => $item)
+              <?php $__currentLoopData = $quotation['items']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                 <tr>
-                  <td class="item-no col-no">{{ $index + 1 }}</td>
+                  <td class="item-no col-no"><?php echo e($index + 1); ?></td>
                   <td class="center col-product">
-                    @if($item['product_image_src'])<img class="product-image" src="{{ $item['product_image_src'] }}" alt="{{ $item['product_name'] }}">@else<div class="product-image-placeholder">Product Image</div>@endif
-                    <div class="product-name">{{ $item['product_name'] }}</div>
-                    @if($item['model_number'])<div class="product-model">{{ $item['model_number'] }}</div>@endif
+                    <?php if($item['product_image_src']): ?><img class="product-image" src="<?php echo e($item['product_image_src']); ?>" alt="<?php echo e($item['product_name']); ?>"><?php else: ?><div class="product-image-placeholder">Product Image</div><?php endif; ?>
+                    <div class="product-name"><?php echo e($item['product_name']); ?></div>
+                    <?php if($item['model_number']): ?><div class="product-model"><?php echo e($item['model_number']); ?></div><?php endif; ?>
                   </td>
-                  <td class="specs col-specs">{!! $item['specifications_html'] !!}</td>
-                  <td class="right amount-strong col-price">{{ $item['edited_price_label'] }}</td>
-                  <td class="center amount-strong col-qty" style="white-space: nowrap;">{{ $item['quantity_label'] }}</td>
-                  @if($quotation['show_discount']) <td class="center col-discount" style="white-space: nowrap;">{{ $item['discount_percent_label'] }}</td> @endif
-                  <td class="right col-gst"><div>{{ $item['gst_percent_label'] }}</div><div class="gst-sub">{{ $item['tax_amount_label'] }}</div></td>
-                  <td class="right amount-strong col-total">{{ $item['line_total_label'] }}</td>
+                  <td class="specs col-specs"><?php echo $item['specifications_html']; ?></td>
+                  <td class="right amount-strong col-price"><?php echo e($item['edited_price_label']); ?></td>
+                  <td class="center amount-strong col-qty" style="white-space: nowrap;"><?php echo e($item['quantity_label']); ?></td>
+                  <?php if($quotation['show_discount']): ?> <td class="center col-discount" style="white-space: nowrap;"><?php echo e($item['discount_percent_label']); ?></td> <?php endif; ?>
+                  <td class="right col-gst"><div><?php echo e($item['gst_percent_label']); ?></div><div class="gst-sub"><?php echo e($item['tax_amount_label']); ?></div></td>
+                  <td class="right amount-strong col-total"><?php echo e($item['line_total_label']); ?></td>
                 </tr>
-              @endforeach
+              <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
             </tbody>
           </table>
         </div>
         <div class="totals">
           <table>
-            <tr class="totals-row muted"><td>Sub Total</td><td class="right">{{ $quotation['subtotal_label'] }}</td></tr>
-            @foreach($quotation['adjustments'] as $adjustment)<tr class="totals-row"><td>{{ $adjustment['name'] }}</td><td class="right">{{ $adjustment['amount_label'] }}</td></tr>@endforeach
-            @if(!$quotation['gst_inclusive'] && $quotation['tax_amount'] > 0)
-              <tr class="totals-row"><td>Total Before Tax</td><td class="right">{{ $quotation['before_tax_total_label'] }}</td></tr>
-              <tr class="totals-row"><td>GST</td><td class="right">{{ $quotation['tax_amount_label'] }}</td></tr>
-            @endif
-            <tr class="totals-row grand-total"><td><span class="grand-label">Grand Total</span></td><td class="right"><span class="grand-value">{{ $quotation['grand_total_label'] }}</span></td></tr>
+            <tr class="totals-row muted"><td>Sub Total</td><td class="right"><?php echo e($quotation['subtotal_label']); ?></td></tr>
+            <?php $__currentLoopData = $quotation['adjustments']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $adjustment): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><tr class="totals-row"><td><?php echo e($adjustment['name']); ?></td><td class="right"><?php echo e($adjustment['amount_label']); ?></td></tr><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            <?php if(!$quotation['gst_inclusive'] && $quotation['tax_amount'] > 0): ?>
+              <tr class="totals-row"><td>Total Before Tax</td><td class="right"><?php echo e($quotation['before_tax_total_label']); ?></td></tr>
+              <tr class="totals-row"><td>GST</td><td class="right"><?php echo e($quotation['tax_amount_label']); ?></td></tr>
+            <?php endif; ?>
+            <tr class="totals-row grand-total"><td><span class="grand-label">Grand Total</span></td><td class="right"><span class="grand-value"><?php echo e($quotation['grand_total_label']); ?></span></td></tr>
           </table>
         </div>
         <table class="bottom-table">
           <tr>
-          @if(count($quotation['terms']) > 0)
+          <?php if(count($quotation['terms']) > 0): ?>
             <td class="bottom-left">
             <div class="card">
               <div class="card-header">Terms and Conditions</div>
               <div class="card-body">
-                @foreach($quotation['terms'] as $index => $term)
+                <?php $__currentLoopData = $quotation['terms']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $term): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                   <table class="term-row">
                     <tr>
-                      <td style="width:22px; vertical-align: top;"><div class="term-index">{{ $index + 1 }}</div></td>
-                      <td class="term-text">{{ $term['content'] }}</td>
+                      <td style="width:22px; vertical-align: top;"><div class="term-index"><?php echo e($index + 1); ?></div></td>
+                      <td class="term-text"><?php echo e($term['content']); ?></td>
                     </tr>
                   </table>
-                @endforeach
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
               </div>
             </div>
             </td>
-          @else
+          <?php else: ?>
             <td class="bottom-left"></td>
-          @endif
+          <?php endif; ?>
           <td class="bottom-right">
           <div class="card">
             <div class="card-header">Company Details</div>
             <div class="card-body">
               <table class="detail-table">
-                @foreach($company['details'] as $detail)
+                <?php $__currentLoopData = $company['details']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $detail): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                   <tr>
-                    <td class="detail-label-cell"><div class="detail-label">{{ $detail['label'] }}</div></td>
+                    <td class="detail-label-cell"><div class="detail-label"><?php echo e($detail['label']); ?></div></td>
                     <td class="detail-colon-cell"><div class="detail-colon">:</div></td>
-                    <td><div class="detail-value">{{ $detail['value'] }}</div></td>
+                    <td><div class="detail-value"><?php echo e($detail['value']); ?></div></td>
                   </tr>
-                @endforeach
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
               </table>
             </div>
           </div>
@@ -296,8 +296,8 @@
                     <td class="footer-copy">
                       Thank you again for showing your interest with us. Looking forward for a healthy and long term relationship with you.<br>
                       Assuring you the best quality and services all the times.
-                      <div class="salesperson-name">{{ $quotation['salesperson']['name'] }}</div>
-                      <div class="salesperson-meta">@if($quotation['salesperson']['phone']) <span>Phone: {{ $quotation['salesperson']['phone'] }}</span> @endif @if($quotation['salesperson']['email']) <span>Email: {{ $quotation['salesperson']['email'] }}</span> @endif</div>
+                      <div class="salesperson-name"><?php echo e($quotation['salesperson']['name']); ?></div>
+                      <div class="salesperson-meta"><?php if($quotation['salesperson']['phone']): ?> <span>Phone: <?php echo e($quotation['salesperson']['phone']); ?></span> <?php endif; ?> <?php if($quotation['salesperson']['email']): ?> <span>Email: <?php echo e($quotation['salesperson']['email']); ?></span> <?php endif; ?></div>
                     </td>
                   </tr>
                 </table>
@@ -311,3 +311,4 @@
   </div>
 </body>
 </html>
+<?php /**PATH /Users/harsimrankaur/Downloads/Interactive Quotation Management Prototype/backend-api/resources/views/pdf/quotation.blade.php ENDPATH**/ ?>

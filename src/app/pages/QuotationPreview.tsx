@@ -394,17 +394,41 @@ export const QuotationPreview = () => {
 
               {/* Product Table */}
               <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200">
-                <table className="w-full border-collapse text-sm">
+                <table className="w-full table-fixed border-collapse text-sm">
+                  <colgroup>
+                    {quotation.showDiscount ? (
+                      <>
+                        <col style={{ width: '3%' }} />
+                        <col style={{ width: '27%' }} />
+                        <col style={{ width: '25%' }} />
+                        <col style={{ width: '11%' }} />
+                        <col style={{ width: '4%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '16%' }} />
+                      </>
+                    ) : (
+                      <>
+                        <col style={{ width: '3%' }} />
+                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '27%' }} />
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '4%' }} />
+                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '15%' }} />
+                      </>
+                    )}
+                  </colgroup>
                   <thead>
                     <tr className="bg-gradient-to-r from-slate-950 to-slate-900 text-white">
-                      <th className="w-12 px-3 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">No.</th>
-                      <th className="w-52 px-4 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Product / Picture</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-black uppercase tracking-wide">Specifications</th>
-                      <th className="w-24 px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">Price</th>
-                      <th className="w-16 px-3 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Qty</th>
-                      {quotation.showDiscount && <th className="w-16 px-3 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Disc%</th>}
-                      <th className="w-24 px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">GST</th>
-                      <th className="w-28 px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">Net Amount</th>
+                      <th className="px-2 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">No.</th>
+                      <th className="px-3 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Product / Picture</th>
+                      <th className="px-3 py-2.5 text-left text-[11px] font-black uppercase tracking-wide">Specifications</th>
+                      <th className="px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">Price</th>
+                      <th className="px-2 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Qty</th>
+                      {quotation.showDiscount && <th className="px-2 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Disc%</th>}
+                      <th className="px-2 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">GST</th>
+                      <th className="px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">Net Amount</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -414,9 +438,9 @@ export const QuotationPreview = () => {
 
                       return (
                         <tr key={item.id} className="border-b border-slate-200 align-middle last:border-b-0">
-                          <td className="border-r border-slate-200 px-3 py-4 text-center font-black text-slate-950">{index + 1}</td>
-                          <td className="border-r border-slate-200 px-4 py-4 text-center">
-                            <div className="mx-auto flex max-w-[190px] flex-col items-center">
+                          <td className="border-r border-slate-200 px-2 py-4 text-center font-black text-slate-950">{index + 1}</td>
+                          <td className="border-r border-slate-200 px-3 py-4 text-center">
+                            <div className="mx-auto flex max-w-[220px] flex-col items-center">
                               {productImage ? (
                                 <img src={productImage} alt={item.product.name} className="mb-3 h-24 w-full object-contain" />
                               ) : (
@@ -430,23 +454,23 @@ export const QuotationPreview = () => {
                               )}
                             </div>
                           </td>
-                          <td className="border-r border-slate-200 px-4 py-4 align-top text-xs leading-5 text-slate-700">
+                          <td className="border-r border-slate-200 px-3 py-4 align-top text-xs leading-5 text-slate-700">
                             <div className="font-medium [&_b]:font-black [&_li]:mb-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-black [&_ul]:list-disc [&_ul]:pl-5 [&_ul_li::marker]:text-red-600">
                               <div dangerouslySetInnerHTML={renderHtml(item.specifications || item.product.description || '')} />
                             </div>
                           </td>
-                          <td className="border-r border-slate-200 px-4 py-4 text-right font-black text-slate-950">{formatMoney(item.price)}</td>
-                          <td className="border-r border-slate-200 px-4 py-4 text-center font-black text-slate-950">{item.quantity}</td>
+                          <td className="border-r border-slate-200 px-3 py-4 text-right font-black text-slate-950">{formatMoney(item.price)}</td>
+                          <td className="border-r border-slate-200 px-2 py-4 text-center font-black text-slate-950">{item.quantity}</td>
                           {quotation.showDiscount && (
-                            <td className="border-r border-slate-200 px-4 py-4 text-center font-bold text-slate-700">
+                            <td className="border-r border-slate-200 px-2 py-4 text-center font-bold text-slate-700">
                               {item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'}
                             </td>
                           )}
-                          <td className="border-r border-slate-200 px-4 py-4 text-right font-bold text-slate-700">
+                          <td className="border-r border-slate-200 px-2 py-4 text-right font-bold text-slate-700">
                             <div>{item.product.gstPercent}%</div>
                             <div className="mt-1 text-xs text-slate-500">{formatMoney(gstAmount)}</div>
                           </td>
-                          <td className="px-4 py-4 text-right text-base font-black text-slate-950">{formatMoney(total)}</td>
+                          <td className="px-3 py-4 text-right text-base font-black text-slate-950">{formatMoney(total)}</td>
                         </tr>
                       );
                     })}
@@ -505,9 +529,9 @@ export const QuotationPreview = () => {
                       <FileText className="h-4 w-4 text-red-500" />
                       <h3 className="text-xs font-black uppercase tracking-wide">Terms and Conditions</h3>
                     </div>
-                    <div className="space-y-1.5 px-3.5 pb-3.5 pt-2 text-xs text-slate-700">
+                    <div className="space-y-1 px-3.5 pb-2.5 pt-1.5 text-xs text-slate-700">
                       {quotation.terms.map((termId: string, index: number) => (
-                        <div key={termId} className="flex gap-2 border-b border-dashed border-slate-200 pb-1.5 last:border-b-0 last:pb-0">
+                        <div key={termId} className="flex gap-1.5 border-b border-dashed border-slate-200 pb-1 last:border-b-0 last:pb-0">
                           <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-red-500 text-[9px] font-black text-red-600">
                             {index + 1}
                           </span>
