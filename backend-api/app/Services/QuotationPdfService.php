@@ -158,6 +158,9 @@ class QuotationPdfService
         $payload = [
             'number' => $quotation->quotation_number,
             'quote_date_label' => optional($quotation->quote_date)->format('d M Y') ?: '',
+            'validity_label' => $quotation->valid_until
+                ? optional($quotation->valid_until)->format('d M Y')
+                : '30 Days from Date of Issue',
             'status_key' => $this->statusKey($quotation->status),
             'status_label' => $this->statusLabel($quotation->status),
             'requires_watermark' => $quotation->status !== 'approved',

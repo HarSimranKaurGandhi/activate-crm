@@ -1,13 +1,12 @@
 import { useNavigate, useParams } from 'react-router';
 import { useData } from '../context/DataContext';
-import { ArrowLeft, Download, Edit, Check, X, Send, Mail, Phone, MapPin, CalendarDays, FileText, Building2, BadgeIndianRupee, UserRound } from 'lucide-react';
+import { ArrowLeft, Download, Edit, Check, X, Send, Mail, Phone, FileText, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useRef, useState } from 'react';
 import { quotationService } from '../../services/quotationService';
 import { mapQuotation } from '../../services/mappers';
 import { useAuth } from '../auth/AuthContext';
 import { LoadingState } from '../components/common/AsyncState';
-import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
 
 export const QuotationPreview = () => {
   const navigate = useNavigate();
@@ -138,6 +137,9 @@ export const QuotationPreview = () => {
       month: 'short',
       year: 'numeric',
     });
+  const validityLabel = quotation.validUntil
+    ? formatDate(quotation.validUntil)
+    : `${settings.defaultValidityDays || 30} Days from Date of Issue`;
 
   const totalAdjustments = Object.entries(quotation.adjustments || {}).reduce(
     (sum, [adjId, adj]: [string, any]) => {
@@ -331,69 +333,109 @@ export const QuotationPreview = () => {
               </div>
             </div> */}
 
-            {/* Brand Ribbon */}
-            <div className="relative mx-3 flex items-center justify-between bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-4 py-2 text-white print:mx-0 print:px-6 print:py-3">
-              <div className="text-[2.35rem] font-black uppercase tracking-[0.22em] text-white print:text-[2rem]">
-                Matrix
+            {!hasLetterhead && (
+              <div className="mx-5 mt-5 grid grid-cols-[140px_1fr_320px] items-center border-y border-slate-200 print:mx-7">
+                <div className="flex items-center justify-center py-5">
+                  {settings.logo ? (
+                    <img src={settings.logo} alt={settings.name} className="max-h-24 max-w-[108px] object-contain" />
+                  ) : (
+                    <div className="flex h-28 w-28 items-center justify-center border border-red-500 text-5xl font-black tracking-tight text-slate-950">
+                      {(settings.name || 'R3').slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="border-l border-slate-200 px-6 py-5">
+                  <h1 className="text-[2.1rem] font-black uppercase tracking-tight text-slate-950">{settings.name}</h1>
+                  <div className="mt-3 max-w-xl space-y-1 text-sm leading-7 text-slate-700">
+                    {settings.address.split(', ').filter(Boolean).map((line, index) => (
+                      <p key={`${line}-${index}`}>{line}</p>
+                    ))}
+                  </div>
+                </div>
+                <div className="border-l border-slate-200 px-6 py-5 text-sm text-slate-800">
+                  {settings.email && (
+                    <div className="mb-4 flex items-center gap-3">
+                      <Mail className="h-4 w-4 text-slate-700" />
+                      <span>Email: {settings.email}</span>
+                    </div>
+                  )}
+                  {settings.phone && (
+                    <div className="mb-4 flex items-center gap-3">
+                      <Phone className="h-4 w-4 text-slate-700" />
+                      <span>Mobile: {settings.phone}</span>
+                    </div>
+                  )}
+                  {settings.gstNumber && (
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-4 w-4 text-slate-700" />
+                      <span>GST: {settings.gstNumber}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="absolute left-[62%] top-0 h-full w-px rotate-[28deg] bg-red-600" />
-              <div className="text-xl font-semibold uppercase tracking-[0.35em] text-white print:text-lg">Quotation</div>
+            )}
+
+            <div className="mx-5 mt-3 grid grid-cols-[1.45fr_0.55fr] border-t-[3px] border-red-600 print:mx-7">
+              <div className="bg-black px-8 py-3 text-[2.05rem] font-black uppercase tracking-[0.24em] text-white">
+                {settings.name}
+              </div>
+              <div className="bg-red-600 px-8 py-3 text-center text-xl font-semibold uppercase tracking-[0.32em] text-white">
+                Quotation
+              </div>
             </div>
 
-            <div className="px-5 py-3 print:px-7 print:py-5">
+            <div className="px-5 py-6 print:px-7 print:py-5">
               {/* Customer + Quotation Meta */}
-              <div className="mb-5 grid grid-cols-1 gap-5 md:grid-cols-[1fr_320px]">
+              <div className="mb-6 grid grid-cols-1 gap-8 md:grid-cols-[1fr_390px]">
                 <div>
-                  <div className="border-l-4 border-red-600 pl-4">
-                    <p className="text-xs font-black uppercase tracking-[0.25em] text-red-600">To</p>
-                    <p className="mt-1.5 text-lg font-black text-slate-950">{quotation.customer.company || quotation.customer.name}</p>
+                  <div>
+                    <div className="mb-4">
+                      <p className="text-[1.05rem] font-black uppercase tracking-wide text-slate-950">Client Details</p>
+                      <div className="mt-2 h-px w-full max-w-[390px] bg-slate-200" />
+                      <div className="mt-[-1px] h-px w-24 bg-red-500" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-950">{quotation.customer.company || quotation.customer.name}</p>
                     {quotation.customer.company && <p className="text-sm font-semibold text-slate-700">{quotation.customer.name}</p>}
-                    <p className="mt-1 text-sm font-medium text-slate-600">{quotation.customer.address}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                    <p className="mt-3 text-sm font-medium leading-7 text-slate-700">{quotation.customer.address}</p>
+                    <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
                       {quotation.customer.phone && <span>Phone: {quotation.customer.phone}</span>}
+                      {(quotation.customer.phone && quotation.customer.email) && <span className="text-slate-400">|</span>}
                       {quotation.customer.email && <span>Email: {quotation.customer.email}</span>}
-                      {quotation.customer.gstNumber && <span>GSTIN: {quotation.customer.gstNumber}</span>}
                     </div>
                   </div>
 
-                  <div className="mt-4 max-w-2xl text-sm leading-5 text-slate-700">
+                  <div className="mt-7 border-t border-slate-300 pt-5 max-w-2xl text-[15px] leading-8 text-slate-800">
                     <p className="font-bold text-slate-950">Dear Sir,</p>
                     <p>We are indeed thankful to you for showing interest in our products.</p>
                     <p>As per the discussion, please find here our most technically viable offer for your consideration.</p>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 shadow-sm">
-                  <div className="grid grid-cols-[38px_1fr_1fr] items-center border-b border-slate-200 pb-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm">
-                      <FileText className="h-4.5 w-4.5" />
-                    </div>
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-700">Quote No.</p>
-                    <p className="text-right text-sm font-black text-slate-950">{quotation.number}</p>
+                <div>
+                  <div className="mb-4">
+                    <p className="text-[1.05rem] font-black uppercase tracking-wide text-slate-950">Quotation Details</p>
+                    <div className="mt-2 h-px w-full bg-slate-200" />
+                    <div className="mt-[-1px] h-px w-28 bg-red-500" />
                   </div>
-                  <div className="grid grid-cols-[38px_1fr_1fr] items-center border-b border-slate-200 py-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm">
-                      <CalendarDays className="h-4.5 w-4.5" />
+                  <div className="overflow-hidden border border-slate-300 bg-white">
+                    <div className="grid grid-cols-[130px_1fr] border-b border-slate-300">
+                      <div className="border-r border-slate-300 px-6 py-4 text-sm font-black text-slate-950">Quote No</div>
+                      <div className="px-6 py-4 text-sm text-slate-800">{quotation.number}</div>
                     </div>
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-700">Date</p>
-                    <p className="text-right text-sm font-black text-slate-950">{formatDate(quotation.date)}</p>
-                  </div>
-                  <div className="grid grid-cols-[38px_1fr_1fr] items-center pt-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm">
-                      <BadgeIndianRupee className="h-4.5 w-4.5" />
+                    <div className="grid grid-cols-[130px_1fr] border-b border-slate-300">
+                      <div className="border-r border-slate-300 px-6 py-4 text-sm font-black text-slate-950">Date</div>
+                      <div className="px-6 py-4 text-sm text-slate-800">{formatDate(quotation.date)}</div>
                     </div>
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-700">Status</p>
-                    <div className="text-right">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${quotationStatusClass(quotation.status)}`}>
-                        {quotationStatusLabel(quotation.status)}
-                      </span>
+                    <div className="grid grid-cols-[130px_1fr]">
+                      <div className="border-r border-slate-300 px-6 py-4 text-sm font-black text-slate-950">Validity</div>
+                      <div className="px-6 py-4 text-sm text-slate-800">{validityLabel}</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Product Table */}
-              <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200">
+              <div className="mb-5 overflow-hidden border border-slate-300">
                 <table className="w-full table-fixed border-collapse text-sm">
                   <colgroup>
                     {quotation.showDiscount ? (
@@ -420,7 +462,7 @@ export const QuotationPreview = () => {
                     )}
                   </colgroup>
                   <thead>
-                    <tr className="bg-gradient-to-r from-slate-950 to-slate-900 text-white">
+                    <tr className="border-t-2 border-red-600 bg-black text-white">
                       <th className="px-2 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">No.</th>
                       <th className="px-3 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Product / Picture</th>
                       <th className="px-3 py-2.5 text-left text-[11px] font-black uppercase tracking-wide">Specifications</th>
@@ -480,10 +522,10 @@ export const QuotationPreview = () => {
 
               {/* Totals */}
               <div className="mb-5 flex justify-end">
-                <div className="w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-sm font-bold text-slate-700">
-                    <span>Sub Total</span>
-                    <span>{formatMoney(quotation.subtotal)}</span>
+                <div className="w-full max-w-[520px] overflow-hidden border border-slate-300">
+                  <div className="grid grid-cols-[1.2fr_0.8fr] border-b border-slate-300">
+                    <div className="px-6 py-3 text-sm text-slate-800">Sub Total</div>
+                    <div className="border-l border-slate-300 px-6 py-3 text-right text-sm text-slate-800">{formatMoney(quotation.subtotal)}</div>
                   </div>
 
                   {Object.entries(quotation.adjustments || {}).map(([adjId, adj]: [string, any]) => {
@@ -494,60 +536,54 @@ export const QuotationPreview = () => {
                     const amount = adjustment.type === 'percentage' ? quotation.subtotal * (adj.amount / 100) : adj.amount;
 
                     return (
-                      <div key={adjId} className="flex justify-between border-b border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700">
-                        <span>{adjustment.name}</span>
-                        <span>{formatMoney(amount)}</span>
+                      <div key={adjId} className="grid grid-cols-[1.2fr_0.8fr] border-b border-slate-300">
+                        <div className="px-6 py-3 text-sm text-slate-800">{adjustment.name}</div>
+                        <div className="border-l border-slate-300 px-6 py-3 text-right text-sm text-slate-800">{formatMoney(amount)}</div>
                       </div>
                     );
                   })}
 
                   {!quotation.gstInclusive && quotation.taxAmount > 0 && (
-                    <>
-                      <div className="flex justify-between border-b border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700">
-                        <span>Total Before Tax</span>
-                        <span>{formatMoney(beforeTaxTotal)}</span>
-                      </div>
-                      <div className="flex justify-between border-b border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700">
-                        <span>GST</span>
-                        <span>{formatMoney(quotation.taxAmount)}</span>
-                      </div>
-                    </>
+                    <div className="grid grid-cols-[1.2fr_0.8fr] border-b border-slate-300">
+                      <div className="px-6 py-3 text-sm text-slate-800">GST</div>
+                      <div className="border-l border-slate-300 px-6 py-3 text-right text-sm text-slate-800">{formatMoney(quotation.taxAmount)}</div>
+                    </div>
                   )}
 
-                  <div className="flex items-center justify-between bg-red-600 px-5 py-3.5 text-white">
-                    <span className="text-sm font-black uppercase tracking-wide">Grand Total</span>
-                    <span className="text-2xl font-black">{formatMoney(quotation.grandTotal)}</span>
+                  <div className="grid grid-cols-[1.2fr_0.8fr] bg-black text-white">
+                    <div className="px-6 py-3 text-2xl font-black uppercase tracking-wide">Grand Total</div>
+                    <div className="border-l border-white/20 px-6 py-3 text-right text-2xl font-black">{formatMoney(quotation.grandTotal)}</div>
                   </div>
                 </div>
               </div>
 
               {/* Terms + Company Details */}
-              <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2">
                 {quotation.terms.length > 0 && (
-                  <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="inline-flex -translate-y-px items-center gap-2 rounded-br-xl rounded-tl-2xl bg-slate-950 px-3.5 py-2 text-white">
-                      <FileText className="h-4 w-4 text-red-500" />
-                      <h3 className="text-xs font-black uppercase tracking-wide">Terms and Conditions</h3>
+                  <section className="border border-slate-300 bg-white px-5 py-4">
+                    <div className="mb-5">
+                      <h3 className="text-[1.05rem] font-black uppercase tracking-wide text-slate-950">Terms and Conditions</h3>
+                      <div className="mt-3 h-px w-full bg-slate-200" />
+                      <div className="mt-[-1px] h-px w-28 bg-red-500" />
                     </div>
-                    <div className="space-y-1 px-3.5 pb-2.5 pt-1.5 text-xs text-slate-700">
+                    <div className="space-y-3 text-sm text-slate-800">
                       {quotation.terms.map((termId: string, index: number) => (
-                        <div key={termId} className="flex gap-1.5 border-b border-dashed border-slate-200 pb-1 last:border-b-0 last:pb-0">
-                          <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-red-500 text-[9px] font-black text-red-600">
-                            {index + 1}
-                          </span>
-                          <span className="font-medium leading-4.5">{getTermContent(termId)}</span>
+                        <div key={termId} className="flex items-start gap-3">
+                          <span className="mt-[7px] h-1.5 w-1.5 shrink-0 bg-red-500" />
+                          <span className="leading-6">{getTermContent(termId)}</span>
                         </div>
                       ))}
                     </div>
                   </section>
                 )}
 
-                <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <div className="inline-flex -translate-y-px items-center gap-2 rounded-br-xl rounded-tl-2xl bg-slate-950 px-3.5 py-2 text-white">
-                    <Building2 className="h-4 w-4 text-red-500" />
-                    <h3 className="text-xs font-black uppercase tracking-wide">Company Details</h3>
+                <section className="border border-slate-300 bg-white px-5 py-4">
+                  <div className="mb-5">
+                    <h3 className="text-[1.05rem] font-black uppercase tracking-wide text-slate-950">Company Details</h3>
+                    <div className="mt-3 h-px w-full bg-slate-200" />
+                    <div className="mt-[-1px] h-px w-28 bg-red-500" />
                   </div>
-                  <div className="grid gap-1 px-3.5 pb-3.5 pt-2 text-sm">
+                  <div className="grid gap-3 text-sm">
                     <DetailRow label="Company Name" value={settings.name} />
                     <DetailRow label="Account No." value={settings.bankDetails.accountNumber} />
                     <DetailRow label="IFSC Code" value={settings.bankDetails.ifsc} />
@@ -558,31 +594,26 @@ export const QuotationPreview = () => {
               </div>
 
               {/* Footer */}
-              <div className="border-t border-slate-200 pt-3.5">
-                <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-[1fr_300px]">
-                  <div className="flex items-center gap-3.5">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-700">
-                      <UserRound className="h-10 w-10" />
-                    </div>
-                    <div>
-                      <p className="max-w-xl text-sm leading-5 text-slate-700">
-                        Thank you again for showing your interest with us. Looking forward for a healthy and long term relationship with you.
-                        <br />
-                        Assuring you the best quality and services all the times.
-                      </p>
-                      
+              <div className="pt-5">
+                <div className="text-[15px] leading-8 text-slate-800">
+                  <p>Thank you again for showing your interest with us. Looking forward for a healthy and long term relationship with you.</p>
+                  <p className="mt-2">Assuring you the best quality and services all the times.</p>
+                </div>
+
+                <div className="mt-12 grid grid-cols-1 items-end gap-10 md:grid-cols-[1fr_320px]">
+                  <div>
+                    <div className="mb-3 h-px w-36 bg-red-500" />
+                    <p className="text-[2rem] font-black uppercase tracking-tight text-red-600">{quotation.salesperson.name}</p>
+                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
+                      {quotation.salesperson.phone && <span>Phone: {quotation.salesperson.phone}</span>}
+                      {(quotation.salesperson.phone && quotation.salesperson.email) && <span className="text-slate-400">|</span>}
+                      {quotation.salesperson.email && <span>Email: {quotation.salesperson.email}</span>}
                     </div>
                   </div>
 
                   <div className="text-center">
-                  <p className="mt-3 text-base font-black uppercase text-slate-950">{quotation.salesperson.name}</p>
-                      <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm font-medium text-slate-600">
-                        {quotation.salesperson.phone && <span>Phone: {quotation.salesperson.phone}</span>}
-                        {quotation.salesperson.email && <span>Email: {quotation.salesperson.email}</span>}
-                      </div>
-                    {/* <div className="mx-auto mt-14 w-64 border-t-2 border-slate-950 pt-3">
-                      <p className="text-sm font-black uppercase tracking-wide text-slate-950">Authorized Signature</p>
-                    </div> */}
+                    <div className="mx-auto mb-3 h-px w-56 bg-red-500" />
+                    <p className="text-[1.1rem] font-black uppercase tracking-[0.18em] text-slate-950">Authorized Signature</p>
                   </div>
                 </div>
               </div>
@@ -703,9 +734,8 @@ const DetailRow = ({ label, value }: { label: string; value?: string }) => {
   if (!value) return null;
 
   return (
-    <div className="grid grid-cols-[140px_12px_1fr] gap-2 text-slate-800">
+    <div className="grid grid-cols-[140px_1fr] gap-5 border-t border-slate-200 pt-3 text-slate-800 first:border-t-0 first:pt-0">
       <span className="font-black uppercase tracking-wide text-slate-700">{label}</span>
-      <span className="font-bold text-slate-400">:</span>
       <span className="font-medium">{value}</span>
     </div>
   );
