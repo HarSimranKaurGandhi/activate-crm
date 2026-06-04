@@ -2,11 +2,25 @@
   RewriteEngine On
   RewriteBase /
 
-  # Serve existing files/directories as-is
+  # Avoid Apache MultiViews interfering with SPA routes like /quotations/16/edit
+  <IfModule mod_negotiation.c>
+    Options -MultiViews
+  </IfModule>
+
+  # Serve real files and directories normally
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
+  # Don't rewrite existing asset requests
+  RewriteRule ^assets/ - [L]
+  RewriteRule ^favicon\.ico$ - [L]
+  RewriteRule ^robots\.txt$ - [L]
+
   # React Router (SPA) fallback
-  RewriteRule ^ index.html [L]
+  RewriteRule . /index.html [L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+  ErrorDocument 404 /index.html
 </IfModule>
