@@ -7,13 +7,13 @@ use App\Models\Brand;
 use App\Models\MeasurementUnit;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Support\PublicAsset;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -250,7 +250,7 @@ class ProductService extends CrudService
         $createdImages = collect();
 
         foreach ($imageFiles as $index => $imageFile) {
-            $storedPath = $imageFile->store('products/images', 'public');
+            $storedPath = PublicAsset::store($imageFile, 'uploads/products/images');
             $createdImages->push($product->images()->create([
                 'image_path' => $storedPath,
                 'is_primary' => false,

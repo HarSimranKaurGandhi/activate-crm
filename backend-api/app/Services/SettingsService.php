@@ -5,12 +5,12 @@ namespace App\Services;
 use App\Models\CompanyBankDetail;
 use App\Models\CompanySetting;
 use App\Models\QuotationNumberSetting;
+use App\Support\PublicAsset;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 
 class SettingsService
 {
@@ -33,19 +33,13 @@ class SettingsService
     private function storeCompanyAssets(array $data, CompanySetting $settings): array
     {
         if (($data['logo_file'] ?? null) instanceof UploadedFile) {
-            if ($settings->logo_path) {
-                Storage::disk('public')->delete($settings->logo_path);
-            }
-
-            $data['logo_path'] = $data['logo_file']->store('company-settings/logos', 'public');
+            PublicAsset::delete($settings->logo_path);
+            $data['logo_path'] = PublicAsset::store($data['logo_file'], 'uploads/company-settings/logos');
         }
 
         if (($data['letterhead_file'] ?? null) instanceof UploadedFile) {
-            if ($settings->letterhead_path) {
-                Storage::disk('public')->delete($settings->letterhead_path);
-            }
-
-            $data['letterhead_path'] = $data['letterhead_file']->store('company-settings/letterheads', 'public');
+            PublicAsset::delete($settings->letterhead_path);
+            $data['letterhead_path'] = PublicAsset::store($data['letterhead_file'], 'uploads/company-settings/letterheads');
         }
 
         unset($data['logo_file'], $data['letterhead_file']);

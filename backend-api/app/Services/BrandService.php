@@ -3,12 +3,12 @@
 namespace App\Services;
 
 use App\Models\Brand;
+use App\Support\PublicAsset;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 
 class BrandService extends MasterService
 {
@@ -62,19 +62,13 @@ class BrandService extends MasterService
         ];
 
         if (($data['brand_logo'] ?? null) instanceof UploadedFile) {
-            if ($brand?->logo) {
-                Storage::disk('public')->delete($brand->logo);
-            }
-
-            $payload['logo'] = $data['brand_logo']->store('brands/logos', 'public');
+            PublicAsset::delete($brand?->logo);
+            $payload['logo'] = PublicAsset::store($data['brand_logo'], 'uploads/brands/logos');
         }
 
         if (($data['brand_catalog'] ?? null) instanceof UploadedFile) {
-            if ($brand?->catalog_path) {
-                Storage::disk('public')->delete($brand->catalog_path);
-            }
-
-            $payload['catalog_path'] = $data['brand_catalog']->store('brands/catalogs', 'public');
+            PublicAsset::delete($brand?->catalog_path);
+            $payload['catalog_path'] = PublicAsset::store($data['brand_catalog'], 'uploads/brands/catalogs');
         }
 
         return $payload;

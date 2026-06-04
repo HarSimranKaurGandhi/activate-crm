@@ -58,10 +58,10 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
 
   return (
     <tr ref={(node) => { drag(drop(node)); }} className="border-b border-gray-200 last:border-0 hover:bg-gray-50">
-      <td className="w-8 px-2 py-2 align-middle">
+      <td className="w-8 px-2 py-3 align-middle">
         <GripVertical className="w-4 h-4 text-gray-400 cursor-move" />
       </td>
-      <td className="px-2 py-2 align-middle">
+      <td className="px-3 py-3 align-middle">
         <div className="flex items-center gap-3 min-w-0">
           <img src={item.product.image} alt="" className="w-12 h-12 shrink-0 object-cover rounded-md border border-gray-100" />
           <div className="min-w-0">
@@ -71,27 +71,33 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
           </div>
         </div>
       </td>
-      <td className="px-2 py-2 align-middle">
+      <td className="px-2 py-3 align-middle">
         <input
           type="number"
           value={item.quantity}
           onChange={(e) => onUpdate(item.id, { quantity: parseInt(e.target.value) || 1 })}
-          className="w-14 px-2 py-1.5 border border-gray-200 rounded-md text-center text-sm"
+          className="w-16 px-2 py-1.5 border border-gray-200 rounded-md text-center text-sm"
           min="1"
         />
       </td>
-      <td className="px-2 py-2 align-middle">
-        <div className="font-medium text-gray-900">
+      <td className="px-2 py-3 align-middle text-right">
+        <div className="font-medium text-sm text-gray-900 whitespace-nowrap">
           ₹{productMrp.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
         </div>
       </td>
-      <td className="px-2 py-2 align-middle">
-        <div className="font-medium text-gray-900">
+      <td className="px-2 py-3 align-middle text-right">
+        <div className="font-medium text-sm text-gray-900 whitespace-nowrap">
           ₹{discountedUnitPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
         </div>
       </td>
+      <td className="px-2 py-3 align-middle text-center text-sm text-gray-600 whitespace-nowrap">
+        {item.product.gstPercent}%
+      </td>
+      <td className="px-2 py-3 align-middle text-right text-sm text-gray-600 whitespace-nowrap">
+        ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+      </td>
       {showDiscount && (
-       <td className="px-2 py-2 align-middle">
+        <td className="px-2 py-3 align-middle text-center">
           <input
             type="number"
             value={item.discount}
@@ -99,39 +105,17 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
               const newDiscount = parseInt(e.target.value, 10) || 0;
               onUpdate(item.id, { discount: normalizeDiscount(newDiscount) });
             }}
-            className="w-24 px-2 py-1.5 border border-gray-200 rounded-md text-sm"
+            className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-center"
             min="0"
             max="100"
             step="1"
           />
         </td>
       )}
-      <td className="px-2 py-2 align-middle text-sm text-gray-600">
-        {item.product.gstPercent}%
-      </td>
-      <td className="px-2 py-2 align-middle text-sm text-gray-600 whitespace-nowrap">
-        ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-      </td>
-      {showDiscount && (
-      <td className="px-4 py-3 font-semibold text-gray-900">
-          <input
-            type="number"
-            value={item.discount.toFixed(2)}
-            onChange={(e) => {
-              const newDiscount = parseFloat(e.target.value) || 0;
-              const basePrice = getQuotationBasePrice(item.product);
-              const newPrice = basePrice * (1 - newDiscount / 100);
-              onUpdate(item.id, { discount: newDiscount, price: newPrice });
-            }}
-            className="w-16 px-2 py-1.5 border border-gray-200 rounded-md text-sm"
-            step="0.01"
-          />
-        </td>
-      )}
-      <td className="px-2 py-2 align-middle font-semibold text-sm text-gray-900 whitespace-nowrap">
+      <td className="px-2 py-3 align-middle text-right font-semibold text-sm text-gray-900 whitespace-nowrap">
         ₹{lineTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
       </td>
-      <td className="w-9 px-2 py-2 align-middle">
+      <td className="w-9 px-2 py-3 align-middle text-center">
         <button
           onClick={() => onDelete(item.id)}
           className="p-1.5 text-red-600 hover:bg-red-50 rounded-md"
@@ -497,32 +481,33 @@ export const QuotationBuilder = () => {
               </button>
             </div>
 
-            <div className="overflow-hidden">
-              <table className="w-full table-fixed">
+            <div className="overflow-x-auto">
+              <table className="min-w-[980px] w-full table-fixed">
                 <colgroup>
                   <col className="w-8" />
-                  <col />
-                  <col className="w-16" />
-                  <col className="w-28" />
-                  <col className="w-16" />
-                  <col className="w-28" />
-                  {showDiscount && <col className="w-20" />}
+                  <col className="w-[28%]" />
+                  <col className="w-20" />
+                  <col className="w-36" />
+                  <col className="w-36" />
+                  <col className="w-20" />
                   <col className="w-32" />
-                  <col className="w-10" />
+                  {showDiscount && <col className="w-20" />}
+                  <col className="w-36" />
+                  <col className="w-12" />
                 </colgroup>
                 <thead>
                   <tr className="border-b-2 border-gray-200">
                     <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase"></th>
                     <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Product</th>
-                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Qty</th>
-                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">MRP</th>
-                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Discounted Price</th>
-                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">GST%</th>
-                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">GST Amt</th>
+                    <th className="px-2 py-2 text-center text-[11px] font-semibold text-gray-600 uppercase">Qty</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold text-gray-600 uppercase">MRP</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold text-gray-600 uppercase">Discounted Price</th>
+                    <th className="px-2 py-2 text-center text-[11px] font-semibold text-gray-600 uppercase">GST%</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold text-gray-600 uppercase">GST Amt</th>
                     {showDiscount && (
-                      <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Disc%</th>
+                      <th className="px-2 py-2 text-center text-[11px] font-semibold text-gray-600 uppercase">Disc%</th>
                     )}
-                    <th className="px-2 py-2 text-left text-[11px] font-semibold text-gray-600 uppercase">Total</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold text-gray-600 uppercase">Total</th>
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>

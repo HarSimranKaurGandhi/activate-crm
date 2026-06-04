@@ -7,6 +7,12 @@ import { LoadingState } from '../components/common/AsyncState';
 import { measurementUnitService } from '../../services/masterService';
 
 const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const FONT_SIZE_OPTIONS = [
+  { label: 'Small', value: '12px' },
+  { label: 'Normal', value: '14px' },
+  { label: 'Large', value: '16px' },
+  { label: 'XL', value: '18px' },
+];
 
 export const ProductForm = () => {
   const navigate = useNavigate();
@@ -15,7 +21,9 @@ export const ProductForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const specsEditorRef = useRef<HTMLDivElement | null>(null);
+  const specSelectionRef = useRef<Range | null>(null);
   const [measurementUnits, setMeasurementUnits] = useState<Array<{ id: string; code: string; name: string }>>([]);
+  const [selectedFontSize, setSelectedFontSize] = useState(FONT_SIZE_OPTIONS[1].value);
 
   const [formData, setFormData] = useState({
     image: '',
@@ -88,13 +96,103 @@ export const ProductForm = () => {
     }));
   };
 
-  const applySpecFormat = (command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList') => {
-    specsEditorRef.current?.focus();
-    document.execCommand(command);
+  const syncSpecifications = () => {
     setFormData((current) => ({
       ...current,
       specifications: specsEditorRef.current?.innerHTML || '',
     }));
+  };
+
+  const saveSpecSelection = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    if (specsEditorRef.current?.contains(range.commonAncestorContainer)) {
+      specSelectionRef.current = range.cloneRange();
+    }
+  };
+
+  const restoreSpecSelection = () => {
+    const selection = window.getSelection();
+    const savedRange = specSelectionRef.current;
+    if (!selection || !savedRange) return;
+
+    selection.removeAllRanges();
+    selection.addRange(savedRange);
+  };
+
+  const applySpecFormat = (command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList') => {
+    specsEditorRef.current?.focus();
+    restoreSpecSelection();
+    document.execCommand(command);
+    saveSpecSelection();
+    syncSpecifications();
+  };
+
+  const applyFontSize = (fontSize: string) => {
+    const editor = specsEditorRef.current;
+    if (!editor) return;
+
+    setSelectedFontSize(fontSize);
+    editor.focus();
+    restoreSpecSelection();
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      editor.style.fontSize = fontSize;
+      syncSpecifications();
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer)) {
+      editor.style.fontSize = fontSize;
+      syncSpecifications();
+      return;
+    }
+
+    if (range.collapsed) {
+      const span = document.createElement('span');
+      span.style.fontSize = fontSize;
+      span.appendChild(document.createTextNode('\u200B'));
+      range.insertNode(span);
+
+      const newRange = document.createRange();
+      newRange.setStart(span.firstChild as Text, 1);
+      newRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+      specSelectionRef.current = newRange.cloneRange();
+    } else {
+      const extractedContents = range.extractContents();
+      const span = document.createElement('span');
+      span.style.fontSize = fontSize;
+      span.appendChild(extractedContents);
+      range.insertNode(span);
+
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+      specSelectionRef.current = newRange.cloneRange();
+    }
+
+    syncSpecifications();
+  };
+
+  const clearSpecificationsFormatting = () => {
+    const editor = specsEditorRef.current;
+    if (!editor) return;
+
+    const lines = editor.innerText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    editor.innerHTML = lines.length > 0 ? lines.map((line) => `<div>${line}</div>`).join('') : '';
+    setSelectedFontSize(FONT_SIZE_OPTIONS[1].value);
+    syncSpecifications();
   };
 
   const handleImageSelection = (files: FileList | null) => {
@@ -367,10 +465,29 @@ export const ProductForm = () => {
                   <button type="button" onClick={() => applySpecFormat('italic')} className="rounded-lg p-2 text-gray-600 hover:bg-white"><Italic className="h-4 w-4" /></button>
                   <button type="button" onClick={() => applySpecFormat('underline')} className="rounded-lg p-2 text-gray-600 hover:bg-white"><Underline className="h-4 w-4" /></button>
                   <button type="button" onClick={() => applySpecFormat('insertUnorderedList')} className="rounded-lg p-2 text-gray-600 hover:bg-white"><List className="h-4 w-4" /></button>
+                  <select
+                    value={selectedFontSize}
+                    onChange={(e) => applyFontSize(e.target.value)}
+                    className="ml-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 outline-none"
+                  >
+                    {FONT_SIZE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={clearSpecificationsFormatting}
+                    className="ml-auto rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  >
+                    Clear Formatting
+                  </button>
                 </div>
                 <div
                   ref={specsEditorRef}
                   contentEditable
+                  onMouseUp={saveSpecSelection}
+                  onKeyUp={saveSpecSelection}
+                  onFocus={saveSpecSelection}
                   onInput={(e) => setFormData({ ...formData, specifications: (e.target as HTMLDivElement).innerHTML })}
                   className="min-h-40 w-full px-4 py-3 outline-none"
                   suppressContentEditableWarning

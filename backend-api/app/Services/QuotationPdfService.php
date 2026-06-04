@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CompanyBankDetail;
 use App\Models\CompanySetting;
 use App\Models\Quotation;
+use App\Support\PublicAsset;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\ExecutableFinder;
@@ -290,9 +291,9 @@ class QuotationPdfService
             return null;
         }
 
-        $fullPath = storage_path('app/public/'.$path);
+        $fullPath = PublicAsset::absolutePath($path);
 
-        if (! is_file($fullPath)) {
+        if (! $fullPath || ! is_file($fullPath)) {
             return null;
         }
 

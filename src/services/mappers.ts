@@ -29,7 +29,15 @@ const assetUrl = (path?: string | null) => {
     return `${apiOrigin}${value}`;
   }
 
+  if (value.startsWith('/uploads/')) {
+    return `${apiOrigin}${value}`;
+  }
+
   if (value.startsWith('storage/')) {
+    return `${apiOrigin}/${value}`;
+  }
+
+  if (value.startsWith('uploads/')) {
     return `${apiOrigin}/${value}`;
   }
 
