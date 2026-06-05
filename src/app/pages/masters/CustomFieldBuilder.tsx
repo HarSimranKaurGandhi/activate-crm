@@ -59,11 +59,11 @@ export const CustomFieldBuilder = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900">Custom Field Builder</h2>
+            <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Custom Field Builder</h2>
             <p className="text-gray-600 mt-1">Create custom fields for customer forms</p>
           </div>
           <button
@@ -72,7 +72,7 @@ export const CustomFieldBuilder = () => {
               setFormData({ name: '', type: 'text', options: [], required: false });
               setShowModal(true);
             }}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto sm:px-6"
           >
             <Plus className="w-5 h-5" />
             Add Custom Field
@@ -80,7 +80,64 @@ export const CustomFieldBuilder = () => {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <table className="w-full">
+          <div className="divide-y divide-gray-200 md:hidden">
+            {pagination.pageItems.map((field) => (
+              <div key={field.id} className="space-y-4 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="break-words text-base font-semibold text-gray-900">{field.name}</div>
+                    <div className="mt-1">
+                      <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                        {field.type}
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
+                    field.required ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-700'
+                  }`}>
+                    {field.required ? 'Required' : 'Optional'}
+                  </span>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 p-3 text-sm">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Options</div>
+                  <div className="mt-2 break-words text-slate-900">
+                    {field.type === 'select' && field.options ? field.options.join(', ') : '-'}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => handleEdit(field)}
+                    className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50"
+                    title="Edit"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (confirm('Are you sure you want to delete this custom field?')) {
+                        await deleteCustomField(field.id);
+                        toast.success('Custom field deleted');
+                      }
+                    }}
+                    className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {customFields.length === 0 && (
+              <div className="px-6 py-12 text-center text-gray-500">
+                No custom fields created yet. Add your first custom field to get started.
+              </div>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+          <table className="min-w-[820px] w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Field Name</th>
@@ -141,6 +198,7 @@ export const CustomFieldBuilder = () => {
               )}
             </tbody>
           </table>
+          </div>
           <PaginationControls
             page={pagination.page}
             pageSize={pagination.pageSize}
@@ -154,8 +212,8 @@ export const CustomFieldBuilder = () => {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 sm:p-6">
             <h3 className="text-xl font-semibold text-gray-900 mb-4">
               {editingId ? 'Edit Custom Field' : 'Add Custom Field'}
             </h3>
@@ -193,7 +251,7 @@ export const CustomFieldBuilder = () => {
               {formData.type === 'select' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Dropdown Options</label>
-                  <div className="flex gap-2 mb-2">
+                  <div className="mb-2 flex flex-col gap-2 sm:flex-row">
                     <input
                       type="text"
                       value={optionInput}
@@ -205,7 +263,7 @@ export const CustomFieldBuilder = () => {
                     <button
                       type="button"
                       onClick={addOption}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
                     >
                       Add
                     </button>
@@ -239,17 +297,17 @@ export const CustomFieldBuilder = () => {
                 </label>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col gap-3 pt-4 sm:flex-row">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50"
+                  className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+                  className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700"
                 >
                   {editingId ? 'Update' : 'Add'}
                 </button>

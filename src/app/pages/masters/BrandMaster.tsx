@@ -72,10 +72,10 @@ export const BrandMaster = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-gray-900">Brand Master</h2>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Brand Master</h2>
           <button
             onClick={() => {
               setEditingId(null);
@@ -92,7 +92,7 @@ export const BrandMaster = () => {
               });
               setShowModal(true);
             }}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto sm:px-6"
           >
             <Plus className="w-5 h-5" />
             Add Brand
@@ -100,7 +100,80 @@ export const BrandMaster = () => {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <table className="w-full">
+          <div className="divide-y divide-gray-200 md:hidden">
+            {pagination.pageItems.map((brand) => (
+              <div key={brand.id} className="space-y-4 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 gap-3">
+                    {brand.logoPath ? (
+                      <img src={brand.logoPath} alt={brand.name} className="h-14 w-14 shrink-0 rounded-xl border border-gray-200 object-cover" />
+                    ) : (
+                      <div className="h-14 w-14 shrink-0 rounded-xl border border-dashed border-gray-300 bg-gray-50" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="break-words text-base font-semibold text-gray-900">{brand.name}</div>
+                      <div className="mt-1 break-words text-sm text-gray-500">{brand.supplierName || 'No supplier set'}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => toggleStatus(brand)}
+                    className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      brand.status === 'active'
+                        ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Power className="w-3 h-3" />
+                    {brand.status === 'active' ? 'Active' : 'Inactive'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Supplier</div>
+                    <div className="mt-1 break-words font-medium text-slate-900">{brand.supplierName || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Catalog</div>
+                    <div className="mt-1 font-medium text-slate-900">
+                      {brand.catalogPath ? (
+                        <a href={brand.catalogPath} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-700">
+                          View Catalog
+                        </a>
+                      ) : (
+                        'No catalog'
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => handleEdit(brand)}
+                    className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50"
+                    title="Edit"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (confirm('Deactivate this brand?')) {
+                        await deleteBrand(brand.id);
+                        toast.success('Brand deactivated');
+                      }
+                    }}
+                    className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
+                    title="Deactivate"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+          <table className="min-w-[860px] w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Logo</th>
@@ -170,6 +243,7 @@ export const BrandMaster = () => {
               ))}
             </tbody>
           </table>
+          </div>
           <PaginationControls
             page={pagination.page}
             pageSize={pagination.pageSize}
@@ -183,8 +257,8 @@ export const BrandMaster = () => {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 sm:p-6">
             <h3 className="text-xl font-semibold text-gray-900 mb-4">
               {editingId ? 'Edit Brand' : 'Add Brand'}
             </h3>
@@ -220,7 +294,7 @@ export const BrandMaster = () => {
                 />
                 {errors.description?.[0] && <p className="mt-1 text-sm text-red-600">{errors.description[0]}</p>}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Brand Logo</label>
                   <input
@@ -268,17 +342,17 @@ export const BrandMaster = () => {
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col gap-3 pt-4 sm:flex-row">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50"
+                  className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+                  className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700"
                 >
                   {editingId ? 'Update' : 'Add'}
                 </button>
