@@ -94,7 +94,7 @@ export const TaskForm = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-3xl">
         <div className="mb-6 flex items-center gap-4">
           <button onClick={() => navigate('/tasks')} className="rounded-lg p-2 hover:bg-gray-100">
@@ -106,11 +106,11 @@ export const TaskForm = () => {
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
             <LoadingState label="Loading task..." />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl border border-gray-200 bg-white p-8">
+          <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-medium text-gray-700">

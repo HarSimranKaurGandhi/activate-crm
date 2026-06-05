@@ -51,7 +51,7 @@ export const TaskView = () => {
   }, [id]);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -72,11 +72,11 @@ export const TaskView = () => {
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
             <LoadingState label="Loading task..." />
           </div>
         ) : task ? (
-          <div className="space-y-6 rounded-2xl border border-gray-200 bg-white p-8">
+          <div className="space-y-6 rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="md:col-span-2">
                 <div className="mb-1 text-sm font-medium text-gray-500">Name</div>

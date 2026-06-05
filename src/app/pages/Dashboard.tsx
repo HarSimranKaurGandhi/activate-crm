@@ -69,17 +69,17 @@ export const Dashboard = () => {
   const isLoading = dataLoading || summaryLoading;
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900">Welcome back!</h2>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Welcome back!</h2>
             <p className="text-gray-600 mt-1">Here's what's happening with your quotations today.</p>
           </div>
           <button
             onClick={() => navigate('/quotations/new')}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto"
           >
             <Plus className="w-5 h-5" />
             Create Quotation
@@ -87,9 +87,9 @@ export const Dashboard = () => {
         </div>
 
         {/* Date Filter */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
           <Calendar className="w-5 h-5 text-gray-400" />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {[
               { label: 'All Time', value: 'all' },
               { label: 'Today', value: 'today' },
@@ -112,7 +112,7 @@ export const Dashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
           {/* Total Quotations */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
             <div className="flex items-start justify-between">
@@ -158,12 +158,12 @@ export const Dashboard = () => {
         </div>
 
         {!isLoading && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Assigned Tasks Due Today</h3>
               <button
                 onClick={() => navigate('/tasks')}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                className="text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:text-right"
               >
                 View all tasks
               </button>
@@ -177,9 +177,9 @@ export const Dashboard = () => {
                   <div
                     key={task.id}
                     onClick={() => navigate(`/tasks/${task.id}`)}
-                    className="flex cursor-pointer items-center justify-between rounded-xl p-4 transition-all hover:bg-gray-50"
+                    className="flex cursor-pointer flex-col gap-3 rounded-xl p-4 transition-all hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-start gap-4">
                       <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center">
                         <ListChecks className="w-5 h-5 text-violet-600" />
                       </div>
@@ -190,7 +190,7 @@ export const Dashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 self-start sm:self-auto">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                         task.status === 'completed'
                           ? 'bg-emerald-50 text-emerald-700'
@@ -226,16 +226,16 @@ export const Dashboard = () => {
         )}
 
         {!isLoading && filteredQuotations.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Quotations</h3>
             <div className="space-y-3">
               {filteredQuotations.slice(0, 5).map(quotation => (
                 <div
                   key={quotation.id}
                   onClick={() => navigate(`/quotations/${quotation.id}/preview`)}
-                  className="flex items-center justify-between p-4 rounded-xl hover:bg-gray-50 cursor-pointer transition-all"
+                  className="flex cursor-pointer flex-col gap-3 rounded-xl p-4 transition-all hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-start gap-4">
                     <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
                       <FileText className="w-5 h-5 text-blue-600" />
                     </div>
@@ -244,8 +244,8 @@ export const Dashboard = () => {
                       <p className="text-sm text-gray-500">{quotation.customer.company}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
+                  <div className="flex items-center gap-4 self-start sm:self-auto">
+                    <div className="text-left sm:text-right">
                       <p className="font-semibold text-gray-900">₹{quotation.grandTotal.toLocaleString('en-IN')}</p>
                       <p className="text-sm text-gray-500">{new Date(quotation.date).toLocaleDateString('en-IN')}</p>
                     </div>

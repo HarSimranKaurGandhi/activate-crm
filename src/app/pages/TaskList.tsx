@@ -142,20 +142,20 @@ export const TaskList = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-gray-900">Task Management</h2>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Task Management</h2>
           <button
             onClick={() => navigate('/tasks/new')}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto"
           >
             <Plus className="h-5 w-5" />
             Create Task
           </button>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
           <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -213,8 +213,8 @@ export const TaskList = () => {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-gray-200">
-            <table className="w-full">
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-[860px] w-full">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="px-4 py-4 text-left">

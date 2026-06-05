@@ -90,11 +90,11 @@ export const ProductList = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-gray-900">Products</h2>
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Products</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               onClick={handleSampleDownload}
               className="px-4 py-3 border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
@@ -120,7 +120,7 @@ export const ProductList = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
           <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
             <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -182,8 +182,8 @@ export const ProductList = () => {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-gray-200">
-            <table className="w-full">
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-[1040px] w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>

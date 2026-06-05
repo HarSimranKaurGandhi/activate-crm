@@ -178,23 +178,23 @@ export const QuotationPreview = () => {
   const beforeTaxTotal = quotation.subtotal + totalAdjustments;
 
   return (
-    <div className="min-h-screen bg-slate-100 p-3 print:bg-white print:p-0">
+    <div className="min-h-screen bg-slate-100 p-2 sm:p-3 print:bg-white print:p-0">
       <div className="mx-auto max-w-[1160px] space-y-3">
         {/* Action Bar - Hidden in print */}
-        <div className="flex items-center justify-between print:hidden">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
           <button
             onClick={() => navigate('/quotations')}
-            className="flex items-center gap-2 rounded-xl px-4 py-2 text-slate-700 transition-all hover:bg-white"
+            className="flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 transition-all hover:bg-white sm:px-4"
           >
             <ArrowLeft className="h-5 w-5" />
             Back to Quotations
           </button>
 
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex flex-wrap items-stretch justify-start gap-2 sm:justify-end sm:gap-3">
             {quotation.status === 'draft' && (
               <button
                 onClick={handleSubmitForApproval}
-                className="flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-white shadow-sm hover:bg-amber-700"
+                className="flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-white shadow-sm hover:bg-amber-700"
               >
                 <Send className="h-5 w-5" />
                 Submit for Approval
@@ -334,8 +334,8 @@ export const QuotationPreview = () => {
             </div> */}
 
             {!hasLetterhead && (
-              <div className="mx-5 mt-5 grid grid-cols-[140px_1fr_320px] items-center border-y border-slate-200 print:mx-7">
-                <div className="flex items-center justify-center py-5">
+              <div className="mx-3 mt-3 grid grid-cols-1 border-y border-slate-200 sm:mx-5 sm:mt-5 md:grid-cols-[140px_1fr_320px] md:items-center print:mx-7">
+                <div className="flex items-center justify-center py-5 md:py-5">
                   {settings.logo ? (
                     <img src={settings.logo} alt={settings.name} className="max-h-24 max-w-[108px] object-contain" />
                   ) : (
@@ -344,15 +344,15 @@ export const QuotationPreview = () => {
                     </div>
                   )}
                 </div>
-                <div className="border-l border-slate-200 px-6 py-5">
-                  <h1 className="text-[2.1rem] font-black uppercase tracking-tight text-slate-950">{settings.name}</h1>
-                  <div className="mt-3 max-w-xl space-y-1 text-sm leading-7 text-slate-700">
+                <div className="border-t border-slate-200 px-4 py-5 text-center md:border-l md:border-t-0 md:px-6 md:text-left">
+                  <h1 className="text-[1.45rem] font-black uppercase tracking-tight text-slate-950 sm:text-[1.8rem] md:text-[2.1rem]">{settings.name}</h1>
+                  <div className="mt-3 max-w-xl space-y-1 text-sm leading-6 text-slate-700 md:leading-7">
                     {settings.address.split(', ').filter(Boolean).map((line, index) => (
                       <p key={`${line}-${index}`}>{line}</p>
                     ))}
                   </div>
                 </div>
-                <div className="border-l border-slate-200 px-6 py-5 text-sm text-slate-800">
+                <div className="border-t border-slate-200 px-4 py-5 text-sm text-slate-800 md:border-l md:border-t-0 md:px-6">
                   {settings.email && (
                     <div className="mb-4 flex items-center gap-3">
                       <Mail className="h-4 w-4 text-slate-700" />
@@ -375,18 +375,18 @@ export const QuotationPreview = () => {
               </div>
             )}
 
-            <div className="mx-5 mt-3 grid grid-cols-[1.45fr_0.55fr] border-t-[3px] border-red-600 print:mx-7">
-              <div className="bg-black px-8 py-3 text-[2.05rem] font-black uppercase tracking-[0.24em] text-white">
+            <div className="mx-3 mt-3 grid grid-cols-1 border-t-[3px] border-red-600 sm:mx-5 md:grid-cols-[1.45fr_0.55fr] print:mx-7">
+              <div className="bg-black px-4 py-3 text-center text-[1rem] font-black uppercase tracking-[0.18em] text-white sm:px-8 sm:text-[1.35rem] md:text-left md:text-[2.05rem] md:tracking-[0.24em]">
                 {settings.name}
               </div>
-              <div className="bg-red-600 px-8 py-3 text-center text-xl font-semibold uppercase tracking-[0.32em] text-white">
+              <div className="bg-red-600 px-4 py-3 text-center text-sm font-semibold uppercase tracking-[0.24em] text-white sm:px-8 sm:text-base md:text-xl md:tracking-[0.32em]">
                 Quotation
               </div>
             </div>
 
-            <div className="px-5 py-6 print:px-7 print:py-5">
+            <div className="px-3 py-4 sm:px-5 sm:py-6 print:px-7 print:py-5">
               {/* Customer + Quotation Meta */}
-              <div className="mb-6 grid grid-cols-1 gap-8 md:grid-cols-[1fr_390px]">
+              <div className="mb-6 grid grid-cols-1 gap-6 md:gap-8 md:grid-cols-[1fr_390px]">
                 <div>
                   <div>
                     <div className="mb-4">
@@ -394,9 +394,9 @@ export const QuotationPreview = () => {
                       <div className="mt-2 h-px w-full max-w-[390px] bg-slate-200" />
                       <div className="mt-[-1px] h-px w-24 bg-red-500" />
                     </div>
-                    <p className="text-2xl font-black text-slate-950">{quotation.customer.company || quotation.customer.name}</p>
+                    <p className="text-xl font-black text-slate-950 sm:text-2xl">{quotation.customer.company || quotation.customer.name}</p>
                     {quotation.customer.company && <p className="text-sm font-semibold text-slate-700">{quotation.customer.name}</p>}
-                    <p className="mt-3 text-sm font-medium leading-7 text-slate-700">{quotation.customer.address}</p>
+                    <p className="mt-3 text-sm font-medium leading-6 sm:leading-7 text-slate-700">{quotation.customer.address}</p>
                     <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
                       {quotation.customer.phone && <span>Phone: {quotation.customer.phone}</span>}
                       {(quotation.customer.phone && quotation.customer.email) && <span className="text-slate-400">|</span>}
@@ -404,7 +404,7 @@ export const QuotationPreview = () => {
                     </div>
                   </div>
 
-                  <div className="mt-7 border-t border-slate-300 pt-5 max-w-2xl text-[15px] leading-8 text-slate-800">
+                  <div className="mt-6 max-w-2xl border-t border-slate-300 pt-4 text-sm leading-7 text-slate-800 sm:mt-7 sm:pt-5 sm:text-[15px] sm:leading-8">
                     <p className="font-bold text-slate-950">Dear Sir,</p>
                     <p>We are indeed thankful to you for showing interest in our products.</p>
                     <p>As per the discussion, please find here our most technically viable offer for your consideration.</p>
@@ -418,24 +418,24 @@ export const QuotationPreview = () => {
                     <div className="mt-[-1px] h-px w-28 bg-red-500" />
                   </div>
                   <div className="overflow-hidden border border-slate-300 bg-white">
-                    <div className="grid grid-cols-[130px_1fr] border-b border-slate-300">
-                      <div className="border-r border-slate-300 px-6 py-4 text-sm font-black text-slate-950">Quote No</div>
-                      <div className="px-6 py-4 text-sm text-slate-800">{quotation.number}</div>
+                    <div className="grid grid-cols-[110px_1fr] border-b border-slate-300 sm:grid-cols-[130px_1fr]">
+                      <div className="border-r border-slate-300 px-4 py-3 text-sm font-black text-slate-950 sm:px-6 sm:py-4">Quote No</div>
+                      <div className="px-4 py-3 text-sm text-slate-800 sm:px-6 sm:py-4">{quotation.number}</div>
                     </div>
-                    <div className="grid grid-cols-[130px_1fr] border-b border-slate-300">
-                      <div className="border-r border-slate-300 px-6 py-4 text-sm font-black text-slate-950">Date</div>
-                      <div className="px-6 py-4 text-sm text-slate-800">{formatDate(quotation.date)}</div>
+                    <div className="grid grid-cols-[110px_1fr] border-b border-slate-300 sm:grid-cols-[130px_1fr]">
+                      <div className="border-r border-slate-300 px-4 py-3 text-sm font-black text-slate-950 sm:px-6 sm:py-4">Date</div>
+                      <div className="px-4 py-3 text-sm text-slate-800 sm:px-6 sm:py-4">{formatDate(quotation.date)}</div>
                     </div>
-                    <div className="grid grid-cols-[130px_1fr]">
-                      <div className="border-r border-slate-300 px-6 py-4 text-sm font-black text-slate-950">Validity</div>
-                      <div className="px-6 py-4 text-sm text-slate-800">{validityLabel}</div>
+                    <div className="grid grid-cols-[110px_1fr] sm:grid-cols-[130px_1fr]">
+                      <div className="border-r border-slate-300 px-4 py-3 text-sm font-black text-slate-950 sm:px-6 sm:py-4">Validity</div>
+                      <div className="px-4 py-3 text-sm text-slate-800 sm:px-6 sm:py-4">{validityLabel}</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Product Table */}
-              <div className="mb-5 overflow-hidden border border-slate-300">
+              <div className="mb-5 hidden overflow-x-auto border border-slate-300 md:block">
                 <table className="w-full table-fixed border-collapse text-sm">
                   <colgroup>
                     {quotation.showDiscount ? (
@@ -520,12 +520,59 @@ export const QuotationPreview = () => {
                 </table>
               </div>
 
+              <div className="mb-5 space-y-4 md:hidden">
+                {quotation.items.map((item: any, index: number) => {
+                  const { gstAmount, total } = calculateItemAmounts(item);
+                  const productImage = item.product.image || item.product.imageUrl || item.product.photo || item.product.picture;
+
+                  return (
+                    <div key={item.id} className="overflow-hidden border border-slate-300 bg-white">
+                      <div className="border-t-2 border-red-600 bg-black px-4 py-2 text-sm font-black uppercase tracking-wide text-white">
+                        Item {index + 1}
+                      </div>
+                      <div className="space-y-4 p-4">
+                        <div className="flex gap-3">
+                          {productImage ? (
+                            <img src={productImage} alt={item.product.name} className="h-20 w-20 shrink-0 object-contain" />
+                          ) : (
+                            <div className="flex h-20 w-20 shrink-0 items-center justify-center bg-slate-100 text-[11px] font-semibold text-slate-400">
+                              No Image
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-base font-black leading-tight text-slate-950">{item.product.name}</p>
+                            {item.product.modelNumber && (
+                              <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-600">{item.product.modelNumber}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-xs leading-5 text-slate-700">
+                          <div className="mb-1 text-[11px] font-black uppercase tracking-wide text-slate-950">Specifications</div>
+                          <div className="[&_b]:font-black [&_li]:mb-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-black [&_ul]:list-disc [&_ul]:pl-5">
+                            <div dangerouslySetInnerHTML={renderHtml(item.specifications || item.product.description || '')} />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                          <MobileMetric label="Price" value={formatMoney(item.price)} />
+                          <MobileMetric label="Qty" value={String(item.quantity)} />
+                          {quotation.showDiscount && <MobileMetric label="Disc%" value={item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'} />}
+                          <MobileMetric label="GST" value={`${item.product.gstPercent}% (${formatMoney(gstAmount)})`} />
+                          <MobileMetric label="Net Amount" value={formatMoney(total)} strong />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
               {/* Totals */}
               <div className="mb-5 flex justify-end">
                 <div className="w-full max-w-[520px] overflow-hidden border border-slate-300">
-                  <div className="grid grid-cols-[1.2fr_0.8fr] border-b border-slate-300">
-                    <div className="px-6 py-3 text-sm text-slate-800">Sub Total</div>
-                    <div className="border-l border-slate-300 px-6 py-3 text-right text-sm text-slate-800">{formatMoney(quotation.subtotal)}</div>
+                  <div className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
+                    <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">Sub Total</div>
+                    <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">{formatMoney(quotation.subtotal)}</div>
                   </div>
 
                   {Object.entries(quotation.adjustments || {}).map(([adjId, adj]: [string, any]) => {
@@ -536,23 +583,23 @@ export const QuotationPreview = () => {
                     const amount = adjustment.type === 'percentage' ? quotation.subtotal * (adj.amount / 100) : adj.amount;
 
                     return (
-                      <div key={adjId} className="grid grid-cols-[1.2fr_0.8fr] border-b border-slate-300">
-                        <div className="px-6 py-3 text-sm text-slate-800">{adjustment.name}</div>
-                        <div className="border-l border-slate-300 px-6 py-3 text-right text-sm text-slate-800">{formatMoney(amount)}</div>
+                      <div key={adjId} className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
+                        <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">{adjustment.name}</div>
+                        <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">{formatMoney(amount)}</div>
                       </div>
                     );
                   })}
 
                   {!quotation.gstInclusive && quotation.taxAmount > 0 && (
-                    <div className="grid grid-cols-[1.2fr_0.8fr] border-b border-slate-300">
-                      <div className="px-6 py-3 text-sm text-slate-800">GST</div>
-                      <div className="border-l border-slate-300 px-6 py-3 text-right text-sm text-slate-800">{formatMoney(quotation.taxAmount)}</div>
+                    <div className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
+                      <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">GST</div>
+                      <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">{formatMoney(quotation.taxAmount)}</div>
                     </div>
                   )}
 
-                  <div className="grid grid-cols-[1.2fr_0.8fr] bg-black text-white">
-                    <div className="px-6 py-3 text-2xl font-black uppercase tracking-wide">Grand Total</div>
-                    <div className="border-l border-white/20 px-6 py-3 text-right text-2xl font-black">{formatMoney(quotation.grandTotal)}</div>
+                  <div className="grid grid-cols-[1.1fr_0.9fr] bg-black text-white sm:grid-cols-[1.2fr_0.8fr]">
+                    <div className="px-4 py-3 text-lg font-black uppercase tracking-wide sm:px-6 sm:text-2xl">Grand Total</div>
+                    <div className="border-l border-white/20 px-4 py-3 text-right text-lg font-black sm:px-6 sm:text-2xl">{formatMoney(quotation.grandTotal)}</div>
                   </div>
                 </div>
               </div>
@@ -560,7 +607,7 @@ export const QuotationPreview = () => {
               {/* Terms + Company Details */}
               <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2">
                 {quotation.terms.length > 0 && (
-                  <section className="border border-slate-300 bg-white px-5 py-4">
+                  <section className="border border-slate-300 bg-white px-4 py-4 sm:px-5">
                     <div className="mb-5">
                       <h3 className="text-[1.05rem] font-black uppercase tracking-wide text-slate-950">Terms and Conditions</h3>
                       <div className="mt-3 h-px w-full bg-slate-200" />
@@ -577,7 +624,7 @@ export const QuotationPreview = () => {
                   </section>
                 )}
 
-                <section className="border border-slate-300 bg-white px-5 py-4">
+                <section className="border border-slate-300 bg-white px-4 py-4 sm:px-5">
                   <div className="mb-5">
                     <h3 className="text-[1.05rem] font-black uppercase tracking-wide text-slate-950">Company Details</h3>
                     <div className="mt-3 h-px w-full bg-slate-200" />
@@ -600,10 +647,10 @@ export const QuotationPreview = () => {
                   <p className="mt-2">Assuring you the best quality and services all the times.</p>
                 </div>
 
-                <div className="mt-12 grid grid-cols-1 items-end gap-10 md:grid-cols-[1fr_320px]">
+                <div className="mt-10 grid grid-cols-1 items-end gap-10 md:mt-12 md:grid-cols-[1fr_320px]">
                   <div>
                     <div className="mb-3 h-px w-36 bg-red-500" />
-                    <p className="text-[2rem] font-black uppercase tracking-tight text-red-600">{quotation.salesperson.name}</p>
+                    <p className="text-[1.45rem] font-black uppercase tracking-tight text-red-600 sm:text-[2rem]">{quotation.salesperson.name}</p>
                     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
                       {quotation.salesperson.phone && <span>Phone: {quotation.salesperson.phone}</span>}
                       {(quotation.salesperson.phone && quotation.salesperson.email) && <span className="text-slate-400">|</span>}
@@ -740,5 +787,22 @@ const DetailRow = ({ label, value }: { label: string; value?: string }) => {
     </div>
   );
 };
+
+const MobileMetric = ({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) => (
+  <div>
+    <div className="text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</div>
+    <div className={strong ? 'mt-1 text-sm font-black text-slate-950' : 'mt-1 text-sm font-medium text-slate-800'}>
+      {value}
+    </div>
+  </div>
+);
 
 const renderHtml = (value: string) => ({ __html: value });
