@@ -2,6 +2,7 @@ import { apiOrigin } from './apiClient';
 
 export type Status = 'active' | 'inactive';
 export type QuotationStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'revised';
+export type TaskStatus = 'new' | 'in_progress' | 'completed' | 'on_hold';
 
 const asNumber = (value: unknown, fallback = 0) => {
   const numeric = Number(value);
@@ -226,6 +227,34 @@ export const customerPayload = (customer: any, definitions: any[] = []) => ({
     field_definition_id: Number(field.id),
     value: customer.customFields?.[field.id] ?? customer.customFields?.[field.key] ?? null,
   })),
+});
+
+export const mapTask = (task: any) => ({
+  id: String(task.id),
+  name: task.name || '',
+  description: task.description || '',
+  status: (task.status || 'new') as TaskStatus,
+  dueDate: task.due_date || '',
+  assignedTo: task.assigned_to ? String(task.assigned_to) : '',
+  assignedUser: task.assigned_user
+    ? {
+        id: String(task.assigned_user.id),
+        name: task.assigned_user.name || '',
+        email: task.assigned_user.email || '',
+        phone: task.assigned_user.phone || '',
+        designation: task.assigned_user.designation || '',
+      }
+    : null,
+  createdAt: task.created_at || '',
+  updatedAt: task.updated_at || '',
+});
+
+export const taskPayload = (task: any) => ({
+  name: task.name || '',
+  description: task.description || '',
+  status: task.status || 'new',
+  due_date: task.dueDate || null,
+  assigned_to: task.assignedTo ? Number(task.assignedTo) : null,
 });
 
 export const mapAdjustment = (adjustment: any) => ({

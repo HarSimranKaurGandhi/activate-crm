@@ -8,6 +8,7 @@ use App\Models\CompanySetting;
 use App\Models\Quotation;
 use App\Models\QuotationNumberSetting;
 use App\Models\TermMaster;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -74,7 +75,7 @@ class QuotationService extends CrudService
 
     public function paginate(Request $request): LengthAwarePaginator
     {
-        return $this->applyFilters(Quotation::query(), $request)
+        return $this->visibleQuery($request)
             ->with($this->listRelations())
             ->latest('id')
             ->paginate((int) $request->integer('per_page', 15));
@@ -82,7 +83,7 @@ class QuotationService extends CrudService
 
     public function find(int|string $id): Quotation
     {
-        return Quotation::query()
+        return $this->visibleQuery(request())
             ->with($this->detailRelations())
             ->findOrFail($id);
     }
@@ -158,6 +159,24 @@ class QuotationService extends CrudService
             ->when($request->filled('created_by'), fn (Builder $q) => $q->where('created_by', $request->integer('created_by')))
             ->when($request->filled('from_date'), fn (Builder $q) => $q->whereDate('quote_date', '>=', $request->date('from_date')))
             ->when($request->filled('to_date'), fn (Builder $q) => $q->whereDate('quote_date', '<=', $request->date('to_date')));
+    }
+
+    private function visibleQuery(Request $request): Builder
+    {
+        $query = $this->applyFilters(Quotation::query(), $request);
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return $query;
+        }
+
+        $user->loadMissing('role');
+
+        if ($user->hasAnyRole(['admin', 'operations'])) {
+            return $query;
+        }
+
+        return $query->where('created_by', $user->getKey());
     }
 
     private function syncLines(Quotation $quotation, array $items, array $adjustments, array $terms): void

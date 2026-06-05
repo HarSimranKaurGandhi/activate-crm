@@ -18,7 +18,7 @@ class TaskRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
             'status' => ['required', Rule::in(['new', 'in_progress', 'completed', 'on_hold'])],
-            'due_date' => ['sometimes', 'nullable', 'date'],
+            'due_date' => ['required', 'date', 'after_or_equal:today'],
             'assigned_to' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ];
     }

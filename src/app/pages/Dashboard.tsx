@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, FileText, Clock, Calendar } from 'lucide-react';
+import { Plus, FileText, Clock, Calendar, ListChecks } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { dashboardService } from '../../services/dashboardService';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
@@ -10,7 +10,12 @@ export const Dashboard = () => {
   const navigate = useNavigate();
   const { quotations, loading: dataLoading } = useData();
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
-  const [summary, setSummary] = useState({ total_quotations: 0, pending_for_approval: 0 });
+  const [summary, setSummary] = useState({
+    total_quotations: 0,
+    pending_for_approval: 0,
+    tasks_due_today_count: 0,
+    tasks_due_today: [] as any[],
+  });
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   const dateRange = useMemo(() => {
@@ -33,7 +38,7 @@ export const Dashboard = () => {
     dashboardService
       .quotationSummary(dateRange)
       .then(setSummary)
-      .catch(() => setSummary({ total_quotations: 0, pending_for_approval: 0 }))
+      .catch(() => setSummary({ total_quotations: 0, pending_for_approval: 0, tasks_due_today_count: 0, tasks_due_today: [] }))
       .finally(() => setSummaryLoading(false));
   }, [dateRange]);
 
@@ -107,7 +112,7 @@ export const Dashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Total Quotations */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
             <div className="flex items-start justify-between">
@@ -137,7 +142,79 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-gray-600 text-sm font-medium">Tasks Due Today</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.tasks_due_today_count}</p>
+                <p className="text-sm text-gray-500 mt-2">Assigned tasks for today</p>
+              </div>
+              <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center">
+                <ListChecks className="w-7 h-7 text-violet-600" />
+              </div>
+            </div>
+          </div>
         </div>
+
+        {!isLoading && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Assigned Tasks Due Today</h3>
+              <button
+                onClick={() => navigate('/tasks')}
+                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+              >
+                View all tasks
+              </button>
+            </div>
+
+            {summary.tasks_due_today.length === 0 ? (
+              <EmptyState label="No assigned tasks due today." />
+            ) : (
+              <div className="space-y-3">
+                {summary.tasks_due_today.map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => navigate(`/tasks/${task.id}`)}
+                    className="flex cursor-pointer items-center justify-between rounded-xl p-4 transition-all hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center">
+                        <ListChecks className="w-5 h-5 text-violet-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{task.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {task.assigned_user?.name ? `Assigned to ${task.assigned_user.name}` : 'Unassigned'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        task.status === 'completed'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : task.status === 'in_progress'
+                            ? 'bg-amber-50 text-amber-700'
+                            : task.status === 'on_hold'
+                              ? 'bg-slate-100 text-slate-700'
+                              : 'bg-sky-50 text-sky-700'
+                      }`}>
+                        {task.status === 'in_progress'
+                          ? 'In Progress'
+                          : task.status === 'on_hold'
+                            ? 'On Hold'
+                            : task.status === 'completed'
+                              ? 'Completed'
+                              : 'New'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Recent Quotations */}
         {isLoading && <LoadingState label="Loading dashboard..." />}
