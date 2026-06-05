@@ -10,7 +10,7 @@ class PublicAsset
     public static function store(UploadedFile $file, string $directory): string
     {
         $directory = trim($directory, '/');
-        $targetDirectory = public_path($directory);
+        $targetDirectory = self::baseRoot().DIRECTORY_SEPARATOR.$directory;
 
         if (! is_dir($targetDirectory)) {
             mkdir($targetDirectory, 0755, true);
@@ -41,9 +41,12 @@ class PublicAsset
 
         $normalizedPath = ltrim((string) $path, '/');
 
-        $publicPath = public_path($normalizedPath);
-        if (is_file($publicPath)) {
-            return $publicPath;
+        foreach (self::candidateRoots() as $root) {
+            $candidate = rtrim($root, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$normalizedPath;
+
+            if (is_file($candidate)) {
+                return $candidate;
+            }
         }
 
         if (str_starts_with($normalizedPath, 'storage/')) {
@@ -59,5 +62,30 @@ class PublicAsset
         }
 
         return null;
+    }
+
+    private static function baseRoot(): string
+    {
+        $configuredRoot = trim((string) env('PUBLIC_UPLOAD_ROOT', ''));
+
+        if ($configuredRoot !== '') {
+            return rtrim($configuredRoot, DIRECTORY_SEPARATOR);
+        }
+
+        return public_path();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function candidateRoots(): array
+    {
+        $roots = [self::baseRoot()];
+
+        if (! in_array(public_path(), $roots, true)) {
+            $roots[] = public_path();
+        }
+
+        return array_values(array_unique(array_filter($roots)));
     }
 }

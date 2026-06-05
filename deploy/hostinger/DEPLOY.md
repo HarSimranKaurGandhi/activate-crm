@@ -110,6 +110,10 @@ APP_DEBUG=false
 APP_URL=https://crmapi.activatefitnessstore.com
 FRONTEND_URL=https://crm.activatefitnessstore.com
 
+# If your API web root is a subfolder like public_html/crm_api and Laravel is outside it,
+# save uploaded files directly into that public folder:
+# PUBLIC_UPLOAD_ROOT=/home/your-user/domains/activatefitnessstore.com/public_html/crm_api
+
 DB_CONNECTION=mysql
 DB_HOST=localhost
 DB_PORT=3306

@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\Quotations\QuotationApprovalController;
 use App\Http\Controllers\Api\Quotations\QuotationController;
 use App\Http\Controllers\Api\Reports\ReportController;
 use App\Http\Controllers\Api\Settings\SettingsController;
+use App\Http\Controllers\Api\Tasks\TaskController;
 use App\Http\Controllers\Api\Users\RoleController;
 use App\Http\Controllers\Api\Users\UserController;
 use Illuminate\Support\Facades\Route;
@@ -96,6 +97,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::patch('customers/{id}/status', [CustomerController::class, 'status']);
     Route::get('customers/{id}', [CustomerController::class, 'show']);
     Route::put('customers/{id}', [CustomerController::class, 'update']);
+
+    Route::get('tasks', [TaskController::class, 'index']);
+    Route::post('tasks', [TaskController::class, 'store']);
+    Route::get('tasks/{id}', [TaskController::class, 'show']);
+    Route::put('tasks/{id}', [TaskController::class, 'update']);
 
     Route::get('quotations/defaults', [QuotationController::class, 'defaults']);
     Route::get('quotations/{id}/preview', [QuotationController::class, 'preview']);
