@@ -13,6 +13,9 @@ import { ProductForm } from "./pages/ProductForm";
 import { TaskList } from "./pages/TaskList";
 import { TaskForm } from "./pages/TaskForm";
 import { TaskView } from "./pages/TaskView";
+import { LeadList } from "./pages/LeadList";
+import { LeadForm } from "./pages/LeadForm";
+import { LeadView } from "./pages/LeadView";
 import { CategoryMaster } from "./pages/masters/CategoryMaster";
 import { BrandMaster } from "./pages/masters/BrandMaster";
 import { AdjustmentMaster } from "./pages/masters/AdjustmentMaster";
@@ -45,6 +48,10 @@ export const router = createBrowserRouter([
           { path: "tasks/new", Component: TaskForm },
           { path: "tasks/:id", Component: TaskView },
           { path: "tasks/:id/edit", Component: TaskForm },
+          { path: "leads", Component: LeadList },
+          { path: "leads/new", Component: LeadForm },
+          { path: "leads/:id", Component: LeadView },
+          { path: "leads/:id/edit", Component: LeadForm },
           { path: "products", Component: ProductList },
           { path: "products/new", Component: ProductForm },
           { path: "products/:id/edit", Component: ProductForm },

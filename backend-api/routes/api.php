@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Customers\CustomerController;
 use App\Http\Controllers\Api\Dashboard\DashboardController;
+use App\Http\Controllers\Api\Leads\LeadController;
 use App\Http\Controllers\Api\Logs\ActivityLogController;
 use App\Http\Controllers\Api\Masters\AdjustmentController;
 use App\Http\Controllers\Api\Masters\BrandController;
@@ -102,6 +103,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('tasks', [TaskController::class, 'store']);
     Route::get('tasks/{id}', [TaskController::class, 'show']);
     Route::put('tasks/{id}', [TaskController::class, 'update']);
+
+    Route::get('leads', [LeadController::class, 'index']);
+    Route::post('leads', [LeadController::class, 'store']);
+    Route::get('leads/{id}', [LeadController::class, 'show']);
+    Route::put('leads/{id}', [LeadController::class, 'update']);
 
     Route::get('quotations/defaults', [QuotationController::class, 'defaults']);
     Route::get('quotations/{id}/preview', [QuotationController::class, 'preview']);

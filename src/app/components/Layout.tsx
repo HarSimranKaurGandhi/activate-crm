@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { LayoutDashboard, FileText, Users, Package, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Package, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X, Phone } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from './BrandLogo';
@@ -8,6 +8,7 @@ const baseNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Quotations', href: '/quotations', icon: FileText },
   { name: 'Tasks', href: '/tasks', icon: ListChecks },
+  { name: 'Leads', href: '/leads', icon: Phone },
   { name: 'Customers', href: '/customers', icon: Users },
   { name: 'Products', href: '/products', icon: Package },
   {

@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Http\Requests\Leads;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class LeadIndexRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'lead_source' => ['sometimes', 'nullable', Rule::in(['walk_in', 'reference', 'india_mart', 'website'])],
+            'status' => ['sometimes', 'nullable', Rule::in(['new', 'in_progress', 'on_hold', 'closed_success', 'closed_fail'])],
+            'tag' => ['sometimes', 'nullable', Rule::in(['hot', 'premium'])],
+            'created_by' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'assigned_to' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'follow_up_from' => ['sometimes', 'nullable', 'date'],
+            'follow_up_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:follow_up_from'],
+        ];
+    }
+}

@@ -3,6 +3,7 @@ import { apiOrigin } from './apiClient';
 export type Status = 'active' | 'inactive';
 export type QuotationStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'revised';
 export type TaskStatus = 'new' | 'in_progress' | 'completed' | 'on_hold';
+export type LeadStatus = 'new' | 'in_progress' | 'on_hold' | 'closed_success' | 'closed_fail';
 
 const asNumber = (value: unknown, fallback = 0) => {
   const numeric = Number(value);
@@ -255,6 +256,62 @@ export const taskPayload = (task: any) => ({
   status: task.status || 'new',
   due_date: task.dueDate || null,
   assigned_to: task.assignedTo ? Number(task.assignedTo) : null,
+});
+
+export const mapLead = (lead: any) => ({
+  id: String(lead.id),
+  leadSource: lead.lead_source || 'walk_in',
+  name: lead.name || '',
+  phone: lead.phone || '',
+  email: lead.email || '',
+  addressLine1: lead.address_line_1 || '',
+  addressLine2: lead.address_line_2 || '',
+  city: lead.city || '',
+  state: lead.state || '',
+  pincode: lead.pincode || '',
+  country: lead.country || '',
+  requirement: lead.requirement || '',
+  status: (lead.status || 'new') as LeadStatus,
+  tags: Array.isArray(lead.tags) ? lead.tags : [],
+  followUpDate: lead.follow_up_date || '',
+  assignedTo: lead.assigned_to ? String(lead.assigned_to) : '',
+  assignedUser: lead.assigned_user
+    ? {
+        id: String(lead.assigned_user.id),
+        name: lead.assigned_user.name || '',
+        email: lead.assigned_user.email || '',
+        phone: lead.assigned_user.phone || '',
+        designation: lead.assigned_user.designation || '',
+      }
+    : null,
+  createdBy: lead.created_by ? String(lead.created_by) : '',
+  creator: lead.creator
+    ? {
+        id: String(lead.creator.id),
+        name: lead.creator.name || '',
+        email: lead.creator.email || '',
+      }
+    : null,
+  createdAt: lead.created_at || '',
+  updatedAt: lead.updated_at || '',
+});
+
+export const leadPayload = (lead: any) => ({
+  lead_source: lead.leadSource || 'walk_in',
+  name: lead.name || '',
+  phone: lead.phone || '',
+  email: lead.email || null,
+  address_line_1: lead.addressLine1 || null,
+  address_line_2: lead.addressLine2 || null,
+  city: lead.city || null,
+  state: lead.state || null,
+  pincode: lead.pincode || null,
+  country: lead.country || null,
+  requirement: lead.requirement || null,
+  status: lead.status || 'new',
+  tags: Array.isArray(lead.tags) ? lead.tags.filter(Boolean) : [],
+  follow_up_date: lead.followUpDate || null,
+  assigned_to: lead.assignedTo ? Number(lead.assignedTo) : null,
 });
 
 export const mapAdjustment = (adjustment: any) => ({
