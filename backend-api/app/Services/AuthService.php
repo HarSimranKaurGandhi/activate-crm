@@ -7,12 +7,15 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
 class AuthService
 {
+    private ?bool $supportsLoginLogTimestamps = null;
+
     public function login(array $credentials, Request $request): array
     {
         $user = User::query()
@@ -34,19 +37,21 @@ class AuthService
 
         $token = $user->createToken('react-api')->plainTextToken;
 
-        try {
-            LoginLog::create([
-                'user_id' => $user->id,
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'log_in_at' => now(),
-            ]);
-        } catch (Throwable $exception) {
-            // Do not block successful login if optional activity-log schema differs.
-            Log::warning('Login log insert failed', [
-                'user_id' => $user->id,
-                'error' => $exception->getMessage(),
-            ]);
+        if ($this->supportsLoginLogTimestamps()) {
+            try {
+                LoginLog::create([
+                    'user_id' => $user->id,
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'log_in_at' => now(),
+                ]);
+            } catch (Throwable $exception) {
+                // Do not block successful login if optional activity-log schema differs.
+                Log::warning('Login log insert failed', [
+                    'user_id' => $user->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
 
         return [
@@ -64,6 +69,10 @@ class AuthService
     public function logout(User $user): void
     {
         $user->currentAccessToken()?->delete();
+
+        if (! $this->supportsLoginLogTimestamps()) {
+            return;
+        }
 
         $loginLog = LoginLog::query()
             ->where('user_id', $user->id)
@@ -96,5 +105,18 @@ class AuthService
         ])->save();
 
         return true;
+    }
+
+    private function supportsLoginLogTimestamps(): bool
+    {
+        if ($this->supportsLoginLogTimestamps !== null) {
+            return $this->supportsLoginLogTimestamps;
+        }
+
+        $this->supportsLoginLogTimestamps = Schema::hasTable('login_logs')
+            && Schema::hasColumn('login_logs', 'log_in_at')
+            && Schema::hasColumn('login_logs', 'log_out_at');
+
+        return $this->supportsLoginLogTimestamps;
     }
 }

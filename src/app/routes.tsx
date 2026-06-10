@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router";
 import { PrivateRoute } from "./auth/PrivateRoute";
+import { AdminRoute } from "./auth/AdminRoute";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
 import { QuotationList } from "./pages/QuotationList";
@@ -56,13 +57,24 @@ export const router = createBrowserRouter([
           { path: "products/new", Component: ProductForm },
           { path: "products/:id/edit", Component: ProductForm },
           { path: "masters/categories", Component: CategoryMaster },
-          { path: "masters/users", Component: UserMaster },
           { path: "masters/brands", Component: BrandMaster },
-          { path: "masters/adjustments", Component: AdjustmentMaster },
           { path: "masters/terms", Component: TermsMaster },
-          { path: "masters/custom-fields", Component: CustomFieldBuilder },
-          { path: "reports", Component: Reports },
-          { path: "settings", Component: Settings },
+        ],
+      },
+      {
+        Component: AdminRoute,
+        children: [
+          {
+            path: "/",
+            Component: Layout,
+            children: [
+              { path: "masters/users", Component: UserMaster },
+              { path: "masters/adjustments", Component: AdjustmentMaster },
+              { path: "masters/custom-fields", Component: CustomFieldBuilder },
+              { path: "reports", Component: Reports },
+              { path: "settings", Component: Settings },
+            ],
+          },
         ],
       },
     ],

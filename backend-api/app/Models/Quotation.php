@@ -13,7 +13,7 @@ class Quotation extends Model
     protected $fillable = [
         'quotation_number', 'customer_id', 'salesperson_name', 'salesperson_phone',
         'salesperson_email', 'quote_date', 'valid_until', 'pricing_mode',
-        'show_discount_to_customer', 'default_discount_percent', 'default_discount_amount',
+        'show_discount_to_customer', 'show_mrp_to_customer', 'show_item_wise_gst_to_customer', 'round_off_net_amount_to_customer', 'default_discount_percent', 'default_discount_amount',
         'intro_text', 'remarks', 'internal_notes', 'subtotal_before_discount',
         'total_line_discount', 'subtotal_after_discount', 'total_adjustments',
         'total_tax', 'grand_total', 'status', 'internal_remarks', 'created_by', 'approved_by',
@@ -26,6 +26,9 @@ class Quotation extends Model
             'quote_date' => 'date',
             'valid_until' => 'date',
             'show_discount_to_customer' => 'boolean',
+            'show_mrp_to_customer' => 'boolean',
+            'show_item_wise_gst_to_customer' => 'boolean',
+            'round_off_net_amount_to_customer' => 'boolean',
             'default_discount_percent' => 'decimal:2',
             'default_discount_amount' => 'decimal:2',
             'subtotal_before_discount' => 'decimal:2',

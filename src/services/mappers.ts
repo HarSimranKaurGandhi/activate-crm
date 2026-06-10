@@ -400,6 +400,15 @@ export const mapQuotation = (quotation: any) => ({
   }, {}),
   gstInclusive: quotation.pricing_mode === 'inclusive_gst',
   showDiscount: Boolean(quotation.show_discount_to_customer),
+  showMrp: quotation.show_mrp_to_customer === undefined || quotation.show_mrp_to_customer === null
+    ? true
+    : Boolean(quotation.show_mrp_to_customer),
+  showItemWiseGst: quotation.show_item_wise_gst_to_customer === undefined || quotation.show_item_wise_gst_to_customer === null
+    ? false
+    : Boolean(quotation.show_item_wise_gst_to_customer),
+  roundOffNetAmount: quotation.round_off_net_amount_to_customer === undefined || quotation.round_off_net_amount_to_customer === null
+    ? false
+    : Boolean(quotation.round_off_net_amount_to_customer),
   terms: (quotation.terms || []).map((term: any) => String(term.term_master_id)),
   status: toFrontendQuotationStatus(quotation.status || 'draft'),
   subtotal: asNumber(quotation.subtotal_after_discount ?? quotation.subtotal),
@@ -408,7 +417,14 @@ export const mapQuotation = (quotation: any) => ({
 });
 
 export const quotationPayload = (quotation: any) => ({
-  customer_id: Number(quotation.customer?.id || quotation.customerId),
+  customer_id:
+    quotation.lead?.sourceType === 'customer'
+      ? Number(quotation.lead?.customerId || quotation.lead?.id)
+      : (quotation.customer?.id || quotation.customerId ? Number(quotation.customer?.id || quotation.customerId) : null),
+  lead_id:
+    quotation.lead?.sourceType === 'lead'
+      ? Number(quotation.lead?.id || quotation.leadId)
+      : (quotation.lead?.sourceType === 'customer' ? null : (quotation.lead?.id || quotation.leadId ? Number(quotation.lead?.id || quotation.leadId) : null)),
   salesperson_name: quotation.salesperson?.name || null,
   salesperson_phone: quotation.salesperson?.phone || null,
   salesperson_email: quotation.salesperson?.email || null,
@@ -416,6 +432,9 @@ export const quotationPayload = (quotation: any) => ({
   valid_until: quotation.validUntil || null,
   pricing_mode: quotation.gstInclusive ? 'inclusive_gst' : 'exclusive_gst',
   show_discount_to_customer: Boolean(quotation.showDiscount),
+  show_mrp_to_customer: quotation.showMrp === undefined ? true : Boolean(quotation.showMrp),
+  show_item_wise_gst_to_customer: quotation.showItemWiseGst === undefined ? false : Boolean(quotation.showItemWiseGst),
+  round_off_net_amount_to_customer: quotation.roundOffNetAmount === undefined ? false : Boolean(quotation.roundOffNetAmount),
   default_discount_percent: quotation.globalDiscount || null,
   default_discount_amount: null,
   status: toApiQuotationStatus(quotation.status || 'draft'),

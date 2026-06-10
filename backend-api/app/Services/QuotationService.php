@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\AdjustmentMaster;
 use App\Models\CompanyBankDetail;
 use App\Models\CompanySetting;
+use App\Models\Customer;
+use App\Models\Lead;
 use App\Models\Quotation;
 use App\Models\QuotationNumberSetting;
 use App\Models\TermMaster;
@@ -28,6 +30,12 @@ class QuotationService extends CrudService
 
     private static ?array $customerColumns = null;
 
+    private ?bool $supportsShowMrpColumn = null;
+
+    private ?bool $supportsShowItemWiseGstColumn = null;
+
+    private ?bool $supportsRoundOffNetAmountColumn = null;
+
     public function __construct(private QuotationCalculator $calculator)
     {
     }
@@ -39,10 +47,15 @@ class QuotationService extends CrudService
             $adjustments = $data['adjustments'] ?? [];
             $terms = $data['terms'] ?? [];
             unset($data['items'], $data['adjustments'], $data['terms']);
+            $data = $this->resolveCustomerFromLead($data);
 
             $data['quotation_number'] = $data['quotation_number'] ?? $this->nextQuotationNumber();
             $data['status'] = $data['status'] ?? 'draft';
             $data['show_discount_to_customer'] = $data['show_discount_to_customer'] ?? true;
+            $data['show_mrp_to_customer'] = $data['show_mrp_to_customer'] ?? true;
+            $data['show_item_wise_gst_to_customer'] = $data['show_item_wise_gst_to_customer'] ?? false;
+            $data['round_off_net_amount_to_customer'] = $data['round_off_net_amount_to_customer'] ?? false;
+            $data = $this->sanitizeForCurrentSchema($data);
 
             $quotation = Quotation::create($data);
             $this->syncLines($quotation, $items, $adjustments, $terms);
@@ -58,6 +71,11 @@ class QuotationService extends CrudService
             $adjustments = $data['adjustments'] ?? null;
             $terms = $data['terms'] ?? null;
             unset($data['items'], $data['adjustments'], $data['terms']);
+            $data = $this->resolveCustomerFromLead($data);
+            $data['show_mrp_to_customer'] = $data['show_mrp_to_customer'] ?? true;
+            $data['show_item_wise_gst_to_customer'] = $data['show_item_wise_gst_to_customer'] ?? false;
+            $data['round_off_net_amount_to_customer'] = $data['round_off_net_amount_to_customer'] ?? false;
+            $data = $this->sanitizeForCurrentSchema($data);
 
             $model->update($data);
 
@@ -179,6 +197,56 @@ class QuotationService extends CrudService
         return $query->where('created_by', $user->getKey());
     }
 
+    private function sanitizeForCurrentSchema(array $data): array
+    {
+        if (! $this->supportsShowMrpColumn()) {
+            unset($data['show_mrp_to_customer']);
+        }
+
+        if (! $this->supportsShowItemWiseGstColumn()) {
+            unset($data['show_item_wise_gst_to_customer']);
+        }
+
+        if (! $this->supportsRoundOffNetAmountColumn()) {
+            unset($data['round_off_net_amount_to_customer']);
+        }
+
+        return $data;
+    }
+
+    private function supportsShowMrpColumn(): bool
+    {
+        if ($this->supportsShowMrpColumn !== null) {
+            return $this->supportsShowMrpColumn;
+        }
+
+        $this->supportsShowMrpColumn = Schema::hasColumn('quotations', 'show_mrp_to_customer');
+
+        return $this->supportsShowMrpColumn;
+    }
+
+    private function supportsShowItemWiseGstColumn(): bool
+    {
+        if ($this->supportsShowItemWiseGstColumn !== null) {
+            return $this->supportsShowItemWiseGstColumn;
+        }
+
+        $this->supportsShowItemWiseGstColumn = Schema::hasColumn('quotations', 'show_item_wise_gst_to_customer');
+
+        return $this->supportsShowItemWiseGstColumn;
+    }
+
+    private function supportsRoundOffNetAmountColumn(): bool
+    {
+        if ($this->supportsRoundOffNetAmountColumn !== null) {
+            return $this->supportsRoundOffNetAmountColumn;
+        }
+
+        $this->supportsRoundOffNetAmountColumn = Schema::hasColumn('quotations', 'round_off_net_amount_to_customer');
+
+        return $this->supportsRoundOffNetAmountColumn;
+    }
+
     private function syncLines(Quotation $quotation, array $items, array $adjustments, array $terms): void
     {
         $totals = [
@@ -276,6 +344,50 @@ class QuotationService extends CrudService
         }
 
         return self::$customerColumns;
+    }
+
+    private function resolveCustomerFromLead(array $data): array
+    {
+        $leadId = $data['lead_id'] ?? null;
+
+        if (! $leadId) {
+            unset($data['lead_id']);
+
+            return $data;
+        }
+
+        /** @var Lead $lead */
+        $lead = Lead::query()->findOrFail($leadId);
+
+        $customer = Customer::query()
+            ->where('phone', $lead->phone)
+            ->when(
+                filled($lead->email),
+                fn (Builder $query) => $query->orWhere('email', $lead->email)
+            )
+            ->first();
+
+        if (! $customer) {
+            $customer = Customer::create([
+                'primary_name' => $lead->name ?: "Lead {$lead->phone}",
+                'company_name' => null,
+                'email' => $lead->email,
+                'phone' => $lead->phone,
+                'address_line_1' => $lead->address_line_1 ?: 'N/A',
+                'address_line_2' => $lead->address_line_2,
+                'city' => $lead->city,
+                'state' => $lead->state ?: 'N/A',
+                'pincode' => $lead->pincode,
+                'country' => $lead->country ?: 'India',
+                'notes' => $lead->requirement ?: null,
+                'is_active' => true,
+            ]);
+        }
+
+        $data['customer_id'] = $customer->id;
+        unset($data['lead_id']);
+
+        return $data;
     }
 
     private function buildAdjustmentSnapshot(array $input, float $subtotalAfterDiscount): array

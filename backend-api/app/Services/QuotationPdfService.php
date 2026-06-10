@@ -166,6 +166,9 @@ class QuotationPdfService
             'status_label' => $this->statusLabel($quotation->status),
             'requires_watermark' => $quotation->status !== 'approved',
             'show_discount' => (bool) $quotation->show_discount_to_customer,
+            'show_mrp' => $quotation->show_mrp_to_customer === null ? true : (bool) $quotation->show_mrp_to_customer,
+            'show_item_wise_gst' => $quotation->show_item_wise_gst_to_customer === null ? false : (bool) $quotation->show_item_wise_gst_to_customer,
+            'round_off_net_amount' => $quotation->round_off_net_amount_to_customer === null ? false : (bool) $quotation->round_off_net_amount_to_customer,
             'gst_inclusive' => $gstInclusive,
             'tax_amount' => (float) $quotation->total_tax,
             'subtotal_label' => $this->money($quotation->subtotal_after_discount),
@@ -199,10 +202,16 @@ class QuotationPdfService
                     'product_image_src' => $this->assetSource($item->product_image_path),
                     'specifications_html' => $item->specifications ?: '',
                     'edited_price_label' => $this->money($item->edited_price),
+                    'discounted_price_label' => $this->money($item->price_after_discount),
                     'quantity_label' => $this->number($item->quantity),
                     'discount_percent_label' => (float) $item->discount_percent > 0 ? $this->number($item->discount_percent).'%' : '-',
                     'gst_percent_label' => $this->number($item->gst_percent).'%',
                     'tax_amount_label' => $this->money($item->tax_amount),
+                    'net_amount_label' => $this->money(
+                        ($quotation->round_off_net_amount_to_customer === null ? false : (bool) $quotation->round_off_net_amount_to_customer)
+                            ? round((float) $item->taxable_amount)
+                            : (float) $item->taxable_amount
+                    ),
                     'line_total_label' => $this->money($item->line_total),
                 ];
             })->all(),

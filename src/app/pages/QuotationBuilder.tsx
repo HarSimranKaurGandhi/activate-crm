@@ -6,7 +6,9 @@ import { useDrag, useDrop } from 'react-dnd';
 import { toast } from 'sonner';
 import { productService } from '../../services/productService';
 import { userService } from '../../services/userService';
+import { leadService } from '../../services/leadService';
 import { mapProduct } from '../../services/mappers';
+import { useAuth } from '../auth/AuthContext';
 import { LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
 
@@ -36,7 +38,7 @@ interface QuotationItem {
   specifications: string;
 }
 
-const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, gstInclusive }: any) => {
+const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }: any) => {
   const [, drag] = useDrag({
     type: 'row',
     item: { index },
@@ -96,22 +98,20 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
       <td className="px-2 py-3 align-middle text-right text-sm text-gray-600 whitespace-nowrap">
         ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
       </td>
-      {showDiscount && (
-        <td className="px-2 py-3 align-middle text-center">
-          <input
-            type="number"
-            value={item.discount}
-            onChange={(e) => {
-              const newDiscount = parseInt(e.target.value, 10) || 0;
-              onUpdate(item.id, { discount: normalizeDiscount(newDiscount) });
-            }}
-            className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-center"
-            min="0"
-            max="100"
-            step="1"
-          />
-        </td>
-      )}
+      <td className="px-2 py-3 align-middle text-center">
+        <input
+          type="number"
+          value={item.discount}
+          onChange={(e) => {
+            const newDiscount = parseInt(e.target.value, 10) || 0;
+            onUpdate(item.id, { discount: normalizeDiscount(newDiscount) });
+          }}
+          className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-center"
+          min="0"
+          max="100"
+          step="1"
+        />
+      </td>
       <td className="px-2 py-3 align-middle text-right font-semibold text-sm text-gray-900 whitespace-nowrap">
         ₹{lineTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
       </td>
@@ -130,9 +130,10 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, showDiscount, 
 export const QuotationBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { products, customers, quotations, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
+  const { products, quotations, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
+  const { user } = useAuth();
 
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedLead, setSelectedLead] = useState<any>(null);
   const [salesperson, setSalesperson] = useState({
     name: '',
     phone: '',
@@ -143,14 +144,19 @@ export const QuotationBuilder = () => {
   const [items, setItems] = useState<QuotationItem[]>([]);
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [gstInclusive, setGstInclusive] = useState(false);
-  const [showDiscount, setShowDiscount] = useState(true);
+  const [showDiscount, setShowDiscount] = useState(false);
+  const [showMrp, setShowMrp] = useState(false);
+  const [showItemWiseGst, setShowItemWiseGst] = useState(false);
+  const [roundOffNetAmount, setRoundOffNetAmount] = useState(false);
   const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
   const [showProductModal, setShowProductModal] = useState(false);
-  const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState('');
+  const [showLeadModal, setShowLeadModal] = useState(false);
+  const [leadSearch, setLeadSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [selectableProducts, setSelectableProducts] = useState<any[]>([]);
+  const [inProgressLeads, setInProgressLeads] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const activeTermIds = masterTerms.filter((term) => term.status === 'active').map((term) => term.id);
 
   useEffect(() => {
     userService
@@ -163,23 +169,76 @@ export const QuotationBuilder = () => {
     const quotation = id ? quotations.find(q => q.id === id) : null;
     if (id) {
       if (quotation) {
-        setSelectedCustomer(quotation.customer);
+        setSelectedLead(quotation.customer ? {
+          id: quotation.customer.id,
+          sourceType: 'customer',
+          customerId: quotation.customer.id,
+          name: quotation.customer.name,
+          phone: quotation.customer.phone,
+          email: quotation.customer.email,
+          company: quotation.customer.company,
+          address: quotation.customer.address,
+        } : null);
         setSalesperson(quotation.salesperson);
         setItems(quotation.items);
         setGlobalDiscount(quotation.globalDiscount);
         setGstInclusive(quotation.gstInclusive);
         setShowDiscount(quotation.showDiscount);
+        setShowMrp(quotation.showMrp ?? true);
+        setShowItemWiseGst(quotation.showItemWiseGst ?? false);
+        setRoundOffNetAmount(quotation.roundOffNetAmount ?? false);
         setSelectedTerms(quotation.terms);
       }
-    } else if (settings.defaultSalespersonName || settings.defaultSalespersonEmail || settings.defaultSalespersonPhone) {
-      setSalesperson({
-        name: settings.defaultSalespersonName || '',
-        phone: settings.defaultSalespersonPhone || '',
-        email: settings.defaultSalespersonEmail || '',
-      });
+    } else {
+      setShowDiscount(false);
+      setShowMrp(false);
+      setShowItemWiseGst(false);
+      setRoundOffNetAmount(false);
+
+      if (user) {
+        setSelectedSalespersonId(String(user.id || ''));
+        setSalesperson({
+          name: user.name || '',
+          phone: user.phone || '',
+          email: user.email || '',
+        });
+      } else if (settings.defaultSalespersonName || settings.defaultSalespersonEmail || settings.defaultSalespersonPhone) {
+        setSalesperson({
+          name: settings.defaultSalespersonName || '',
+          phone: settings.defaultSalespersonPhone || '',
+          email: settings.defaultSalespersonEmail || '',
+        });
+      }
     }
 
-  }, [id, quotations, settings]);
+  }, [id, quotations, settings, masterTerms, user]);
+
+  useEffect(() => {
+    if (id || activeTermIds.length === 0) {
+      return;
+    }
+
+    const hasAllActiveTermsSelected =
+      selectedTerms.length === activeTermIds.length
+      && activeTermIds.every((termId) => selectedTerms.includes(termId));
+
+    if (!hasAllActiveTermsSelected) {
+      setSelectedTerms(activeTermIds);
+    }
+  }, [id, activeTermIds, selectedTerms]);
+
+  useEffect(() => {
+    if (id || !user || selectedSalespersonId) {
+      return;
+    }
+
+    setSelectedSalespersonId(String(user.id || ''));
+    setSalesperson({
+      name: user.name || '',
+      phone: user.phone || '',
+      email: user.email || '',
+    });
+  }, [id, user, selectedSalespersonId]);
 
   useEffect(() => {
     if (selectedSalespersonId || salesUsers.length === 0 || (!salesperson.email && !salesperson.name)) {
@@ -211,13 +270,15 @@ export const QuotationBuilder = () => {
   }, [products, showProductModal]);
 
   useEffect(() => {
-    setItems((currentItems) =>
-      currentItems.map((item) => ({
-        ...item,
-        discount: normalizeDiscount(globalDiscount),
-      })),
-    );
-  }, [globalDiscount]);
+    if (!showLeadModal) return;
+
+    leadService
+      .list({ status: 'in_progress' })
+      .then((result) => {
+        setInProgressLeads(Array.isArray(result.data) ? result.data : []);
+      })
+      .catch(() => setInProgressLeads([]));
+  }, [showLeadModal]);
 
   const moveRow = (fromIndex: number, toIndex: number) => {
     const newItems = [...items];
@@ -269,6 +330,17 @@ export const QuotationBuilder = () => {
     });
   };
 
+  const handleGlobalDiscountChange = (value: number) => {
+    const normalizedValue = normalizeDiscount(value);
+    setGlobalDiscount(normalizedValue);
+    setItems((currentItems) =>
+      currentItems.map((item) => ({
+        ...item,
+        discount: normalizedValue,
+      })),
+    );
+  };
+
   const calculateTotals = () => {
     let subtotal = 0;
     items.forEach(item => {
@@ -294,18 +366,19 @@ export const QuotationBuilder = () => {
 
   const totals = calculateTotals();
   const itemPagination = usePagination(items, 10);
-  const filteredCustomers = customers.filter((customer) => {
-    const search = customerSearch.trim().toLowerCase();
+  const filteredLeads = inProgressLeads.filter((lead) => {
+    const search = leadSearch.trim().toLowerCase();
 
     if (!search) {
       return true;
     }
 
     return (
-      customer.name.toLowerCase().includes(search) ||
-      customer.company.toLowerCase().includes(search) ||
-      customer.phone.toLowerCase().includes(search) ||
-      customer.email.toLowerCase().includes(search)
+      String(lead.name || '').toLowerCase().includes(search) ||
+      String(lead.phone || '').toLowerCase().includes(search) ||
+      String(lead.email || '').toLowerCase().includes(search) ||
+      String(lead.city || '').toLowerCase().includes(search) ||
+      String(lead.requirement || '').toLowerCase().includes(search)
     );
   });
   const filteredProducts = (selectableProducts.length ? selectableProducts : products.filter((product) => product.status === 'active')).filter((product) => {
@@ -331,8 +404,8 @@ export const QuotationBuilder = () => {
   }
 
   const handleSave = async () => {
-    if (!selectedCustomer) {
-      toast.error('Please select a customer');
+    if (!selectedLead) {
+      toast.error('Please select a lead');
       return;
     }
     if (items.length === 0) {
@@ -342,12 +415,15 @@ export const QuotationBuilder = () => {
 
     const quotationData = {
       date: new Date().toISOString(),
-      customer: selectedCustomer,
+      lead: selectedLead,
       salesperson,
       items,
       globalDiscount,
       gstInclusive,
       showDiscount,
+      showMrp,
+      showItemWiseGst,
+      roundOffNetAmount,
       terms: selectedTerms,
       status: 'draft' as const,
       subtotal: totals.subtotal,
@@ -395,22 +471,22 @@ export const QuotationBuilder = () => {
           </button>
         </div>
 
-        {/* Customer & Salesperson */}
+        {/* Lead & Salesperson */}
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(280px,0.85fr)_minmax(520px,1.15fr)] gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Customer Details</h3>
-            {selectedCustomer ? (
+            <h3 className="font-semibold text-gray-900 mb-3">Lead Details</h3>
+            {selectedLead ? (
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium text-gray-900 leading-tight truncate">{selectedCustomer.company}</p>
+                  <p className="font-medium text-gray-900 leading-tight truncate">{selectedLead.company || selectedLead.name}</p>
                   <div className="mt-1 grid gap-x-4 gap-y-0.5 text-sm text-gray-600 sm:grid-cols-2">
-                    <span className="truncate">{selectedCustomer.name}</span>
-                    <span className="truncate">{selectedCustomer.phone}</span>
-                    <span className="truncate sm:col-span-2">{selectedCustomer.email}</span>
+                    <span className="truncate">{selectedLead.name}</span>
+                    <span className="truncate">{selectedLead.phone}</span>
+                    <span className="truncate sm:col-span-2">{selectedLead.email}</span>
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowCustomerModal(true)}
+                  onClick={() => setShowLeadModal(true)}
                   className="shrink-0 text-sm text-blue-600 hover:underline"
                 >
                   Change
@@ -418,10 +494,10 @@ export const QuotationBuilder = () => {
               </div>
             ) : (
               <button
-                onClick={() => setShowCustomerModal(true)}
+                onClick={() => setShowLeadModal(true)}
                 className="w-full py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-all"
               >
-                Select Customer
+                Select Lead
               </button>
             )}
           </div>
@@ -491,7 +567,7 @@ export const QuotationBuilder = () => {
                   <col className="w-36" />
                   <col className="w-20" />
                   <col className="w-32" />
-                  {showDiscount && <col className="w-20" />}
+                  <col className="w-20" />
                   <col className="w-36" />
                   <col className="w-12" />
                 </colgroup>
@@ -504,9 +580,7 @@ export const QuotationBuilder = () => {
                     <th className="px-2 py-2 text-right text-[11px] font-semibold text-gray-600 uppercase">Discounted Price</th>
                     <th className="px-2 py-2 text-center text-[11px] font-semibold text-gray-600 uppercase">GST%</th>
                     <th className="px-2 py-2 text-right text-[11px] font-semibold text-gray-600 uppercase">GST Amt</th>
-                    {showDiscount && (
-                      <th className="px-2 py-2 text-center text-[11px] font-semibold text-gray-600 uppercase">Disc%</th>
-                    )}
+                    <th className="px-2 py-2 text-center text-[11px] font-semibold text-gray-600 uppercase">Disc%</th>
                     <th className="px-2 py-2 text-right text-[11px] font-semibold text-gray-600 uppercase">Total</th>
                     <th className="px-2 py-2"></th>
                   </tr>
@@ -520,7 +594,6 @@ export const QuotationBuilder = () => {
                       moveRow={moveRow}
                       onUpdate={updateItem}
                       onDelete={deleteItem}
-                      showDiscount={showDiscount}
                       gstInclusive={gstInclusive}
                     />
                   ))}
@@ -553,7 +626,7 @@ export const QuotationBuilder = () => {
                 <input
                   type="number"
                   value={globalDiscount}
-                  onChange={(e) => setGlobalDiscount(normalizeDiscount(parseInt(e.target.value, 10) || 0))}
+                  onChange={(e) => handleGlobalDiscountChange(parseInt(e.target.value, 10) || 0)}
                   className="min-w-0 flex-1 px-3 py-2 border border-gray-200 rounded-lg"
                   placeholder="0"
                   min="0"
@@ -584,6 +657,39 @@ export const QuotationBuilder = () => {
                   type="checkbox"
                   checked={showDiscount}
                   onChange={(e) => setShowDiscount(e.target.checked)}
+                  className="w-11 h-6 bg-gray-200 rounded-full appearance-none cursor-pointer relative checked:bg-blue-600 transition-colors
+                           after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-5"
+                />
+              </label>
+
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-medium text-gray-700">Show MRP in Quotation</span>
+                <input
+                  type="checkbox"
+                  checked={showMrp}
+                  onChange={(e) => setShowMrp(e.target.checked)}
+                  className="w-11 h-6 bg-gray-200 rounded-full appearance-none cursor-pointer relative checked:bg-blue-600 transition-colors
+                           after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-5"
+                />
+              </label>
+
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-medium text-gray-700">Show Item-wise GST in Quotation</span>
+                <input
+                  type="checkbox"
+                  checked={showItemWiseGst}
+                  onChange={(e) => setShowItemWiseGst(e.target.checked)}
+                  className="w-11 h-6 bg-gray-200 rounded-full appearance-none cursor-pointer relative checked:bg-blue-600 transition-colors
+                           after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-5"
+                />
+              </label>
+
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-medium text-gray-700">Round Off Net Amount in Quotation</span>
+                <input
+                  type="checkbox"
+                  checked={roundOffNetAmount}
+                  onChange={(e) => setRoundOffNetAmount(e.target.checked)}
                   className="w-11 h-6 bg-gray-200 rounded-full appearance-none cursor-pointer relative checked:bg-blue-600 transition-colors
                            after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-5"
                 />
@@ -698,14 +804,14 @@ export const QuotationBuilder = () => {
         </div>
       )}
 
-      {/* Customer Selection Modal */}
-      {showCustomerModal && (
+      {/* Lead Selection Modal */}
+      {showLeadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">Select Customer</h3>
+              <h3 className="text-xl font-semibold text-gray-900">Select Lead</h3>
               <button
-                onClick={() => setShowCustomerModal(false)}
+                onClick={() => setShowLeadModal(false)}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 ✕
@@ -715,45 +821,43 @@ export const QuotationBuilder = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                placeholder="Search by name, phone, or email"
+                value={leadSearch}
+                onChange={(e) => setLeadSearch(e.target.value)}
+                placeholder="Search by name, phone, email, city, or requirement"
                 className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div className="space-y-3 mb-4">
-              {filteredCustomers.map(customer => (
+              {filteredLeads.map(lead => (
                 <div
-                  key={customer.id}
+                  key={lead.id}
                   onClick={() => {
-                    setSelectedCustomer(customer);
-                    setCustomerSearch('');
-                    setShowCustomerModal(false);
+                    setSelectedLead({
+                      id: String(lead.id),
+                      sourceType: 'lead',
+                      name: lead.name || '',
+                      phone: lead.phone || '',
+                      email: lead.email || '',
+                      company: '',
+                      address: [lead.address_line_1, lead.address_line_2, lead.city, lead.state, lead.pincode, lead.country].filter(Boolean).join(', '),
+                    });
+                    setLeadSearch('');
+                    setShowLeadModal(false);
                   }}
                   className="p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
                 >
-                  <p className="font-medium text-gray-900">{customer.company}</p>
-                  <p className="text-sm text-gray-600">{customer.name}</p>
-                  <p className="text-sm text-gray-600">{customer.phone}</p>
-                  <p className="text-sm text-gray-600">{customer.email}</p>
+                  <p className="font-medium text-gray-900">{lead.name || lead.phone}</p>
+                  <p className="text-sm text-gray-600">{lead.phone}</p>
+                  <p className="text-sm text-gray-600">{lead.email}</p>
+                  <p className="text-sm text-gray-600">{lead.city || '-'}</p>
                 </div>
               ))}
-              {filteredCustomers.length === 0 && (
+              {filteredLeads.length === 0 && (
                 <div className="py-8 text-center text-sm text-gray-500">
-                  No customers matched your search.
+                  No in-progress leads matched your search.
                 </div>
               )}
             </div>
-            <button
-              onClick={() => {
-                setCustomerSearch('');
-                setShowCustomerModal(false);
-                navigate('/customers/new');
-              }}
-              className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-all"
-            >
-              + Add New Customer
-            </button>
           </div>
         </div>
       )}

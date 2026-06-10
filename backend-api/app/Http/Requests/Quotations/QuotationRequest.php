@@ -15,7 +15,8 @@ class QuotationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer_id' => ['required', 'exists:customers,id'],
+            'customer_id' => ['nullable', 'exists:customers,id', 'required_without:lead_id'],
+            'lead_id' => ['nullable', 'exists:leads,id', 'required_without:customer_id'],
             'salesperson_name' => ['nullable', 'string', 'max:255'],
             'salesperson_phone' => ['nullable', 'string', 'max:30'],
             'salesperson_email' => ['nullable', 'email', 'max:255'],
@@ -23,6 +24,9 @@ class QuotationRequest extends FormRequest
             'valid_until' => ['nullable', 'date', 'after_or_equal:quote_date'],
             'pricing_mode' => ['required', Rule::in(['exclusive_gst', 'inclusive_gst'])],
             'show_discount_to_customer' => ['sometimes', 'boolean'],
+            'show_mrp_to_customer' => ['sometimes', 'boolean'],
+            'show_item_wise_gst_to_customer' => ['sometimes', 'boolean'],
+            'round_off_net_amount_to_customer' => ['sometimes', 'boolean'],
             'default_discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'default_discount_amount' => ['nullable', 'numeric', 'min:0'],
             'intro_text' => ['nullable', 'string'],

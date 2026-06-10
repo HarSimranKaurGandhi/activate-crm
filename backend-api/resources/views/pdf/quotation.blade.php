@@ -225,7 +225,7 @@
                 <th class="right col-price">Price</th>
                 <th class="center col-qty">Qty</th>
                 @if($quotation['show_discount']) <th class="center col-discount">Disc%</th> @endif
-                <th class="right col-gst">GST</th>
+                @if($quotation['show_item_wise_gst']) <th class="right col-gst">GST</th> @endif
                 <th class="right col-total">Net Amount</th>
               </tr>
             </thead>
@@ -239,11 +239,11 @@
                     @if($item['model_number'])<div class="product-model">{{ $item['model_number'] }}</div>@endif
                   </td>
                   <td class="specs col-specs">{!! $item['specifications_html'] !!}</td>
-                  <td class="right amount-strong col-price">{{ $item['edited_price_label'] }}</td>
+                  <td class="right amount-strong col-price">{{ $quotation['show_mrp'] ? $item['edited_price_label'] : $item['discounted_price_label'] }}</td>
                   <td class="center amount-strong col-qty" style="white-space: nowrap;">{{ $item['quantity_label'] }}</td>
                   @if($quotation['show_discount']) <td class="center col-discount" style="white-space: nowrap;">{{ $item['discount_percent_label'] }}</td> @endif
-                  <td class="right col-gst"><div>{{ $item['gst_percent_label'] }}</div><div class="gst-sub">{{ $item['tax_amount_label'] }}</div></td>
-                  <td class="right amount-strong col-total">{{ $item['line_total_label'] }}</td>
+                  @if($quotation['show_item_wise_gst']) <td class="right col-gst"><div>{{ $item['gst_percent_label'] }}</div><div class="gst-sub">{{ $item['tax_amount_label'] }}</div></td> @endif
+                  <td class="right amount-strong col-total">{{ $item['net_amount_label'] }}</td>
                 </tr>
               @endforeach
             </tbody>
@@ -253,8 +253,10 @@
           <table>
             <tr class="totals-row muted"><td>Sub Total</td><td>{{ $quotation['subtotal_label'] }}</td></tr>
             @foreach($quotation['adjustments'] as $adjustment)<tr class="totals-row"><td>{{ $adjustment['name'] }}</td><td>{{ $adjustment['amount_label'] }}</td></tr>@endforeach
-            @if(!$quotation['gst_inclusive'] && $quotation['tax_amount'] > 0)
-              <tr class="totals-row"><td>Total Before Tax</td><td>{{ $quotation['before_tax_total_label'] }}</td></tr>
+            @if($quotation['tax_amount'] > 0)
+              @if(!$quotation['gst_inclusive'])
+                <tr class="totals-row"><td>Total Before Tax</td><td>{{ $quotation['before_tax_total_label'] }}</td></tr>
+              @endif
               <tr class="totals-row"><td>GST</td><td>{{ $quotation['tax_amount_label'] }}</td></tr>
             @endif
             <tr class="totals-row grand-total"><td><span class="grand-label">Grand Total</span></td><td><span class="grand-value">{{ $quotation['grand_total_label'] }}</span></td></tr>

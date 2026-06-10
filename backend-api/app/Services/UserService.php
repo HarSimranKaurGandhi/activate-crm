@@ -7,6 +7,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class UserService extends CrudService
 {
@@ -15,6 +16,13 @@ class UserService extends CrudService
     protected array $searchColumns = ['name', 'email', 'phone', 'designation'];
 
     protected array $relations = ['role'];
+
+    public function __construct()
+    {
+        if (! Schema::hasColumn('users', 'designation')) {
+            $this->searchColumns = ['name', 'email', 'phone'];
+        }
+    }
 
     public function paginate(Request $request): LengthAwarePaginator
     {
@@ -34,6 +42,7 @@ class UserService extends CrudService
     {
         $data['password'] = Hash::make($data['password']);
         $data['is_active'] = $data['is_active'] ?? true;
+        $data = $this->sanitizeForCurrentSchema($data);
 
         return User::create($data)->load($this->relations);
     }
@@ -46,6 +55,7 @@ class UserService extends CrudService
             unset($data['password']);
         }
 
+        $data = $this->sanitizeForCurrentSchema($data);
         $model->update($data);
 
         return $model->refresh()->load($this->relations);
@@ -61,5 +71,14 @@ class UserService extends CrudService
     protected function applyFilters(Builder $query, Request $request): Builder
     {
         return $query->when($request->filled('role_id'), fn (Builder $q) => $q->where('role_id', $request->integer('role_id')));
+    }
+
+    private function sanitizeForCurrentSchema(array $data): array
+    {
+        if (! Schema::hasColumn('users', 'designation')) {
+            unset($data['designation']);
+        }
+
+        return $data;
     }
 }

@@ -34,13 +34,29 @@ export const Layout = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
   const canManageApprovals = ['admin', 'operations'].includes(role);
+  const visibleBaseNavigation = baseNavigation
+    .filter((item) => (role === 'admin' ? true : !['Settings', 'Reports'].includes(item.name)))
+    .map((item) => {
+      if (!item.children) {
+        return item;
+      }
+
+      return {
+        ...item,
+        children: role === 'admin'
+          ? item.children
+          : item.children.filter((child) =>
+              !['/masters/users', '/masters/adjustments', '/masters/custom-fields'].includes(child.href)
+            ),
+      };
+    });
   const navigation = canManageApprovals
     ? [
-        ...baseNavigation.slice(0, 2),
+        ...visibleBaseNavigation.slice(0, 2),
         { name: 'Approvals', href: '/quotations/approvals', icon: ClipboardCheck },
-        ...baseNavigation.slice(2),
+        ...visibleBaseNavigation.slice(2),
       ]
-    : baseNavigation;
+    : visibleBaseNavigation;
 
   const isActive = (href: string) => {
     if (href === '/') return location.pathname === '/';

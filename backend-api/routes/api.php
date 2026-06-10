@@ -125,13 +125,16 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::put('quotations/{id}', [QuotationController::class, 'update']);
 
     Route::get('settings/company', [SettingsController::class, 'company']);
-    Route::put('settings/company', [SettingsController::class, 'updateCompany']);
     Route::get('settings/bank-details', [SettingsController::class, 'bankDetails']);
-    Route::post('settings/bank-details', [SettingsController::class, 'storeBankDetail']);
-    Route::put('settings/bank-details/{id}', [SettingsController::class, 'updateBankDetail']);
-    Route::patch('settings/bank-details/{id}/default', [SettingsController::class, 'makeDefaultBankDetail']);
     Route::get('settings/quotation-numbering', [SettingsController::class, 'quotationNumbering']);
-    Route::put('settings/quotation-numbering', [SettingsController::class, 'updateQuotationNumbering']);
+
+    Route::middleware('role:admin')->group(function (): void {
+        Route::put('settings/company', [SettingsController::class, 'updateCompany']);
+        Route::post('settings/bank-details', [SettingsController::class, 'storeBankDetail']);
+        Route::put('settings/bank-details/{id}', [SettingsController::class, 'updateBankDetail']);
+        Route::patch('settings/bank-details/{id}/default', [SettingsController::class, 'makeDefaultBankDetail']);
+        Route::put('settings/quotation-numbering', [SettingsController::class, 'updateQuotationNumbering']);
+    });
 
     Route::get('reports/quotations', [ReportController::class, 'quotations']);
     Route::get('reports/quotations/export', [ReportController::class, 'export']);

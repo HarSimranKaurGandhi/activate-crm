@@ -119,14 +119,21 @@ export const QuotationPreview = () => {
   const calculateItemAmounts = (item: any) => {
     const basePrice = item.price * item.quantity;
     const discountAmount = basePrice * (item.discount / 100);
-    const afterDiscount = basePrice - discountAmount;
-    const gstAmount = quotation.gstInclusive ? 0 : afterDiscount * (item.product.gstPercent / 100);
+    const netAmount = basePrice - discountAmount;
+    const gstAmount = quotation.gstInclusive ? 0 : netAmount * (item.product.gstPercent / 100);
+    const discountedUnitPrice = item.quantity > 0 ? netAmount / item.quantity : 0;
 
     return {
+      discountedUnitPrice,
+      netAmount,
       gstAmount,
-      total: afterDiscount + gstAmount,
+      total: netAmount + gstAmount,
     };
   };
+
+  const displayNetAmount = (amount: number) => (
+    quotation.roundOffNetAmount ? Math.round(amount || 0) : amount
+  );
 
   const formatMoney = (amount: number) =>
     `₹${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -438,7 +445,7 @@ export const QuotationPreview = () => {
               <div className="mb-5 hidden overflow-x-auto border border-slate-300 md:block">
                 <table className="w-full table-fixed border-collapse text-sm">
                   <colgroup>
-                    {quotation.showDiscount ? (
+                    {quotation.showDiscount && quotation.showItemWiseGst ? (
                       <>
                         <col style={{ width: '3%' }} />
                         <col style={{ width: '27%' }} />
@@ -449,6 +456,16 @@ export const QuotationPreview = () => {
                         <col style={{ width: '8%' }} />
                         <col style={{ width: '16%' }} />
                       </>
+                    ) : quotation.showDiscount ? (
+                      <>
+                        <col style={{ width: '3%' }} />
+                        <col style={{ width: '28%' }} />
+                        <col style={{ width: '27%' }} />
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '5%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '18%' }} />
+                      </>
                     ) : (
                       <>
                         <col style={{ width: '3%' }} />
@@ -456,8 +473,14 @@ export const QuotationPreview = () => {
                         <col style={{ width: '27%' }} />
                         <col style={{ width: '12%' }} />
                         <col style={{ width: '4%' }} />
-                        <col style={{ width: '9%' }} />
-                        <col style={{ width: '15%' }} />
+                        {quotation.showItemWiseGst ? (
+                          <>
+                            <col style={{ width: '9%' }} />
+                            <col style={{ width: '15%' }} />
+                          </>
+                        ) : (
+                          <col style={{ width: '24%' }} />
+                        )}
                       </>
                     )}
                   </colgroup>
@@ -469,14 +492,16 @@ export const QuotationPreview = () => {
                       <th className="px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">Price</th>
                       <th className="px-2 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Qty</th>
                       {quotation.showDiscount && <th className="px-2 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Disc%</th>}
-                      <th className="px-2 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">GST</th>
+                      {quotation.showItemWiseGst && <th className="px-2 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">GST</th>}
                       <th className="px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">Net Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {quotation.items.map((item: any, index: number) => {
-                      const { gstAmount, total } = calculateItemAmounts(item);
+                      const { gstAmount, netAmount, discountedUnitPrice } = calculateItemAmounts(item);
                       const productImage = item.product.image || item.product.imageUrl || item.product.photo || item.product.picture;
+                      const displayPrice = quotation.showMrp ? item.price : discountedUnitPrice;
+                      const roundedNetAmount = displayNetAmount(netAmount);
 
                       return (
                         <tr key={item.id} className="border-b border-slate-200 align-middle last:border-b-0">
@@ -501,18 +526,20 @@ export const QuotationPreview = () => {
                               <div dangerouslySetInnerHTML={renderHtml(item.specifications || item.product.description || '')} />
                             </div>
                           </td>
-                          <td className="border-r border-slate-200 px-3 py-4 text-right font-black text-slate-950">{formatMoney(item.price)}</td>
+                          <td className="border-r border-slate-200 px-3 py-4 text-right font-black text-slate-950">{formatMoney(displayPrice)}</td>
                           <td className="border-r border-slate-200 px-2 py-4 text-center font-black text-slate-950">{item.quantity}</td>
                           {quotation.showDiscount && (
                             <td className="border-r border-slate-200 px-2 py-4 text-center font-bold text-slate-700">
                               {item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'}
                             </td>
                           )}
-                          <td className="border-r border-slate-200 px-2 py-4 text-right font-bold text-slate-700">
-                            <div>{item.product.gstPercent}%</div>
-                            <div className="mt-1 text-xs text-slate-500">{formatMoney(gstAmount)}</div>
-                          </td>
-                          <td className="px-3 py-4 text-right text-base font-black text-slate-950">{formatMoney(total)}</td>
+                          {quotation.showItemWiseGst && (
+                            <td className="border-r border-slate-200 px-2 py-4 text-right font-bold text-slate-700">
+                              <div>{item.product.gstPercent}%</div>
+                              <div className="mt-1 text-xs text-slate-500">{formatMoney(gstAmount)}</div>
+                            </td>
+                          )}
+                          <td className="px-3 py-4 text-right text-base font-black text-slate-950">{formatMoney(roundedNetAmount)}</td>
                         </tr>
                       );
                     })}
@@ -522,8 +549,10 @@ export const QuotationPreview = () => {
 
               <div className="mb-5 space-y-4 md:hidden">
                 {quotation.items.map((item: any, index: number) => {
-                  const { gstAmount, total } = calculateItemAmounts(item);
+                  const { gstAmount, netAmount, discountedUnitPrice } = calculateItemAmounts(item);
                   const productImage = item.product.image || item.product.imageUrl || item.product.photo || item.product.picture;
+                  const displayPrice = quotation.showMrp ? item.price : discountedUnitPrice;
+                  const roundedNetAmount = displayNetAmount(netAmount);
 
                   return (
                     <div key={item.id} className="overflow-hidden border border-slate-300 bg-white">
@@ -555,11 +584,11 @@ export const QuotationPreview = () => {
                         </div>
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                          <MobileMetric label="Price" value={formatMoney(item.price)} />
+                          <MobileMetric label="Price" value={formatMoney(displayPrice)} />
                           <MobileMetric label="Qty" value={String(item.quantity)} />
                           {quotation.showDiscount && <MobileMetric label="Disc%" value={item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'} />}
-                          <MobileMetric label="GST" value={`${item.product.gstPercent}% (${formatMoney(gstAmount)})`} />
-                          <MobileMetric label="Net Amount" value={formatMoney(total)} strong />
+                          {quotation.showItemWiseGst && <MobileMetric label="GST" value={`${item.product.gstPercent}% (${formatMoney(gstAmount)})`} />}
+                          <MobileMetric label="Net Amount" value={formatMoney(roundedNetAmount)} strong />
                         </div>
                       </div>
                     </div>
@@ -590,11 +619,19 @@ export const QuotationPreview = () => {
                     );
                   })}
 
-                  {!quotation.gstInclusive && quotation.taxAmount > 0 && (
-                    <div className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
-                      <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">GST</div>
-                      <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">{formatMoney(quotation.taxAmount)}</div>
-                    </div>
+                  {quotation.taxAmount > 0 && (
+                    <>
+                      {!quotation.gstInclusive && (
+                        <div className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
+                          <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">Total Before Tax</div>
+                          <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">{formatMoney(beforeTaxTotal)}</div>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
+                        <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">GST</div>
+                        <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">{formatMoney(quotation.taxAmount)}</div>
+                      </div>
+                    </>
                   )}
 
                   <div className="grid grid-cols-[1.1fr_0.9fr] bg-black text-white sm:grid-cols-[1.2fr_0.8fr]">
