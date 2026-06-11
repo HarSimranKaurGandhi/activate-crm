@@ -155,6 +155,9 @@ class QuotationPdfService
         $adjustments = $quotation->adjustments->sortBy('display_order')->values();
         $items = $quotation->items->sortBy('sort_order')->values();
         $totalAdjustments = (float) $adjustments->sum('amount');
+        $roundOffNetAmount = $quotation->round_off_net_amount_to_customer === null
+            ? false
+            : (bool) $quotation->round_off_net_amount_to_customer;
 
         $payload = [
             'number' => $quotation->quotation_number,
@@ -168,7 +171,7 @@ class QuotationPdfService
             'show_discount' => (bool) $quotation->show_discount_to_customer,
             'show_mrp' => $quotation->show_mrp_to_customer === null ? true : (bool) $quotation->show_mrp_to_customer,
             'show_item_wise_gst' => $quotation->show_item_wise_gst_to_customer === null ? false : (bool) $quotation->show_item_wise_gst_to_customer,
-            'round_off_net_amount' => $quotation->round_off_net_amount_to_customer === null ? false : (bool) $quotation->round_off_net_amount_to_customer,
+            'round_off_net_amount' => $roundOffNetAmount,
             'gst_inclusive' => $gstInclusive,
             'tax_amount' => (float) $quotation->total_tax,
             'subtotal_label' => $this->money($quotation->subtotal_after_discount),
@@ -195,7 +198,7 @@ class QuotationPdfService
                 'phone' => $quotation->salesperson_phone ?: '',
                 'email' => $quotation->salesperson_email ?: '',
             ],
-            'items' => $items->map(function ($item) {
+            'items' => $items->map(function ($item) use ($roundOffNetAmount) {
                 return [
                     'product_name' => $item->product_name,
                     'model_number' => $item->model_number,
@@ -208,7 +211,7 @@ class QuotationPdfService
                     'gst_percent_label' => $this->number($item->gst_percent).'%',
                     'tax_amount_label' => $this->money($item->tax_amount),
                     'net_amount_label' => $this->money(
-                        ($quotation->round_off_net_amount_to_customer === null ? false : (bool) $quotation->round_off_net_amount_to_customer)
+                        $roundOffNetAmount
                             ? round((float) $item->taxable_amount)
                             : (float) $item->taxable_amount
                     ),

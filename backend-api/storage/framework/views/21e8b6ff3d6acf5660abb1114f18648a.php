@@ -225,7 +225,7 @@
                 <th class="right col-price">Price</th>
                 <th class="center col-qty">Qty</th>
                 <?php if($quotation['show_discount']): ?> <th class="center col-discount">Disc%</th> <?php endif; ?>
-                <th class="right col-gst">GST</th>
+                <?php if($quotation['show_item_wise_gst']): ?> <th class="right col-gst">GST</th> <?php endif; ?>
                 <th class="right col-total">Net Amount</th>
               </tr>
             </thead>
@@ -239,11 +239,11 @@
                     <?php if($item['model_number']): ?><div class="product-model"><?php echo e($item['model_number']); ?></div><?php endif; ?>
                   </td>
                   <td class="specs col-specs"><?php echo $item['specifications_html']; ?></td>
-                  <td class="right amount-strong col-price"><?php echo e($item['edited_price_label']); ?></td>
+                  <td class="right amount-strong col-price"><?php echo e($quotation['show_mrp'] ? $item['edited_price_label'] : $item['discounted_price_label']); ?></td>
                   <td class="center amount-strong col-qty" style="white-space: nowrap;"><?php echo e($item['quantity_label']); ?></td>
                   <?php if($quotation['show_discount']): ?> <td class="center col-discount" style="white-space: nowrap;"><?php echo e($item['discount_percent_label']); ?></td> <?php endif; ?>
-                  <td class="right col-gst"><div><?php echo e($item['gst_percent_label']); ?></div><div class="gst-sub"><?php echo e($item['tax_amount_label']); ?></div></td>
-                  <td class="right amount-strong col-total"><?php echo e($item['line_total_label']); ?></td>
+                  <?php if($quotation['show_item_wise_gst']): ?> <td class="right col-gst"><div><?php echo e($item['gst_percent_label']); ?></div><div class="gst-sub"><?php echo e($item['tax_amount_label']); ?></div></td> <?php endif; ?>
+                  <td class="right amount-strong col-total"><?php echo e($item['net_amount_label']); ?></td>
                 </tr>
               <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
             </tbody>
@@ -253,8 +253,10 @@
           <table>
             <tr class="totals-row muted"><td>Sub Total</td><td><?php echo e($quotation['subtotal_label']); ?></td></tr>
             <?php $__currentLoopData = $quotation['adjustments']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $adjustment): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><tr class="totals-row"><td><?php echo e($adjustment['name']); ?></td><td><?php echo e($adjustment['amount_label']); ?></td></tr><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-            <?php if(!$quotation['gst_inclusive'] && $quotation['tax_amount'] > 0): ?>
-              <tr class="totals-row"><td>Total Before Tax</td><td><?php echo e($quotation['before_tax_total_label']); ?></td></tr>
+            <?php if($quotation['tax_amount'] > 0): ?>
+              <?php if(!$quotation['gst_inclusive']): ?>
+                <tr class="totals-row"><td>Total Before Tax</td><td><?php echo e($quotation['before_tax_total_label']); ?></td></tr>
+              <?php endif; ?>
               <tr class="totals-row"><td>GST</td><td><?php echo e($quotation['tax_amount_label']); ?></td></tr>
             <?php endif; ?>
             <tr class="totals-row grand-total"><td><span class="grand-label">Grand Total</span></td><td><span class="grand-value"><?php echo e($quotation['grand_total_label']); ?></span></td></tr>
