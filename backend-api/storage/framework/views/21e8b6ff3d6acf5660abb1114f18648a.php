@@ -13,8 +13,8 @@
     .watermark { position: fixed; top: 44%; left: 8%; width: 84%; text-align: center; z-index: 1; }
     .watermark span { display: inline-block; transform: rotate(-35deg); white-space: nowrap; font-size: 60px; font-weight: 900; letter-spacing: 0.16em; color: #e2e8f0; }
     .content { position: relative; z-index: 2; }
-    .letterhead { margin: 0 10px 6px; background: #f8fafc; }
-    .letterhead img { display: block; width: 100%; height: 92px; object-fit: cover; object-position: top; }
+    .letterhead { margin: 0 10px 6px; padding: 4px 0; background: #f8fafc; text-align: center; }
+    .letterhead img { display: inline-block; width: auto; max-width: 100%; max-height: 92px; height: auto; object-fit: contain; object-position: top; }
     .brand-header { width: calc(100% - 20px); margin: 0 10px 8px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
     .brand-header td { padding: 10px 10px; vertical-align: middle; }
     .brand-logo-cell { width: 22%; }
@@ -67,27 +67,27 @@
     .items-table td:last-child, .items-table th:last-child { border-right: 0; }
     .items-table tbody tr { page-break-inside: avoid; }
     .col-no { width: 3%; }
-    .col-product { width: 27%; }
-    .col-specs { width: 25%; }
-    .col-price { width: 11%; }
+    .col-product { width: 21%; }
+    .col-specs { width: 38%; }
+    .col-price { width: 10%; }
     .col-qty { width: 4%; }
     .col-discount { width: 6%; }
     .col-gst { width: 8%; }
-    .col-total { width: 16%; }
+    .col-total { width: 10%; }
     .items-table td.col-no, .items-table th.col-no,
     .items-table td.col-qty, .items-table th.col-qty,
     .items-table td.col-discount, .items-table th.col-discount { padding-left: 1px; padding-right: 1px; }
     .center { text-align: center; } .right { text-align: right; }
     .item-no { width: 20px; font-weight: 900; color: #020617; text-align: center; }
-    .product-image { display: block; width: 100%; max-width: 90px; height: 56px; margin: 0 auto 6px; object-fit: contain; }
-    .product-image-placeholder { width: 90px; height: 56px; margin: 0 auto 6px; border-radius: 8px; background: #f1f5f9; color: #94a3b8; font-size: 8px; font-weight: 700; text-align: center; line-height: 56px; }
+    .product-image { display: block; width: 100%; max-width: 138px; height: 88px; margin: 0 auto 6px; object-fit: contain; }
+    .product-image-placeholder { width: 138px; height: 88px; margin: 0 auto 6px; border-radius: 8px; background: #f1f5f9; color: #94a3b8; font-size: 8px; font-weight: 700; text-align: center; line-height: 88px; }
     .product-name { font-size: 10px; font-weight: 900; color: #020617; text-align: center; line-height: 1.2; }
     .product-model { margin-top: 2px; text-align: center; font-size: 8px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #475569; }
     .specs { font-size: 8.5px; line-height: 1.24; color: #334155; word-wrap: break-word; word-break: break-word; overflow-wrap: anywhere; white-space: normal; }
     .specs p { margin: 0 0 2px; }
     .specs ul, .specs ol { margin: 0; padding-left: 14px; }
     .specs li { margin-bottom: 2px; }
-    .specs * { max-width: 100%; white-space: normal !important; word-break: break-word !important; overflow-wrap: anywhere !important; }
+    .specs * { max-width: 100%; white-space: normal !important; word-break: break-word !important; overflow-wrap: anywhere !important; font-family: inherit !important; font-size: inherit !important; line-height: inherit !important; color: inherit !important; }
     .amount-strong { font-size: 9.5px; font-weight: 900; color: #020617; }
     .gst-sub { margin-top: 2px; font-size: 8px; color: #64748b; }
     .totals { width: 420px; margin-left: auto; border: 1px solid #d1d5db; overflow: hidden; margin-bottom: 10px; }
@@ -118,14 +118,19 @@
     .detail-label { font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; color: #334155; }
     .detail-value { font-weight: 500; }
     .footer { padding-top: 10px; page-break-inside: avoid; }
-    .footer-left { width: 70%; padding-right: 12px; }
-    .footer-right { width: 30%; padding-top: 28px; text-align: center; vertical-align: top; }
+    .footer-left { width: 62%; padding-right: 12px; vertical-align: top; }
+    .footer-right { width: 38%; padding-left: 18px; text-align: center; vertical-align: top; }
     .footer-copy { font-size: 10px; line-height: 1.8; color: #334155; }
-    .salesperson-block { text-align: left; margin-top: 24px; }
-    .salesperson-name { margin-top: 0; padding-top: 16px; border-top: 2px solid #dc2626; display: block; width: 120px; font-size: 16px; font-weight: 900; text-transform: uppercase; color: #dc2626; text-align: left; }
+    .footer-signatures { width: 100%; margin-top: 28px; border-collapse: collapse; }
+    .footer-signatures td { vertical-align: top; }
+    .footer-signatures-left { width: 62%; padding-right: 12px; }
+    .footer-signatures-right { width: 38%; padding-left: 18px; }
+    .salesperson-block { text-align: left; }
+    .salesperson-name { margin-top: 0; padding-top: 12px; border-top: 2px solid #dc2626; display: block; width: 220px; white-space: nowrap; font-size: 16px; font-weight: 900; text-transform: uppercase; color: #dc2626; text-align: left; }
     .salesperson-meta { margin-top: 6px; font-size: 9px; color: #475569; }
     .salesperson-meta span { margin-right: 12px; }
-    .signature-line { width: 190px; margin: 52px auto 0; padding-top: 10px; border-top: 2px solid #dc2626; font-size: 10px; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase; color: #020617; }
+    .signature-wrap { width: 220px; margin-left: auto; }
+    .signature-line { width: 220px; margin: 0 0 0 auto; padding-top: 12px; border-top: 2px solid #dc2626; font-size: 10px; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase; color: #020617; text-align: center; }
   </style>
 </head>
 <body>
@@ -188,11 +193,6 @@
                 <?php if($quotation['customer']['gst_number']): ?> <span>GSTIN: <?php echo e($quotation['customer']['gst_number']); ?></span> <?php endif; ?>
               </div>
             </div>
-            <div class="intro">
-              <p><strong>Dear Sir,</strong></p>
-              <p>We are indeed thankful to you for showing interest in our products.</p>
-              <p>As per the discussion, please find here our most technically viable offer for your consideration.</p>
-            </div>
             </td>
             <td class="top-right">
               <div class="detail-heading">Quotation Details<div class="accent"></div></div>
@@ -215,6 +215,11 @@
             </td>
           </tr>
         </table>
+        <div class="intro">
+          <p><strong>Dear Sir,</strong></p>
+          <p>We are indeed thankful to you for showing interest in our products.</p>
+          <p>As per the discussion, please find here our most technically viable offer for your consideration.</p>
+        </div>
         <div class="items-wrap">
           <table class="items-table">
             <thead>
@@ -304,20 +309,25 @@
           <table class="footer-table">
             <tr>
               <td class="footer-left">
-                <table style="width:100%; border-collapse: collapse;">
-                  <tr>
-                    <td class="footer-copy" style="text-align:left;">
-                      Thank you again for showing your interest with us. Looking forward for a healthy and long term relationship with you.<br>
-                      Assuring you the best quality and services all the times.
-                      <div class="salesperson-block">
-                        <div class="salesperson-name"><?php echo e($quotation['salesperson']['name']); ?></div>
-                        <div class="salesperson-meta"><?php if($quotation['salesperson']['phone']): ?> <span>Phone: <?php echo e($quotation['salesperson']['phone']); ?></span> <?php endif; ?> <?php if($quotation['salesperson']['email']): ?> <span>Email: <?php echo e($quotation['salesperson']['email']); ?></span> <?php endif; ?></div>
-                      </div>
-                    </td>
-                  </tr>
-                </table>
+                <div class="footer-copy" style="text-align:left;">
+                  Thank you again for showing your interest with us. Looking forward for a healthy and long term relationship with you.<br>
+                  Assuring you the best quality and services all the times.
+                </div>
               </td>
-              <td class="footer-right"><div class="signature-line">Authorized Signature</div></td>
+              <td class="footer-right"></td>
+            </tr>
+          </table>
+          <table class="footer-signatures">
+            <tr>
+              <td class="footer-signatures-left">
+                <div class="salesperson-block">
+                  <div class="salesperson-name"><?php echo e($quotation['salesperson']['name']); ?></div>
+                  <div class="salesperson-meta"><?php if($quotation['salesperson']['phone']): ?> <span>Phone: <?php echo e($quotation['salesperson']['phone']); ?></span> <?php endif; ?> <?php if($quotation['salesperson']['email']): ?> <span>Email: <?php echo e($quotation['salesperson']['email']); ?></span> <?php endif; ?></div>
+                </div>
+              </td>
+              <td class="footer-signatures-right">
+                <div class="signature-wrap"><div class="signature-line">Authorized Signature</div></div>
+              </td>
             </tr>
           </table>
         </div>

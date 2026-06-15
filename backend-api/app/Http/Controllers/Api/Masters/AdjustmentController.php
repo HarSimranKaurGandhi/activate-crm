@@ -54,6 +54,13 @@ class AdjustmentController extends ApiController
         );
     }
 
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->adjustments->delete($this->adjustments->find($id));
+
+        return $this->ok('Adjustment deleted successfully');
+    }
+
     public function status(StatusRequest $request, int|string $id): JsonResponse
     {
         $adjustment = $this->adjustments->find($id);

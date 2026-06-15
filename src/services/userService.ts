@@ -16,6 +16,9 @@ export const userService = {
   async update(id: string, payload: Record<string, unknown>) {
     return unwrap<any>(await apiClient.put(`/users/${id}`, payload));
   },
+  async remove(id: string) {
+    return unwrap<any>(await apiClient.delete(`/users/${id}`));
+  },
   async status(id: string, isActive: boolean) {
     return unwrap<any>(await apiClient.patch(`/users/${id}/status`, { is_active: isActive }));
   },

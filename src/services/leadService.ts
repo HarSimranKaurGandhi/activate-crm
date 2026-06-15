@@ -13,4 +13,7 @@ export const leadService = {
   async update(id: string, payload: any) {
     return unwrap<any>(await apiClient.put(`/leads/${id}`, payload));
   },
+  async remove(id: string) {
+    return unwrap<any>(await apiClient.delete(`/leads/${id}`));
+  },
 };

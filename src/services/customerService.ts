@@ -13,6 +13,9 @@ export const customerService = {
   async update(id: string, payload: Record<string, unknown>) {
     return unwrap<any>(await apiClient.put(`/customers/${id}`, payload));
   },
+  async remove(id: string) {
+    return unwrap<any>(await apiClient.delete(`/customers/${id}`));
+  },
   async status(id: string, isActive: boolean) {
     return unwrap<any>(await apiClient.patch(`/customers/${id}/status`, { is_active: isActive }));
   },
@@ -20,4 +23,3 @@ export const customerService = {
     return unwrapEnvelope<any[]>(await apiClient.get(`/customers/${id}/quotations`, { params }));
   },
 };
-

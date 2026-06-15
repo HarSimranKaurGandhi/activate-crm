@@ -49,6 +49,13 @@ class QuotationController extends ApiController
         );
     }
 
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->quotations->delete($this->quotations->find($id));
+
+        return $this->ok('Quotation deleted successfully');
+    }
+
     public function duplicate(Request $request, int|string $id): JsonResponse
     {
         return $this->ok(

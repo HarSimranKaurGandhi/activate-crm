@@ -132,6 +132,19 @@ class QuotationService extends CrudService
         });
     }
 
+    public function delete($model): void
+    {
+        DB::transaction(function () use ($model): void {
+            $model->items->each(fn ($item) => $item->discountOverrides()->delete());
+            $model->items()->delete();
+            $model->adjustments()->delete();
+            $model->terms()->delete();
+            $model->approvals()->delete();
+            $model->files()->delete();
+            $model->delete();
+        });
+    }
+
     public function defaults(): array
     {
         return [

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '../auth/AuthContext';
 import { categoryService, brandService, adjustmentService, termService, customerFieldService } from '../../services/masterService';
@@ -65,6 +65,7 @@ interface DataContextType {
   quotations: any[];
   addQuotation: (quotation: any) => Promise<void>;
   updateQuotation: (id: string, quotation: any) => Promise<void>;
+  deleteQuotation: (id: string) => Promise<void>;
   submitQuotationForApproval: (id: string) => Promise<void>;
   approveQuotation: (id: string, remarks?: string) => Promise<void>;
   rejectQuotation: (id: string, remarks: string) => Promise<void>;
@@ -111,6 +112,7 @@ export const useData = () => {
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { token } = useAuth();
+  const [pathname, setPathname] = useState(() => window.location.pathname);
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -121,61 +123,226 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [terms, setTerms] = useState<any[]>([]);
   const [customFields, setCustomFields] = useState<any[]>([]);
   const [settings, setSettings] = useState(emptySettings);
+  const loadedRef = useRef<Record<string, boolean>>({});
+  const inFlightRef = useRef<Record<string, Promise<void> | null>>({});
 
-  const loadSettings = useCallback(async () => {
-    const [company, banks, numbering] = await Promise.all([
-      settingsService.company(),
-      settingsService.bankDetails(),
-      settingsService.quotationNumbering(),
-    ]);
-    const bankList = asArray(banks);
-    const defaultBank = bankList.find((bank: any) => bank.is_default) || bankList[0];
-    setSettings(mapCompanySettings(company, defaultBank, numbering));
-  }, []);
+  const runLoader = useCallback(async (key: string, loader: () => Promise<void>, force = false) => {
+    if (!token) return;
+
+    if (!force && loadedRef.current[key]) return;
+    if (!force && inFlightRef.current[key]) return inFlightRef.current[key];
+
+    const promise = loader()
+      .then(() => {
+        loadedRef.current[key] = true;
+      })
+      .finally(() => {
+        inFlightRef.current[key] = null;
+      });
+
+    inFlightRef.current[key] = promise;
+    return promise;
+  }, [token]);
+
+  const loadSettings = useCallback(async (force = false) => {
+    return runLoader('settings', async () => {
+      const [company, banks, numbering] = await Promise.all([
+        settingsService.company(),
+        settingsService.bankDetails(),
+        settingsService.quotationNumbering(),
+      ]);
+      const bankList = asArray(banks);
+      const defaultBank = bankList.find((bank: any) => bank.is_default) || bankList[0];
+      setSettings(mapCompanySettings(company, defaultBank, numbering));
+    }, force);
+  }, [runLoader]);
+
+  const loadCategories = useCallback(async (force = false) => {
+    return runLoader('categories', async () => {
+      const result = await categoryService.list();
+      setCategories(asArray(result.data).map(mapCategory));
+    }, force);
+  }, [runLoader]);
+
+  const loadBrands = useCallback(async (force = false) => {
+    return runLoader('brands', async () => {
+      const result = await brandService.list();
+      setBrands(asArray(result.data).map(mapBrand));
+    }, force);
+  }, [runLoader]);
+
+  const loadProducts = useCallback(async (force = false) => {
+    return runLoader('products', async () => {
+      const result = await productService.list();
+      setProducts(asArray(result.data).map(mapProduct));
+    }, force);
+  }, [runLoader]);
+
+  const loadCustomers = useCallback(async (force = false) => {
+    return runLoader('customers', async () => {
+      const result = await customerService.list();
+      setCustomers(asArray(result.data).map(mapCustomer));
+    }, force);
+  }, [runLoader]);
+
+  const loadQuotations = useCallback(async (force = false) => {
+    return runLoader('quotations', async () => {
+      const result = await quotationService.list();
+      setQuotations(asArray(result.data).map(mapQuotation));
+    }, force);
+  }, [runLoader]);
+
+  const loadAdjustments = useCallback(async (force = false) => {
+    return runLoader('adjustments', async () => {
+      const result = await adjustmentService.list();
+      setAdjustments(asArray(result.data).map(mapAdjustment));
+    }, force);
+  }, [runLoader]);
+
+  const loadTerms = useCallback(async (force = false) => {
+    return runLoader('terms', async () => {
+      const result = await termService.list();
+      setTerms(asArray(result.data).map(mapTerm));
+    }, force);
+  }, [runLoader]);
+
+  const loadCustomFields = useCallback(async (force = false) => {
+    return runLoader('customFields', async () => {
+      const result = await customerFieldService.list();
+      setCustomFields(asArray(result.data).map(mapCustomerField));
+    }, force);
+  }, [runLoader]);
+
+  const loadForPath = useCallback(async (pathname: string) => {
+    if (!token) return;
+
+    const loaders: Array<Promise<void> | undefined> = [];
+
+    if (pathname === '/') {
+      loaders.push(loadQuotations());
+    }
+
+    if (pathname.startsWith('/quotations')) {
+      if (pathname === '/quotations' || pathname === '/quotations/approvals') {
+        loaders.push(loadQuotations());
+      }
+
+      if (pathname === '/quotations/new' || /^\/quotations\/[^/]+\/edit$/.test(pathname)) {
+        loaders.push(loadCategories(), loadBrands(), loadProducts(), loadAdjustments(), loadTerms(), loadSettings(), loadQuotations());
+      }
+
+      if (/^\/quotations\/[^/]+\/preview$/.test(pathname)) {
+        loaders.push(loadAdjustments(), loadTerms(), loadSettings());
+      }
+    }
+
+    if (pathname.startsWith('/customers')) {
+      loaders.push(loadCustomers());
+      if (pathname === '/customers/new' || /^\/customers\/[^/]+\/edit$/.test(pathname)) {
+        loaders.push(loadCustomFields());
+      }
+    }
+
+    if (pathname.startsWith('/products')) {
+      loaders.push(loadProducts(), loadCategories(), loadBrands());
+    }
+
+    if (pathname === '/masters/categories') loaders.push(loadCategories());
+    if (pathname === '/masters/brands') loaders.push(loadBrands());
+    if (pathname === '/masters/terms') loaders.push(loadTerms());
+    if (pathname === '/masters/adjustments') loaders.push(loadAdjustments());
+    if (pathname === '/masters/custom-fields') loaders.push(loadCustomFields());
+    if (pathname === '/reports') loaders.push(loadQuotations(), loadCustomers(), loadProducts());
+    if (pathname === '/settings') loaders.push(loadSettings());
+
+    if (loaders.length === 0) return;
+
+    setLoading(true);
+    try {
+      await Promise.all(loaders.filter(Boolean) as Promise<void>[]);
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    loadAdjustments,
+    loadBrands,
+    loadCategories,
+    loadCustomFields,
+    loadCustomers,
+    loadProducts,
+    loadQuotations,
+    loadSettings,
+    loadTerms,
+    token,
+  ]);
 
   const refreshAll = useCallback(async () => {
     if (!token) return;
 
     setLoading(true);
     try {
-      const [
-        categoryResult,
-        brandResult,
-        productResult,
-        customerResult,
-        quotationResult,
-        adjustmentResult,
-        termResult,
-        customFieldResult,
-      ] = await Promise.all([
-        categoryService.list(),
-        brandService.list(),
-        productService.list(),
-        customerService.list(),
-        quotationService.list(),
-        adjustmentService.list(),
-        termService.list(),
-        customerFieldService.list(),
+      await Promise.all([
+        loadCategories(true),
+        loadBrands(true),
+        loadProducts(true),
+        loadCustomers(true),
+        loadQuotations(true),
+        loadAdjustments(true),
+        loadTerms(true),
+        loadCustomFields(true),
+        loadSettings(true),
       ]);
-
-      setCategories(asArray(categoryResult.data).map(mapCategory));
-      setBrands(asArray(brandResult.data).map(mapBrand));
-      setProducts(asArray(productResult.data).map(mapProduct));
-      setCustomers(asArray(customerResult.data).map(mapCustomer));
-      setQuotations(asArray(quotationResult.data).map(mapQuotation));
-      setAdjustments(asArray(adjustmentResult.data).map(mapAdjustment));
-      setTerms(asArray(termResult.data).map(mapTerm));
-      setCustomFields(asArray(customFieldResult.data).map(mapCustomerField));
-      await loadSettings();
     } finally {
       setLoading(false);
     }
-  }, [loadSettings, token]);
+  }, [
+    loadAdjustments,
+    loadBrands,
+    loadCategories,
+    loadCustomFields,
+    loadCustomers,
+    loadProducts,
+    loadQuotations,
+    loadSettings,
+    loadTerms,
+    token,
+  ]);
+
+  useEffect(() => {
+    const notify = () => setPathname(window.location.pathname);
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function (...args) {
+      const result = originalPushState.apply(this, args);
+      window.dispatchEvent(new Event('locationchange'));
+      return result;
+    };
+
+    window.history.replaceState = function (...args) {
+      const result = originalReplaceState.apply(this, args);
+      window.dispatchEvent(new Event('locationchange'));
+      return result;
+    };
+
+    window.addEventListener('popstate', notify);
+    window.addEventListener('locationchange', notify);
+
+    return () => {
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+      window.removeEventListener('popstate', notify);
+      window.removeEventListener('locationchange', notify);
+    };
+  }, []);
 
   useEffect(() => {
     if (token) {
-      refreshAll();
+      loadForPath(pathname);
     } else {
+      loadedRef.current = {};
+      inFlightRef.current = {};
       setProducts([]);
       setCustomers([]);
       setQuotations([]);
@@ -186,7 +353,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCustomFields([]);
       setSettings(emptySettings);
     }
-  }, [refreshAll, token]);
+  }, [loadForPath, pathname, token]);
 
   const replaceById = (setter: React.Dispatch<React.SetStateAction<any[]>>, item: any) => {
     setter((current) => current.map((existing) => (existing.id === item.id ? item : existing)));
@@ -205,8 +372,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       replaceById(setProducts, mapProduct(updated));
     },
     async deleteProduct(id) {
-      const updated = await productService.status(id, false);
-      replaceById(setProducts, mapProduct(updated));
+      await productService.remove(id);
+      setProducts((current) => current.filter((product) => product.id !== id));
     },
     customers,
     async addCustomer(customer) {
@@ -220,8 +387,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       replaceById(setCustomers, mapCustomer(updated));
     },
     async deleteCustomer(id) {
-      const updated = await customerService.status(id, false);
-      replaceById(setCustomers, mapCustomer(updated));
+      await customerService.remove(id);
+      setCustomers((current) => current.filter((customer) => customer.id !== id));
     },
     quotations,
     async addQuotation(quotation) {
@@ -231,6 +398,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async updateQuotation(id, quotation) {
       const updated = await quotationService.update(id, quotationPayload(quotation));
       replaceById(setQuotations, mapQuotation(updated));
+    },
+    async deleteQuotation(id) {
+      await quotationService.remove(id);
+      setQuotations((current) => current.filter((quotation) => quotation.id !== id));
     },
     async submitQuotationForApproval(id) {
       const updated = await quotationService.submitForApproval(id);
@@ -258,8 +429,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       replaceById(setCategories, mapCategory(updated));
     },
     async deleteCategory(id) {
-      const updated = await categoryService.status(id, false);
-      replaceById(setCategories, mapCategory(updated));
+      await categoryService.remove(id);
+      setCategories((current) => current.filter((category) => category.id !== id));
     },
     brands,
     async addBrand(brand) {
@@ -271,8 +442,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       replaceById(setBrands, mapBrand(updated));
     },
     async deleteBrand(id) {
-      const updated = await brandService.status(id, false);
-      replaceById(setBrands, mapBrand(updated));
+      await brandService.remove(id);
+      setBrands((current) => current.filter((brand) => brand.id !== id));
     },
     adjustments,
     async addAdjustment(adjustment) {
@@ -284,8 +455,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       replaceById(setAdjustments, mapAdjustment(updated));
     },
     async deleteAdjustment(id) {
-      const updated = await adjustmentService.status(id, false);
-      replaceById(setAdjustments, mapAdjustment(updated));
+      await adjustmentService.remove(id);
+      setAdjustments((current) => current.filter((adjustment) => adjustment.id !== id));
     },
     terms,
     async addTerm(term) {
@@ -297,8 +468,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       replaceById(setTerms, mapTerm(updated));
     },
     async deleteTerm(id) {
-      const updated = await termService.status(id, false);
-      replaceById(setTerms, mapTerm(updated));
+      await termService.remove(id);
+      setTerms((current) => current.filter((term) => term.id !== id));
     },
     customFields,
     async addCustomField(field) {

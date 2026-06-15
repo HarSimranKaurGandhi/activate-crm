@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Edit, Eye, Plus, Search } from 'lucide-react';
+import { Edit, Eye, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
@@ -64,6 +64,20 @@ export const LeadList = () => {
     status: 'all',
     tag: 'all',
   });
+
+  const handleDelete = async (leadId: string) => {
+    if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await leadService.remove(leadId);
+      setLeads((current) => current.filter((lead) => lead.id !== leadId));
+      toast.success('Lead deleted');
+    } catch {
+      toast.error('Unable to delete lead');
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -216,6 +230,13 @@ export const LeadList = () => {
                     >
                       <Edit className="h-4 w-4" />
                     </button>
+                    <button
+                      onClick={() => void handleDelete(lead.id)}
+                      className="rounded-lg p-2 text-rose-600 transition-colors hover:bg-rose-50"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -278,6 +299,13 @@ export const LeadList = () => {
                             title="Edit"
                           >
                             <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => void handleDelete(lead.id)}
+                            className="rounded-lg p-2 text-rose-600 transition-colors hover:bg-rose-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>

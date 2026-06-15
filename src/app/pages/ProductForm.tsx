@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router';
 import { useData } from '../context/DataContext';
-import { ArrowLeft, Bold, ImagePlus, Italic, List, Save, Underline } from 'lucide-react';
+import { ArrowLeft, Bold, ImagePlus, Italic, List, Save, Trash2, Underline } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../components/common/AsyncState';
@@ -35,6 +35,7 @@ export const ProductForm = () => {
     category: '',
     categoryId: '',
     brand: '',
+    brandId: '',
     unit: 'NOS',
     mrp: 0,
     usualSellingPrice: 0,
@@ -205,11 +206,48 @@ export const ProductForm = () => {
     }));
   };
 
+  const handleRemoveExistingImage = (imageId: string) => {
+    setFormData((current) => {
+      const nextImages = current.images.filter((image) => image.id !== imageId);
+      const nextPrimaryToken = current.primaryImageToken === `existing:${imageId}`
+        ? (nextImages[0]?.id ? `existing:${nextImages[0].id}` : (current.newImageFiles[0] ? 'new:0' : ''))
+        : current.primaryImageToken;
+
+      return {
+        ...current,
+        images: nextImages,
+        primaryImageToken: nextPrimaryToken,
+      };
+    });
+  };
+
+  const handleRemoveNewImage = (imageIndex: number) => {
+    setFormData((current) => {
+      const nextNewImageFiles = current.newImageFiles.filter((_, index) => index !== imageIndex);
+      let nextPrimaryToken = current.primaryImageToken;
+
+      if (current.primaryImageToken === `new:${imageIndex}`) {
+        nextPrimaryToken = current.images[0]?.id ? `existing:${current.images[0].id}` : (nextNewImageFiles[0] ? 'new:0' : '');
+      } else if (current.primaryImageToken.startsWith('new:')) {
+        const currentPrimaryIndex = Number(current.primaryImageToken.split(':')[1]);
+        if (Number.isFinite(currentPrimaryIndex) && currentPrimaryIndex > imageIndex) {
+          nextPrimaryToken = `new:${currentPrimaryIndex - 1}`;
+        }
+      }
+
+      return {
+        ...current,
+        newImageFiles: nextNewImageFiles,
+        primaryImageToken: nextPrimaryToken,
+      };
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
 
-    if (!formData.name || !formData.modelNumber || (!formData.category && !formData.categoryId) || !formData.brand || !formData.unit || formData.mrp < 0 || formData.usualSellingPrice < 0 || formData.leastSellingPrice < 0) {
+    if (!formData.name || !formData.modelNumber || (!formData.category && !formData.categoryId) || !formData.brandId || !formData.unit || formData.mrp < 0 || formData.usualSellingPrice < 0 || formData.leastSellingPrice < 0) {
       toast.error('Please complete the required product fields');
       return;
     }
@@ -268,26 +306,48 @@ export const ProductForm = () => {
               {errors['product_images.0']?.[0] && <p className="mt-2 text-sm text-red-600">{errors['product_images.0'][0]}</p>}
               <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
                 {formData.images.map((image) => (
-                  <button
-                    type="button"
+                  <div
                     key={`existing-${image.id}`}
-                    onClick={() => setFormData({ ...formData, primaryImageToken: `existing:${image.id}` })}
-                    className={`rounded-2xl border p-2 text-left ${formData.primaryImageToken === `existing:${image.id}` ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}
+                    className={`relative rounded-2xl border p-2 text-left ${formData.primaryImageToken === `existing:${image.id}` ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}
                   >
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExistingImage(image.id)}
+                      className="absolute right-3 top-3 rounded-full bg-white/95 p-1.5 text-red-600 shadow-sm hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, primaryImageToken: `existing:${image.id}` })}
+                      className="block w-full text-left"
+                    >
                     <img src={image.imagePath} alt="" className="h-28 w-full rounded-xl object-cover" />
                     <div className="mt-2 text-xs font-medium text-gray-700">{formData.primaryImageToken === `existing:${image.id}` ? 'Primary image' : 'Set as primary'}</div>
-                  </button>
+                    </button>
+                  </div>
                 ))}
                 {formData.newImageFiles.map((file, index) => (
-                  <button
-                    type="button"
+                  <div
                     key={`new-${index}-${file.name}`}
-                    onClick={() => setFormData({ ...formData, primaryImageToken: `new:${index}` })}
-                    className={`rounded-2xl border p-2 text-left ${formData.primaryImageToken === `new:${index}` ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}
+                    className={`relative rounded-2xl border p-2 text-left ${formData.primaryImageToken === `new:${index}` ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}
                   >
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveNewImage(index)}
+                      className="absolute right-3 top-3 rounded-full bg-white/95 p-1.5 text-red-600 shadow-sm hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, primaryImageToken: `new:${index}` })}
+                      className="block w-full text-left"
+                    >
                     <img src={URL.createObjectURL(file)} alt="" className="h-28 w-full rounded-xl object-cover" />
                     <div className="mt-2 text-xs font-medium text-gray-700">{formData.primaryImageToken === `new:${index}` ? 'Primary image' : 'Set as primary'}</div>
-                  </button>
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -346,13 +406,20 @@ export const ProductForm = () => {
               </label>
               <select
                 required
-                value={formData.brand}
-                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                value={formData.brandId || ''}
+                onChange={(e) => {
+                  const selectedBrand = brands.find((brand) => brand.id === e.target.value);
+                  setFormData({
+                    ...formData,
+                    brandId: e.target.value,
+                    brand: selectedBrand?.name || '',
+                  });
+                }}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select Brand</option>
                 {brands.filter(b => b.status === 'active').map(brand => (
-                  <option key={brand.id} value={brand.name}>{brand.name}</option>
+                  <option key={brand.id} value={brand.id}>{brand.name}</option>
                 ))}
               </select>
               {errors.brand_id?.[0] && <p className="text-sm text-red-600 mt-1">{errors.brand_id[0]}</p>}
@@ -438,21 +505,6 @@ export const ProductForm = () => {
                 readOnly
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-600"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status *
-              </label>
-              <select
-                required
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
             </div>
 
             <div className="md:col-span-2">

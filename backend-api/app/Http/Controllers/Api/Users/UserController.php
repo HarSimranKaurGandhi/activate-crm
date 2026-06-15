@@ -64,6 +64,13 @@ class UserController extends ApiController
         );
     }
 
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->users->delete($this->users->find($id));
+
+        return $this->ok('User deleted successfully');
+    }
+
     public function status(StatusRequest $request, int|string $id): JsonResponse
     {
         $user = $this->users->find($id);

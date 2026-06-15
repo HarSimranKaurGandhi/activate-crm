@@ -21,6 +21,9 @@ export const productService = {
 
     return unwrap<any>(await apiClient.put(`/products/${id}`, payload));
   },
+  async remove(id: string) {
+    return unwrap<any>(await apiClient.delete(`/products/${id}`));
+  },
   async status(id: string, isActive: boolean) {
     return unwrap<any>(await apiClient.patch(`/products/${id}/status`, { is_active: isActive }));
   },

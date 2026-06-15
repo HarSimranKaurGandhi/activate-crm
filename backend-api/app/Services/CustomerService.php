@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class CustomerService extends CrudService
 {
@@ -63,6 +64,18 @@ class CustomerService extends CrudService
         $model->update(['is_active' => $isActive]);
 
         return $model->refresh()->load($this->relations);
+    }
+
+    public function delete(Model $model): void
+    {
+        if ($model->quotations()->exists()) {
+            throw new HttpException(422, 'Cannot delete this customer because quotations exist for this customer.');
+        }
+
+        DB::transaction(function () use ($model): void {
+            $model->fieldValues()->delete();
+            $model->delete();
+        });
     }
 
     public function quotationHistory(Customer $customer, Request $request): LengthAwarePaginator

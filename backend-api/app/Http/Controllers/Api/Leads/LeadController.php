@@ -58,4 +58,11 @@ class LeadController extends ApiController
             new LeadResource($this->leads->update($lead, $data))
         );
     }
+
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->leads->delete($this->leads->find($id));
+
+        return $this->ok('Lead deleted successfully');
+    }
 }

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Edit, Trash2, Power } from 'lucide-react';
+import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
@@ -15,7 +15,6 @@ export const CustomerList = () => {
     email: '',
     phone: '',
     city: '',
-    status: 'all',
     rating: 'all',
   });
 
@@ -26,10 +25,9 @@ export const CustomerList = () => {
       const emailMatch = customer.email.toLowerCase().includes(filters.email.trim().toLowerCase());
       const phoneMatch = customer.phone.toLowerCase().includes(filters.phone.trim().toLowerCase());
       const cityMatch = (customer.city || '').toLowerCase().includes(filters.city.trim().toLowerCase());
-      const statusMatch = filters.status === 'all' || customer.status === filters.status;
       const ratingMatch = filters.rating === 'all' || Number(customer.rating || 0) === Number(filters.rating);
 
-      return companyMatch && nameMatch && emailMatch && phoneMatch && cityMatch && statusMatch && ratingMatch;
+      return companyMatch && nameMatch && emailMatch && phoneMatch && cityMatch && ratingMatch;
     });
   }, [customers, filters]);
 
@@ -46,7 +44,6 @@ export const CustomerList = () => {
       email: '',
       phone: '',
       city: '',
-      status: 'all',
       rating: 'all',
     });
   };
@@ -105,15 +102,6 @@ export const CustomerList = () => {
               onChange={(event) => updateFilter('city', event.target.value)}
               className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <select
-              value={filters.status}
-              onChange={(event) => updateFilter('status', event.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
             <div className="flex gap-2 md:col-span-3 xl:col-span-1">
               <select
                 value={filters.rating}
@@ -144,7 +132,6 @@ export const CustomerList = () => {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Phone</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Location</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Rating</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -160,14 +147,6 @@ export const CustomerList = () => {
                     <td className="px-6 py-4 text-gray-700">{[customer.city, customer.state].filter(Boolean).join(', ') || '-'}</td>
                     <td className="px-6 py-4 text-gray-700">{customer.rating ? `${customer.rating}/5` : '-'}</td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                        customer.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-700'
-                      }`}>
-                        <Power className="h-3 w-3" />
-                        {customer.status === 'active' ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => navigate(`/customers/${customer.id}/edit`)}
@@ -178,13 +157,13 @@ export const CustomerList = () => {
                         </button>
                         <button
                           onClick={async () => {
-                            if (confirm('Deactivate this customer?')) {
+                            if (confirm('Delete this customer permanently?')) {
                               await deleteCustomer(customer.id);
-                              toast.success('Customer deactivated');
+                              toast.success('Customer deleted');
                             }
                           }}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Deactivate"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

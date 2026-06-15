@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Edit, Trash2, Power, ImageIcon } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, ImageIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { toast } from 'sonner';
@@ -14,7 +14,6 @@ export const ProductList = () => {
     search: '',
     category: 'all',
     brand: 'all',
-    status: 'all',
     gst: 'all',
   });
   const [bulkUploading, setBulkUploading] = useState(false);
@@ -32,10 +31,9 @@ export const ProductList = () => {
       ].some((value) => String(value || '').toLowerCase().includes(search));
       const matchesCategory = filters.category === 'all' || product.category === filters.category;
       const matchesBrand = filters.brand === 'all' || product.brand === filters.brand;
-      const matchesStatus = filters.status === 'all' || product.status === filters.status;
       const matchesGst = filters.gst === 'all' || Number(product.gstPercent) === Number(filters.gst);
 
-      return matchesSearch && matchesCategory && matchesBrand && matchesStatus && matchesGst;
+      return matchesSearch && matchesCategory && matchesBrand && matchesGst;
     });
   }, [filters, products]);
 
@@ -55,7 +53,6 @@ export const ProductList = () => {
       search: '',
       category: 'all',
       brand: 'all',
-      status: 'all',
       gst: 'all',
     });
   };
@@ -152,15 +149,6 @@ export const ProductList = () => {
                 <option key={brand.id} value={brand.name}>{brand.name}</option>
               ))}
             </select>
-            <select
-              value={filters.status}
-              onChange={(event) => updateFilter('status', event.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
             <div className="flex gap-2">
               <select
                 value={filters.gst}
@@ -193,7 +181,6 @@ export const ProductList = () => {
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Selling</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Least</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">GST / HSN</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -225,14 +212,6 @@ export const ProductList = () => {
                       <div className="text-sm text-gray-500">{product.hsnCode || '-'}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                        product.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-700'
-                      }`}>
-                        <Power className="h-3 w-3" />
-                        {product.status === 'active' ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => navigate(`/products/${product.id}/edit`)}
@@ -243,13 +222,13 @@ export const ProductList = () => {
                         </button>
                         <button
                           onClick={async () => {
-                            if (confirm('Deactivate this product?')) {
+                            if (confirm('Delete this product permanently?')) {
                               await deleteProduct(product.id);
-                              toast.success('Product deactivated');
+                              toast.success('Product deleted');
                             }
                           }}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Deactivate"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

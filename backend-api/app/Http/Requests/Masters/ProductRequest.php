@@ -27,6 +27,8 @@ class ProductRequest extends FormRequest
             'product_images' => ['sometimes', 'array'],
             'product_images.*' => ['file', 'image', 'max:5120'],
             'primary_image_token' => ['nullable', 'string', 'max:100'],
+            'keep_existing_image_ids' => ['sometimes', 'array'],
+            'keep_existing_image_ids.*' => ['integer'],
             'brochure_path' => ['nullable', 'string', 'max:500'],
             'is_active' => ['sometimes', 'boolean'],
         ];

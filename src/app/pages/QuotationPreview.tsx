@@ -131,12 +131,15 @@ export const QuotationPreview = () => {
     };
   };
 
-  const displayNetAmount = (amount: number) => (
+  const displayRoundedAmount = (amount: number) => (
     quotation.roundOffNetAmount ? Math.round(amount || 0) : amount
   );
 
-  const formatMoney = (amount: number) =>
-    `₹${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  const formatMoney = (amount: number, options?: { whole?: boolean }) =>
+    `₹${Number(amount || 0).toLocaleString('en-IN', {
+      minimumFractionDigits: options?.whole ? 0 : 0,
+      maximumFractionDigits: options?.whole ? 0 : 2,
+    })}`;
 
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-IN', {
@@ -280,11 +283,13 @@ export const QuotationPreview = () => {
                   </div>
                 </div>
               ) : (
-                <img
-                  src={settings.letterhead}
-                  alt="Company letterhead"
-                  className="block h-36 w-full object-cover object-top print:h-40"
-                />
+                <div className="flex justify-center bg-gradient-to-b from-slate-50 to-white px-3 py-2 print:px-0 print:py-0">
+                  <img
+                    src={settings.letterhead}
+                    alt="Company letterhead"
+                    className="block max-h-44 w-auto max-w-full object-contain object-top print:max-h-40"
+                  />
+                </div>
               )}
             </div>
           )}
@@ -410,12 +415,6 @@ export const QuotationPreview = () => {
                       {quotation.customer.email && <span>Email: {quotation.customer.email}</span>}
                     </div>
                   </div>
-
-                  <div className="mt-6 max-w-2xl border-t border-slate-300 pt-4 text-sm leading-7 text-slate-800 sm:mt-7 sm:pt-5 sm:text-[15px] sm:leading-8">
-                    <p className="font-bold text-slate-950">Dear Sir,</p>
-                    <p>We are indeed thankful to you for showing interest in our products.</p>
-                    <p>As per the discussion, please find here our most technically viable offer for your consideration.</p>
-                  </div>
                 </div>
 
                 <div>
@@ -441,6 +440,12 @@ export const QuotationPreview = () => {
                 </div>
               </div>
 
+              <div className="mb-6 border-t border-slate-300 pt-4 text-sm leading-7 text-slate-800 sm:mb-7 sm:pt-5 sm:text-[15px] sm:leading-8">
+                <p className="font-bold text-slate-950">Dear Sir,</p>
+                <p>We are indeed thankful to you for showing interest in our products.</p>
+                <p>As per the discussion, please find here our most technically viable offer for your consideration.</p>
+              </div>
+
               {/* Product Table */}
               <div className="mb-5 hidden overflow-x-auto border border-slate-300 md:block">
                 <table className="w-full table-fixed border-collapse text-sm">
@@ -448,38 +453,38 @@ export const QuotationPreview = () => {
                     {quotation.showDiscount && quotation.showItemWiseGst ? (
                       <>
                         <col style={{ width: '3%' }} />
-                        <col style={{ width: '27%' }} />
-                        <col style={{ width: '25%' }} />
-                        <col style={{ width: '11%' }} />
+                        <col style={{ width: '21%' }} />
+                        <col style={{ width: '38%' }} />
+                        <col style={{ width: '10%' }} />
                         <col style={{ width: '4%' }} />
                         <col style={{ width: '6%' }} />
                         <col style={{ width: '8%' }} />
-                        <col style={{ width: '16%' }} />
+                        <col style={{ width: '10%' }} />
                       </>
                     ) : quotation.showDiscount ? (
                       <>
                         <col style={{ width: '3%' }} />
-                        <col style={{ width: '28%' }} />
-                        <col style={{ width: '27%' }} />
-                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '22%' }} />
+                        <col style={{ width: '42%' }} />
+                        <col style={{ width: '10%' }} />
                         <col style={{ width: '5%' }} />
                         <col style={{ width: '7%' }} />
-                        <col style={{ width: '18%' }} />
+                        <col style={{ width: '11%' }} />
                       </>
                     ) : (
                       <>
                         <col style={{ width: '3%' }} />
-                        <col style={{ width: '30%' }} />
-                        <col style={{ width: '27%' }} />
-                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '23%' }} />
+                        <col style={{ width: '44%' }} />
+                        <col style={{ width: '10%' }} />
                         <col style={{ width: '4%' }} />
                         {quotation.showItemWiseGst ? (
                           <>
+                            <col style={{ width: '7%' }} />
                             <col style={{ width: '9%' }} />
-                            <col style={{ width: '15%' }} />
                           </>
                         ) : (
-                          <col style={{ width: '24%' }} />
+                          <col style={{ width: '16%' }} />
                         )}
                       </>
                     )}
@@ -500,18 +505,18 @@ export const QuotationPreview = () => {
                     {quotation.items.map((item: any, index: number) => {
                       const { gstAmount, netAmount, discountedUnitPrice } = calculateItemAmounts(item);
                       const productImage = item.product.image || item.product.imageUrl || item.product.photo || item.product.picture;
-                      const displayPrice = quotation.showMrp ? item.price : discountedUnitPrice;
-                      const roundedNetAmount = displayNetAmount(netAmount);
+                      const displayPrice = displayRoundedAmount(quotation.showMrp ? item.price : discountedUnitPrice);
+                      const roundedNetAmount = displayRoundedAmount(netAmount);
 
                       return (
                         <tr key={item.id} className="border-b border-slate-200 align-middle last:border-b-0">
                           <td className="border-r border-slate-200 px-2 py-4 text-center font-black text-slate-950">{index + 1}</td>
                           <td className="border-r border-slate-200 px-3 py-4 text-center">
-                            <div className="mx-auto flex max-w-[220px] flex-col items-center">
+                            <div className="mx-auto flex max-w-[250px] flex-col items-center">
                               {productImage ? (
-                                <img src={productImage} alt={item.product.name} className="mb-3 h-24 w-full object-contain" />
+                                <img src={productImage} alt={item.product.name} className="mb-3 h-36 w-full object-contain" />
                               ) : (
-                                <div className="mb-3 flex h-24 w-full items-center justify-center rounded-xl bg-slate-100 text-xs font-semibold text-slate-400">
+                                <div className="mb-3 flex h-36 w-full items-center justify-center rounded-xl bg-slate-100 text-xs font-semibold text-slate-400">
                                   Product Image
                                 </div>
                               )}
@@ -521,12 +526,14 @@ export const QuotationPreview = () => {
                               )}
                             </div>
                           </td>
-                          <td className="border-r border-slate-200 px-3 py-4 align-top text-xs leading-5 text-slate-700">
-                            <div className="font-medium [&_b]:font-black [&_li]:mb-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-black [&_ul]:list-disc [&_ul]:pl-5 [&_ul_li::marker]:text-red-600">
+                          <td className="border-r border-slate-200 px-3 py-4 align-top text-[8.5px] leading-[1.24] text-slate-700">
+                            <div className="quotation-specs font-medium [&_b]:font-black [&_li]:mb-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-black [&_ul]:list-disc [&_ul]:pl-5 [&_ul_li::marker]:text-red-600">
                               <div dangerouslySetInnerHTML={renderHtml(item.specifications || item.product.description || '')} />
                             </div>
                           </td>
-                          <td className="border-r border-slate-200 px-3 py-4 text-right font-black text-slate-950">{formatMoney(displayPrice)}</td>
+                          <td className="border-r border-slate-200 px-3 py-4 text-right font-black text-slate-950">
+                            {formatMoney(displayPrice, { whole: quotation.roundOffNetAmount })}
+                          </td>
                           <td className="border-r border-slate-200 px-2 py-4 text-center font-black text-slate-950">{item.quantity}</td>
                           {quotation.showDiscount && (
                             <td className="border-r border-slate-200 px-2 py-4 text-center font-bold text-slate-700">
@@ -539,7 +546,9 @@ export const QuotationPreview = () => {
                               <div className="mt-1 text-xs text-slate-500">{formatMoney(gstAmount)}</div>
                             </td>
                           )}
-                          <td className="px-3 py-4 text-right text-base font-black text-slate-950">{formatMoney(roundedNetAmount)}</td>
+                          <td className="px-3 py-4 text-right text-base font-black text-slate-950">
+                            {formatMoney(roundedNetAmount, { whole: quotation.roundOffNetAmount })}
+                          </td>
                         </tr>
                       );
                     })}
@@ -551,8 +560,8 @@ export const QuotationPreview = () => {
                 {quotation.items.map((item: any, index: number) => {
                   const { gstAmount, netAmount, discountedUnitPrice } = calculateItemAmounts(item);
                   const productImage = item.product.image || item.product.imageUrl || item.product.photo || item.product.picture;
-                  const displayPrice = quotation.showMrp ? item.price : discountedUnitPrice;
-                  const roundedNetAmount = displayNetAmount(netAmount);
+                  const displayPrice = displayRoundedAmount(quotation.showMrp ? item.price : discountedUnitPrice);
+                  const roundedNetAmount = displayRoundedAmount(netAmount);
 
                   return (
                     <div key={item.id} className="overflow-hidden border border-slate-300 bg-white">
@@ -576,19 +585,19 @@ export const QuotationPreview = () => {
                           </div>
                         </div>
 
-                        <div className="text-xs leading-5 text-slate-700">
+                        <div className="text-[8.5px] leading-[1.24] text-slate-700">
                           <div className="mb-1 text-[11px] font-black uppercase tracking-wide text-slate-950">Specifications</div>
-                          <div className="[&_b]:font-black [&_li]:mb-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-black [&_ul]:list-disc [&_ul]:pl-5">
+                          <div className="quotation-specs [&_b]:font-black [&_li]:mb-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-black [&_ul]:list-disc [&_ul]:pl-5">
                             <div dangerouslySetInnerHTML={renderHtml(item.specifications || item.product.description || '')} />
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                          <MobileMetric label="Price" value={formatMoney(displayPrice)} />
+                          <MobileMetric label="Price" value={formatMoney(displayPrice, { whole: quotation.roundOffNetAmount })} />
                           <MobileMetric label="Qty" value={String(item.quantity)} />
                           {quotation.showDiscount && <MobileMetric label="Disc%" value={item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'} />}
                           {quotation.showItemWiseGst && <MobileMetric label="GST" value={`${item.product.gstPercent}% (${formatMoney(gstAmount)})`} />}
-                          <MobileMetric label="Net Amount" value={formatMoney(roundedNetAmount)} strong />
+                          <MobileMetric label="Net Amount" value={formatMoney(roundedNetAmount, { whole: quotation.roundOffNetAmount })} strong />
                         </div>
                       </div>
                     </div>
@@ -809,6 +818,14 @@ export const QuotationPreview = () => {
 .pdf-safe .ring-slate-200 {
   box-shadow: 0 0 0 1px #e2e8f0 !important;
 }
+
+.quotation-specs,
+.quotation-specs * {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  color: inherit !important;
+}
       `}</style>
     </div>
   );
@@ -842,4 +859,45 @@ const MobileMetric = ({
   </div>
 );
 
-const renderHtml = (value: string) => ({ __html: value });
+const renderHtml = (value: string) => ({ __html: sanitizeQuotationHtml(value) });
+
+const sanitizeQuotationHtml = (value: string) => {
+  if (!value) {
+    return '';
+  }
+
+  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+    return value;
+  }
+
+  const parser = new DOMParser();
+  const document = parser.parseFromString(value, 'text/html');
+
+  document.body.querySelectorAll('*').forEach((element) => {
+    element.removeAttribute('face');
+    element.removeAttribute('size');
+
+    const style = element.getAttribute('style');
+    if (!style) {
+      return;
+    }
+
+    const sanitizedRules = style
+      .split(';')
+      .map((rule) => rule.trim())
+      .filter(Boolean)
+      .filter((rule) => {
+        const property = rule.split(':')[0]?.trim().toLowerCase();
+
+        return !['font', 'font-family', 'font-size', 'line-height'].includes(property);
+      });
+
+    if (sanitizedRules.length > 0) {
+      element.setAttribute('style', sanitizedRules.join('; '));
+    } else {
+      element.removeAttribute('style');
+    }
+  });
+
+  return document.body.innerHTML;
+};

@@ -54,6 +54,13 @@ class BrandController extends ApiController
         );
     }
 
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->brands->delete($this->brands->find($id));
+
+        return $this->ok('Brand deleted successfully');
+    }
+
     public function status(StatusRequest $request, int|string $id): JsonResponse
     {
         $brand = $this->brands->find($id);

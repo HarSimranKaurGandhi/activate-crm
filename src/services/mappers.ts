@@ -143,6 +143,12 @@ export const productPayload = (product: any, categories: any[] = [], brands: any
     payload.append('primary_image_token', product.primaryImageToken);
   }
 
+  (product.images || []).forEach((image: any) => {
+    if (image?.id) {
+      payload.append('keep_existing_image_ids[]', String(image.id));
+    }
+  });
+
   (product.newImageFiles || []).forEach((file: File) => {
     payload.append('product_images[]', file);
   });

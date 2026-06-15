@@ -1,14 +1,15 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Calendar, Eye, Edit } from 'lucide-react';
+import { Plus, Search, Calendar, Eye, Edit, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { LoadingState } from '../components/common/AsyncState';
 import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
+import { toast } from 'sonner';
 
 export const QuotationList = () => {
   const navigate = useNavigate();
-  const { quotations, loading } = useData();
+  const { quotations, loading, deleteQuotation } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -29,6 +30,19 @@ export const QuotationList = () => {
     return matchesSearch && matchesStatus && matchesDate;
   });
   const pagination = usePagination(filteredQuotations, 10);
+
+  const handleDelete = async (quotationId: string) => {
+    if (!confirm('Are you sure you want to delete this quotation? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteQuotation(quotationId);
+      toast.success('Quotation deleted');
+    } catch {
+      toast.error('Unable to delete quotation');
+    }
+  };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -170,6 +184,13 @@ export const QuotationList = () => {
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => void handleDelete(quotation.id)}
+                          className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

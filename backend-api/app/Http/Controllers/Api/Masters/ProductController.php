@@ -56,6 +56,13 @@ class ProductController extends ApiController
         );
     }
 
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->products->delete($this->products->find($id));
+
+        return $this->ok('Product deleted successfully');
+    }
+
     public function status(StatusRequest $request, int|string $id): JsonResponse
     {
         $product = $this->products->find($id);

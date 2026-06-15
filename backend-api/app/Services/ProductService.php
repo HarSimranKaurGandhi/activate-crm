@@ -73,7 +73,7 @@ class ProductService extends CrudService
         return DB::transaction(function () use ($data): Product {
             $imageFiles = $data['product_images'] ?? [];
             $primaryToken = $data['primary_image_token'] ?? null;
-            unset($data['product_images'], $data['primary_image_token']);
+            unset($data['product_images'], $data['primary_image_token'], $data['keep_existing_image_ids']);
 
             $data = $this->applyCategoryAttributes($data);
             $data['is_active'] = $data['is_active'] ?? true;
@@ -91,14 +91,19 @@ class ProductService extends CrudService
         return DB::transaction(function () use ($model, $data): Product {
             $imageFiles = $data['product_images'] ?? [];
             $primaryToken = $data['primary_image_token'] ?? null;
-            unset($data['product_images'], $data['primary_image_token']);
+            $keepExistingImageIds = collect($data['keep_existing_image_ids'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->values()
+                ->all();
+            unset($data['product_images'], $data['primary_image_token'], $data['keep_existing_image_ids']);
 
             $data = $this->applyCategoryAttributes($data, $model);
             if (array_key_exists('unit', $data)) {
                 $data['unit'] = $this->normalizeMeasurementUnitCode($data['unit']);
             }
             $model->update($data);
-            $this->syncImages($model, $this->normalizeUploadFiles($imageFiles), $primaryToken);
+            $this->syncImages($model, $this->normalizeUploadFiles($imageFiles), $primaryToken, $keepExistingImageIds);
 
             return $model->refresh()->load($this->relations);
         });
@@ -109,6 +114,20 @@ class ProductService extends CrudService
         $model->update(['is_active' => $isActive]);
 
         return $model->refresh()->load($this->relations);
+    }
+
+    public function delete($model): void
+    {
+        DB::transaction(function () use ($model): void {
+            $model->images()->get()->each(function (ProductImage $image): void {
+                PublicAsset::delete($image->image_path);
+                $image->delete();
+            });
+
+            PublicAsset::delete($model->image_path);
+            PublicAsset::delete($model->brochure_path);
+            $model->delete();
+        });
     }
 
     protected function applyFilters(Builder $query, Request $request): Builder
@@ -245,8 +264,18 @@ class ProductService extends CrudService
     /**
      * @param  array<int, UploadedFile>  $imageFiles
      */
-    private function syncImages(Product $product, array $imageFiles, ?string $primaryToken): void
+    private function syncImages(Product $product, array $imageFiles, ?string $primaryToken, ?array $keepExistingImageIds = null): void
     {
+        if (is_array($keepExistingImageIds)) {
+            $product->images()
+                ->whereNotIn('id', $keepExistingImageIds)
+                ->get()
+                ->each(function (ProductImage $image): void {
+                    PublicAsset::delete($image->image_path);
+                    $image->delete();
+                });
+        }
+
         $createdImages = collect();
 
         foreach ($imageFiles as $index => $imageFile) {
@@ -258,7 +287,7 @@ class ProductService extends CrudService
             ]));
         }
 
-        $allImages = $product->images()->get();
+        $allImages = $product->images()->orderBy('display_order')->orderBy('id')->get()->values();
 
         if ($allImages->isEmpty()) {
             $product->update(['image_path' => null]);
@@ -272,6 +301,12 @@ class ProductService extends CrudService
             ->update(['is_primary' => false]);
 
         $primaryImage->update(['is_primary' => true]);
+        $allImages->values()->each(function (ProductImage $image, int $index) use ($primaryImage): void {
+            $image->update([
+                'display_order' => $index,
+                'is_primary' => $image->is($primaryImage),
+            ]);
+        });
         $product->update(['image_path' => $primaryImage->image_path]);
     }
 

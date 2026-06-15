@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::middleware('role:admin')->group(function (): void {
         Route::get('users', [UserController::class, 'index']);
         Route::post('users', [UserController::class, 'store']);
+        Route::delete('users/{id}', [UserController::class, 'destroy']);
         Route::patch('users/{id}/status', [UserController::class, 'status']);
         Route::get('users/{id}', [UserController::class, 'show']);
         Route::put('users/{id}', [UserController::class, 'update']);
@@ -46,6 +47,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('categories/dropdown', [CategoryController::class, 'dropdown']);
     Route::get('categories', [CategoryController::class, 'index']);
     Route::post('categories', [CategoryController::class, 'store']);
+    Route::delete('categories/{id}', [CategoryController::class, 'destroy']);
     Route::patch('categories/{id}/status', [CategoryController::class, 'status']);
     Route::get('categories/{id}', [CategoryController::class, 'show']);
     Route::put('categories/{id}', [CategoryController::class, 'update']);
@@ -53,6 +55,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('brands/dropdown', [BrandController::class, 'dropdown']);
     Route::get('brands', [BrandController::class, 'index']);
     Route::post('brands', [BrandController::class, 'store']);
+    Route::delete('brands/{id}', [BrandController::class, 'destroy']);
     Route::patch('brands/{id}/status', [BrandController::class, 'status']);
     Route::get('brands/{id}', [BrandController::class, 'show']);
     Route::put('brands/{id}', [BrandController::class, 'update']);
@@ -64,6 +67,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('products/bulk-upload', [ProductController::class, 'bulkUpload']);
     Route::get('products', [ProductController::class, 'index']);
     Route::post('products', [ProductController::class, 'store']);
+    Route::delete('products/{id}', [ProductController::class, 'destroy']);
     Route::patch('products/{id}/status', [ProductController::class, 'status']);
     Route::get('products/{id}', [ProductController::class, 'show']);
     Route::put('products/{id}', [ProductController::class, 'update']);
@@ -72,6 +76,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('adjustments/reorder', [AdjustmentController::class, 'reorder']);
     Route::get('adjustments', [AdjustmentController::class, 'index']);
     Route::post('adjustments', [AdjustmentController::class, 'store']);
+    Route::delete('adjustments/{id}', [AdjustmentController::class, 'destroy']);
     Route::patch('adjustments/{id}/status', [AdjustmentController::class, 'status']);
     Route::get('adjustments/{id}', [AdjustmentController::class, 'show']);
     Route::put('adjustments/{id}', [AdjustmentController::class, 'update']);
@@ -80,6 +85,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('terms/reorder', [TermController::class, 'reorder']);
     Route::get('terms', [TermController::class, 'index']);
     Route::post('terms', [TermController::class, 'store']);
+    Route::delete('terms/{id}', [TermController::class, 'destroy']);
     Route::patch('terms/{id}/status', [TermController::class, 'status']);
     Route::get('terms/{id}', [TermController::class, 'show']);
     Route::put('terms/{id}', [TermController::class, 'update']);
@@ -95,6 +101,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('customers', [CustomerController::class, 'index']);
     Route::post('customers', [CustomerController::class, 'store']);
     Route::get('customers/{id}/quotations', [CustomerController::class, 'quotations']);
+    Route::delete('customers/{id}', [CustomerController::class, 'destroy']);
     Route::patch('customers/{id}/status', [CustomerController::class, 'status']);
     Route::get('customers/{id}', [CustomerController::class, 'show']);
     Route::put('customers/{id}', [CustomerController::class, 'update']);
@@ -106,6 +113,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::get('leads', [LeadController::class, 'index']);
     Route::post('leads', [LeadController::class, 'store']);
+    Route::delete('leads/{id}', [LeadController::class, 'destroy']);
     Route::get('leads/{id}', [LeadController::class, 'show']);
     Route::put('leads/{id}', [LeadController::class, 'update']);
 
@@ -121,6 +129,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('quotations/{id}/activity', [QuotationApprovalController::class, 'activity']);
     Route::get('quotations', [QuotationController::class, 'index']);
     Route::post('quotations', [QuotationController::class, 'store']);
+    Route::delete('quotations/{id}', [QuotationController::class, 'destroy']);
     Route::get('quotations/{id}', [QuotationController::class, 'show']);
     Route::put('quotations/{id}', [QuotationController::class, 'update']);
 

@@ -54,6 +54,13 @@ class CategoryController extends ApiController
         );
     }
 
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->categories->delete($this->categories->find($id));
+
+        return $this->ok('Category deleted successfully');
+    }
+
     public function status(StatusRequest $request, int|string $id): JsonResponse
     {
         $category = $this->categories->find($id);

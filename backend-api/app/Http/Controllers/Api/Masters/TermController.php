@@ -54,6 +54,13 @@ class TermController extends ApiController
         );
     }
 
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->terms->delete($this->terms->find($id));
+
+        return $this->ok('Term deleted successfully');
+    }
+
     public function status(StatusRequest $request, int|string $id): JsonResponse
     {
         $term = $this->terms->find($id);

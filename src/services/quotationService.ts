@@ -16,6 +16,9 @@ export const quotationService = {
   async update(id: string, payload: Record<string, unknown>) {
     return unwrap<any>(await apiClient.put(`/quotations/${id}`, payload));
   },
+  async remove(id: string) {
+    return unwrap<any>(await apiClient.delete(`/quotations/${id}`));
+  },
   async preview(id: string) {
     return unwrap<any>(await apiClient.get(`/quotations/${id}/preview`));
   },

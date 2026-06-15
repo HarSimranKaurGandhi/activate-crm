@@ -51,6 +51,16 @@ class BrandService extends MasterService
         return $model->refresh();
     }
 
+    public function delete(Model $model): void
+    {
+        if ($model instanceof Brand) {
+            PublicAsset::delete($model->logo);
+            PublicAsset::delete($model->catalog_path);
+        }
+
+        parent::delete($model);
+    }
+
     private function normalizeData(array $data, ?Brand $brand = null): array
     {
         $payload = [

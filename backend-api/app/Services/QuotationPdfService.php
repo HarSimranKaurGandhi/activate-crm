@@ -203,9 +203,15 @@ class QuotationPdfService
                     'product_name' => $item->product_name,
                     'model_number' => $item->model_number,
                     'product_image_src' => $this->assetSource($item->product_image_path),
-                    'specifications_html' => $item->specifications ?: '',
-                    'edited_price_label' => $this->money($item->edited_price),
-                    'discounted_price_label' => $this->money($item->price_after_discount),
+                    'specifications_html' => $this->sanitizeQuotationHtml($item->specifications ?: ''),
+                    'edited_price_label' => $this->money(
+                        $roundOffNetAmount ? round((float) $item->edited_price) : (float) $item->edited_price,
+                        $roundOffNetAmount ? 0 : 2
+                    ),
+                    'discounted_price_label' => $this->money(
+                        $roundOffNetAmount ? round((float) $item->price_after_discount) : (float) $item->price_after_discount,
+                        $roundOffNetAmount ? 0 : 2
+                    ),
                     'quantity_label' => $this->number($item->quantity),
                     'discount_percent_label' => (float) $item->discount_percent > 0 ? $this->number($item->discount_percent).'%' : '-',
                     'gst_percent_label' => $this->number($item->gst_percent).'%',
@@ -213,7 +219,8 @@ class QuotationPdfService
                     'net_amount_label' => $this->money(
                         $roundOffNetAmount
                             ? round((float) $item->taxable_amount)
-                            : (float) $item->taxable_amount
+                            : (float) $item->taxable_amount,
+                        $roundOffNetAmount ? 0 : 2
                     ),
                     'line_total_label' => $this->money($item->line_total),
                 ];
@@ -256,9 +263,60 @@ class QuotationPdfService
         ])->render();
     }
 
-    private function money(mixed $value): string
+    private function money(mixed $value, int $decimals = 2): string
     {
-        return '₹'.number_format((float) $value, 2, '.', ',');
+        $amount = round((float) $value, $decimals);
+        $sign = $amount < 0 ? '-' : '';
+        $absolute = abs($amount);
+
+        $formatted = number_format($absolute, $decimals, '.', '');
+        [$integerPart, $decimalPart] = array_pad(explode('.', $formatted, 2), 2, '');
+
+        if (strlen($integerPart) > 3) {
+            $lastThree = substr($integerPart, -3);
+            $remaining = substr($integerPart, 0, -3);
+            $remaining = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $remaining) ?? $remaining;
+            $integerPart = $remaining.','.$lastThree;
+        }
+
+        return '₹'.$sign.$integerPart.($decimals > 0 ? '.'.$decimalPart : '');
+    }
+
+    private function sanitizeQuotationHtml(string $html): string
+    {
+        if ($html === '') {
+            return '';
+        }
+
+        $html = preg_replace_callback(
+            '/\sstyle=("|\')(.*?)\1/i',
+            function (array $matches): string {
+                $quote = $matches[1];
+                $style = $matches[2];
+
+                $sanitizedRules = collect(explode(';', $style))
+                    ->map(fn (string $rule) => trim($rule))
+                    ->filter()
+                    ->reject(function (string $rule): bool {
+                        $property = strtolower(trim(explode(':', $rule, 2)[0] ?? ''));
+
+                        return in_array($property, ['font', 'font-family', 'font-size', 'line-height'], true);
+                    })
+                    ->values()
+                    ->all();
+
+                if ($sanitizedRules === []) {
+                    return '';
+                }
+
+                return ' style='.$quote.implode('; ', $sanitizedRules).$quote;
+            },
+            $html
+        ) ?? $html;
+
+        $html = preg_replace('/\s(face|size)=("|\').*?\2/i', '', $html) ?? $html;
+
+        return $html;
     }
 
     private function number(mixed $value): string

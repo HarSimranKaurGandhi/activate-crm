@@ -1,5 +1,5 @@
 import { useData } from '../../context/DataContext';
-import { Plus, Edit, Trash2, Power } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
@@ -12,6 +12,11 @@ export const CategoryMaster = () => {
   const [formData, setFormData] = useState({ name: '', hsnCode: '', gstPercent: 18, status: 'active' as 'active' | 'inactive' });
   const pagination = usePagination(categories, 10);
 
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData({ name: '', hsnCode: '', gstPercent: 18, status: 'active' });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
@@ -22,18 +27,18 @@ export const CategoryMaster = () => {
       toast.success('Category added successfully');
     }
     setShowModal(false);
-    setEditingId(null);
-    setFormData({ name: '', hsnCode: '', gstPercent: 18, status: 'active' });
+    resetForm();
   };
 
   const handleEdit = (category: any) => {
     setEditingId(category.id);
-    setFormData({ name: category.name, hsnCode: category.hsnCode || '', gstPercent: category.gstPercent ?? 18, status: category.status });
+    setFormData({
+      name: category.name,
+      hsnCode: category.hsnCode || '',
+      gstPercent: category.gstPercent ?? 18,
+      status: category.status || 'active',
+    });
     setShowModal(true);
-  };
-
-  const toggleStatus = async (category: any) => {
-    await updateCategory(category.id, { ...category, status: category.status === 'active' ? 'inactive' : 'active' });
   };
 
   return (
@@ -43,8 +48,7 @@ export const CategoryMaster = () => {
           <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Category Master</h2>
           <button
             onClick={() => {
-              setEditingId(null);
-              setFormData({ name: '', hsnCode: '', gstPercent: 18, status: 'active' });
+              resetForm();
               setShowModal(true);
             }}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto sm:px-6"
@@ -58,33 +62,14 @@ export const CategoryMaster = () => {
           <div className="md:hidden divide-y divide-gray-200">
             {pagination.pageItems.map((category) => (
               <div key={category.id} className="p-4 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-base font-semibold text-gray-900 break-words">{category.name}</div>
-                    <div className="mt-1 text-sm text-gray-500">HSN: {category.hsnCode || '-'}</div>
-                  </div>
-                  <button
-                    onClick={() => toggleStatus(category)}
-                    className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      category.status === 'active'
-                        ? 'bg-green-50 text-green-700 hover:bg-green-100'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Power className="w-3 h-3" />
-                    {category.status === 'active' ? 'Active' : 'Inactive'}
-                  </button>
+                <div className="min-w-0">
+                  <div className="text-base font-semibold text-gray-900 break-words">{category.name}</div>
+                  <div className="mt-1 text-sm text-gray-500">HSN: {category.hsnCode || '-'}</div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">GST</div>
-                    <div className="mt-1 font-medium text-slate-900">{category.gstPercent}%</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Status</div>
-                    <div className="mt-1 font-medium text-slate-900">{category.status === 'active' ? 'Active' : 'Inactive'}</div>
-                  </div>
+                <div className="rounded-xl bg-slate-50 p-3 text-sm">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">GST</div>
+                  <div className="mt-1 font-medium text-slate-900">{category.gstPercent}%</div>
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
@@ -97,13 +82,13 @@ export const CategoryMaster = () => {
                   </button>
                   <button
                     onClick={async () => {
-                      if (confirm('Deactivate this category?')) {
+                      if (confirm('Delete this category permanently?')) {
                         await deleteCategory(category.id);
-                        toast.success('Category deactivated');
+                        toast.success('Category deleted');
                       }
                     }}
                     className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
-                    title="Deactivate"
+                    title="Delete"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -113,60 +98,46 @@ export const CategoryMaster = () => {
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-          <table className="min-w-[760px] w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Category Name</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">HSN Code</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">GST %</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {pagination.pageItems.map(category => (
-                <tr key={category.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-medium text-gray-900">{category.name}</td>
-                  <td className="px-6 py-4 text-gray-700">{category.hsnCode || '-'}</td>
-                  <td className="px-6 py-4 text-gray-700">{category.gstPercent}%</td>
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => toggleStatus(category)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                        category.status === 'active'
-                          ? 'bg-green-50 text-green-700 hover:bg-green-100'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <Power className="w-3 h-3" />
-                      {category.status === 'active' ? 'Active' : 'Inactive'}
-                    </button>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleEdit(category)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (confirm('Deactivate this category?')) {
-                            await deleteCategory(category.id);
-                            toast.success('Category deactivated');
-                          }
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+            <table className="min-w-[760px] w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Category Name</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">HSN Code</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">GST %</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {pagination.pageItems.map((category) => (
+                  <tr key={category.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 font-medium text-gray-900">{category.name}</td>
+                    <td className="px-6 py-4 text-gray-700">{category.hsnCode || '-'}</td>
+                    <td className="px-6 py-4 text-gray-700">{category.gstPercent}%</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleEdit(category)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm('Delete this category permanently?')) {
+                              await deleteCategory(category.id);
+                              toast.success('Category deleted');
+                            }
+                          }}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           <PaginationControls
             page={pagination.page}
@@ -218,17 +189,6 @@ export const CategoryMaster = () => {
                   onChange={(e) => setFormData({ ...formData, gstPercent: Number(e.target.value) })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
               </div>
               <div className="flex flex-col gap-3 pt-4 sm:flex-row">
                 <button

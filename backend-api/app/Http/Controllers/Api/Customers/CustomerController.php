@@ -54,6 +54,13 @@ class CustomerController extends ApiController
         );
     }
 
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->customers->delete($this->customers->find($id));
+
+        return $this->ok('Customer deleted successfully');
+    }
+
     public function status(StatusRequest $request, int|string $id): JsonResponse
     {
         $customer = $this->customers->find($id);

@@ -55,6 +55,11 @@ abstract class CrudService
         return $model->refresh();
     }
 
+    public function delete(Model $model): void
+    {
+        $model->delete();
+    }
+
     public function reorder(array $items): void
     {
         DB::transaction(function () use ($items): void {
