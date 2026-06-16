@@ -20,6 +20,7 @@ class UserResource extends JsonResource
             'role' => $this->whenLoaded('role', fn () => [
                 'id' => $this->role?->id,
                 'name' => $this->role?->name,
+                'code' => $this->role?->code,
                 'display_name' => $this->role?->display_name,
             ]),
             'created_at' => $this->created_at,

@@ -175,7 +175,10 @@ class QuotationPdfService
             'gst_inclusive' => $gstInclusive,
             'tax_amount' => (float) $quotation->total_tax,
             'subtotal_label' => $this->money($quotation->subtotal_after_discount),
-            'tax_amount_label' => $this->money($quotation->total_tax),
+            'tax_amount_label' => $this->money(
+                $roundOffNetAmount ? round((float) $quotation->total_tax) : (float) $quotation->total_tax,
+                $roundOffNetAmount ? 0 : 2
+            ),
             'before_tax_total_label' => $this->money((float) $quotation->subtotal_after_discount + $totalAdjustments),
             'grand_total_label' => $this->money($quotation->grand_total),
             'customer' => [
@@ -215,14 +218,22 @@ class QuotationPdfService
                     'quantity_label' => $this->number($item->quantity),
                     'discount_percent_label' => (float) $item->discount_percent > 0 ? $this->number($item->discount_percent).'%' : '-',
                     'gst_percent_label' => $this->number($item->gst_percent).'%',
-                    'tax_amount_label' => $this->money($item->tax_amount),
+                    'tax_amount_label' => $this->money(
+                        $roundOffNetAmount ? round((float) $item->tax_amount) : (float) $item->tax_amount,
+                        $roundOffNetAmount ? 0 : 2
+                    ),
                     'net_amount_label' => $this->money(
                         $roundOffNetAmount
                             ? round((float) $item->taxable_amount)
                             : (float) $item->taxable_amount,
                         $roundOffNetAmount ? 0 : 2
                     ),
-                    'line_total_label' => $this->money($item->line_total),
+                    'line_total_label' => $this->money(
+                        $roundOffNetAmount
+                            ? round((float) $item->line_total)
+                            : (float) $item->line_total,
+                        $roundOffNetAmount ? 0 : 2
+                    ),
                 ];
             })->all(),
             'adjustments' => $adjustments->map(fn ($adjustment) => [
@@ -300,7 +311,7 @@ class QuotationPdfService
                     ->reject(function (string $rule): bool {
                         $property = strtolower(trim(explode(':', $rule, 2)[0] ?? ''));
 
-                        return in_array($property, ['font', 'font-family', 'font-size', 'line-height'], true);
+                        return in_array($property, ['font', 'font-family', 'font-size', 'line-height', 'width', 'min-width', 'max-width'], true);
                     })
                     ->values()
                     ->all();

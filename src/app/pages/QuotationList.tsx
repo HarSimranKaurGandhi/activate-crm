@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
 import { Plus, Search, Calendar, Eye, Edit, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LoadingState } from '../components/common/AsyncState';
 import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
 import { toast } from 'sonner';
+import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
+import { sortItems } from '../utils/sort';
 
 export const QuotationList = () => {
   const navigate = useNavigate();
@@ -13,8 +15,12 @@ export const QuotationList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [sort, setSort] = useState<{ key: 'number' | 'date' | 'customer' | 'items' | 'grandTotal' | 'status'; direction: SortDirection }>({
+    key: 'date',
+    direction: 'desc',
+  });
 
-  const filteredQuotations = quotations.filter(q => {
+  const filteredQuotations = useMemo(() => quotations.filter(q => {
     const matchesSearch = q.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          q.customer.company.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
@@ -28,8 +34,27 @@ export const QuotationList = () => {
     }
 
     return matchesSearch && matchesStatus && matchesDate;
-  });
-  const pagination = usePagination(filteredQuotations, 10);
+  }), [quotations, searchTerm, statusFilter, dateRange]);
+
+  const sortedQuotations = useMemo(
+    () =>
+      sortItems(
+        filteredQuotations,
+        (quotation) => {
+          switch (sort.key) {
+            case 'customer':
+              return quotation.customer.company || quotation.customer.name || '';
+            case 'items':
+              return quotation.items.length;
+            default:
+              return quotation[sort.key];
+          }
+        },
+        sort.direction,
+      ),
+    [filteredQuotations, sort],
+  );
+  const pagination = usePagination(sortedQuotations, 10);
 
   const handleDelete = async (quotationId: string) => {
     if (!confirm('Are you sure you want to delete this quotation? This action cannot be undone.')) {
@@ -42,6 +67,13 @@ export const QuotationList = () => {
     } catch {
       toast.error('Unable to delete quotation');
     }
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -121,22 +153,22 @@ export const QuotationList = () => {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Quotation #
+                    <SortableHeader label="Quotation #" sortKey="number" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} />
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Date
+                    <SortableHeader label="Date" sortKey="date" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} />
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Customer
+                    <SortableHeader label="Customer" sortKey="customer" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} />
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Items
+                    <SortableHeader label="Items" sortKey="items" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} />
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Amount
+                    <SortableHeader label="Amount" sortKey="grandTotal" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} />
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Status
+                    <SortableHeader label="Status" sortKey="status" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} />
                   </th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Actions
@@ -203,7 +235,7 @@ export const QuotationList = () => {
                     </td>
                   </tr>
                 )}
-                {!loading && filteredQuotations.length === 0 && (
+                {!loading && sortedQuotations.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                       No quotations found. Create your first quotation to get started.

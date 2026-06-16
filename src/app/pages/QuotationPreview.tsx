@@ -65,7 +65,8 @@ export const QuotationPreview = () => {
     );
   }
 
-  const canApprove = ['admin', 'operations'].includes(user?.role?.name);
+  const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
+  const canApprove = ['admin', 'sales_manager'].includes(role);
 
   const handleSubmitForApproval = async () => {
     await submitQuotationForApproval(quotation.id);
@@ -185,8 +186,6 @@ export const QuotationPreview = () => {
       });
     }
   };
-  const beforeTaxTotal = quotation.subtotal + totalAdjustments;
-
   return (
     <div className="min-h-screen bg-slate-100 p-2 sm:p-3 print:bg-white print:p-0">
       <div className="mx-auto max-w-[1160px] space-y-3">
@@ -283,11 +282,11 @@ export const QuotationPreview = () => {
                   </div>
                 </div>
               ) : (
-                <div className="flex justify-center bg-gradient-to-b from-slate-50 to-white px-3 py-2 print:px-0 print:py-0">
+                <div className="bg-gradient-to-b from-slate-50 to-white print:px-0 print:py-0">
                   <img
                     src={settings.letterhead}
                     alt="Company letterhead"
-                    className="block max-h-44 w-auto max-w-full object-contain object-top print:max-h-40"
+                    className="block w-full object-cover object-top"
                   />
                 </div>
               )}
@@ -498,7 +497,9 @@ export const QuotationPreview = () => {
                       <th className="px-2 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Qty</th>
                       {quotation.showDiscount && <th className="px-2 py-2.5 text-center text-[11px] font-black uppercase tracking-wide">Disc%</th>}
                       {quotation.showItemWiseGst && <th className="px-2 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">GST</th>}
-                      <th className="px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">Net Amount</th>
+                      <th className="px-3 py-2.5 text-right text-[11px] font-black uppercase tracking-wide">
+                        {quotation.gstInclusive ? 'Amount' : 'Net Amount'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -506,7 +507,7 @@ export const QuotationPreview = () => {
                       const { gstAmount, netAmount, discountedUnitPrice } = calculateItemAmounts(item);
                       const productImage = item.product.image || item.product.imageUrl || item.product.photo || item.product.picture;
                       const displayPrice = displayRoundedAmount(quotation.showMrp ? item.price : discountedUnitPrice);
-                      const roundedNetAmount = displayRoundedAmount(netAmount);
+                      const displayAmount = displayRoundedAmount(quotation.gstInclusive ? item.lineTotal : netAmount);
 
                       return (
                         <tr key={item.id} className="border-b border-slate-200 align-middle last:border-b-0">
@@ -543,11 +544,11 @@ export const QuotationPreview = () => {
                           {quotation.showItemWiseGst && (
                             <td className="border-r border-slate-200 px-2 py-4 text-right font-bold text-slate-700">
                               <div>{item.product.gstPercent}%</div>
-                              <div className="mt-1 text-xs text-slate-500">{formatMoney(gstAmount)}</div>
+                              <div className="mt-1 text-xs text-slate-500">{formatMoney(gstAmount, { whole: quotation.roundOffNetAmount })}</div>
                             </td>
                           )}
                           <td className="px-3 py-4 text-right text-base font-black text-slate-950">
-                            {formatMoney(roundedNetAmount, { whole: quotation.roundOffNetAmount })}
+                            {formatMoney(displayAmount, { whole: quotation.roundOffNetAmount })}
                           </td>
                         </tr>
                       );
@@ -561,7 +562,7 @@ export const QuotationPreview = () => {
                   const { gstAmount, netAmount, discountedUnitPrice } = calculateItemAmounts(item);
                   const productImage = item.product.image || item.product.imageUrl || item.product.photo || item.product.picture;
                   const displayPrice = displayRoundedAmount(quotation.showMrp ? item.price : discountedUnitPrice);
-                  const roundedNetAmount = displayRoundedAmount(netAmount);
+                  const displayAmount = displayRoundedAmount(quotation.gstInclusive ? item.lineTotal : netAmount);
 
                   return (
                     <div key={item.id} className="overflow-hidden border border-slate-300 bg-white">
@@ -596,8 +597,12 @@ export const QuotationPreview = () => {
                           <MobileMetric label="Price" value={formatMoney(displayPrice, { whole: quotation.roundOffNetAmount })} />
                           <MobileMetric label="Qty" value={String(item.quantity)} />
                           {quotation.showDiscount && <MobileMetric label="Disc%" value={item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'} />}
-                          {quotation.showItemWiseGst && <MobileMetric label="GST" value={`${item.product.gstPercent}% (${formatMoney(gstAmount)})`} />}
-                          <MobileMetric label="Net Amount" value={formatMoney(roundedNetAmount, { whole: quotation.roundOffNetAmount })} strong />
+                          {quotation.showItemWiseGst && <MobileMetric label="GST" value={`${item.product.gstPercent}% (${formatMoney(gstAmount, { whole: quotation.roundOffNetAmount })})`} />}
+                          <MobileMetric
+                            label={quotation.gstInclusive ? 'Amount' : 'Net Amount'}
+                            value={formatMoney(displayAmount, { whole: quotation.roundOffNetAmount })}
+                            strong
+                          />
                         </div>
                       </div>
                     </div>
@@ -630,15 +635,9 @@ export const QuotationPreview = () => {
 
                   {quotation.taxAmount > 0 && (
                     <>
-                      {!quotation.gstInclusive && (
-                        <div className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
-                          <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">Total Before Tax</div>
-                          <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">{formatMoney(beforeTaxTotal)}</div>
-                        </div>
-                      )}
                       <div className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
                         <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">GST</div>
-                        <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">{formatMoney(quotation.taxAmount)}</div>
+                        <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">{formatMoney(quotation.taxAmount, { whole: quotation.roundOffNetAmount })}</div>
                       </div>
                     </>
                   )}
@@ -819,12 +818,53 @@ export const QuotationPreview = () => {
   box-shadow: 0 0 0 1px #e2e8f0 !important;
 }
 
+.quotation-specs {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .quotation-specs,
 .quotation-specs * {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
   font-family: inherit !important;
   font-size: inherit !important;
   line-height: inherit !important;
   color: inherit !important;
+}
+
+.quotation-specs img,
+.quotation-specs svg,
+.quotation-specs video,
+.quotation-specs canvas,
+.quotation-specs iframe,
+.quotation-specs embed,
+.quotation-specs object {
+  display: block !important;
+  max-width: 100% !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+.quotation-specs table {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+}
+
+.quotation-specs th,
+.quotation-specs td,
+.quotation-specs pre,
+.quotation-specs code {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
 }
       `}</style>
     </div>
@@ -889,7 +929,7 @@ const sanitizeQuotationHtml = (value: string) => {
       .filter((rule) => {
         const property = rule.split(':')[0]?.trim().toLowerCase();
 
-        return !['font', 'font-family', 'font-size', 'line-height'].includes(property);
+        return !['font', 'font-family', 'font-size', 'line-height', 'width', 'min-width', 'max-width'].includes(property);
       });
 
     if (sanitizedRules.length > 0) {

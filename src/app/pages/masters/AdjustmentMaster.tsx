@@ -1,9 +1,11 @@
 import { useData } from '../../context/DataContext';
 import { Plus, Edit, Trash2, Power } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../../components/common/Pagination';
+import { SortableHeader, type SortDirection } from '../../components/common/SortableHeader';
+import { sortItems } from '../../utils/sort';
 
 export const AdjustmentMaster = () => {
   const { adjustments, addAdjustment, updateAdjustment, deleteAdjustment, loading } = useData();
@@ -15,7 +17,9 @@ export const AdjustmentMaster = () => {
     defaultValue: 0,
     status: 'active' as 'active' | 'inactive'
   });
-  const pagination = usePagination(adjustments, 10);
+  const [sort, setSort] = useState<{ key: 'name' | 'type' | 'defaultValue' | 'status'; direction: SortDirection }>({ key: 'name', direction: 'asc' });
+  const sortedAdjustments = useMemo(() => sortItems(adjustments, (adjustment) => adjustment[sort.key], sort.direction), [adjustments, sort]);
+  const pagination = usePagination(sortedAdjustments, 10);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +48,13 @@ export const AdjustmentMaster = () => {
 
   const toggleStatus = async (adjustment: any) => {
     await updateAdjustment(adjustment.id, { ...adjustment, status: adjustment.status === 'active' ? 'inactive' : 'active' });
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -132,10 +143,10 @@ export const AdjustmentMaster = () => {
           <table className="min-w-[760px] w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Default Value</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Name" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Type" sortKey="type" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Default Value" sortKey="defaultValue" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Status" sortKey="status" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
             </thead>

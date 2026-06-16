@@ -1,16 +1,20 @@
 import { useData } from '../../context/DataContext';
 import { Plus, Edit, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../../components/common/Pagination';
+import { SortableHeader, type SortDirection } from '../../components/common/SortableHeader';
+import { sortItems } from '../../utils/sort';
 
 export const CategoryMaster = () => {
   const { categories, addCategory, updateCategory, deleteCategory, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', hsnCode: '', gstPercent: 18, status: 'active' as 'active' | 'inactive' });
-  const pagination = usePagination(categories, 10);
+  const [sort, setSort] = useState<{ key: 'name' | 'hsnCode' | 'gstPercent'; direction: SortDirection }>({ key: 'name', direction: 'asc' });
+  const sortedCategories = useMemo(() => sortItems(categories, (category) => category[sort.key], sort.direction), [categories, sort]);
+  const pagination = usePagination(sortedCategories, 10);
 
   const resetForm = () => {
     setEditingId(null);
@@ -39,6 +43,13 @@ export const CategoryMaster = () => {
       status: category.status || 'active',
     });
     setShowModal(true);
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -101,9 +112,9 @@ export const CategoryMaster = () => {
             <table className="min-w-[760px] w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Category Name</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">HSN Code</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">GST %</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Category Name" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="HSN Code" sortKey="hsnCode" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="GST %" sortKey="gstPercent" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
               </thead>

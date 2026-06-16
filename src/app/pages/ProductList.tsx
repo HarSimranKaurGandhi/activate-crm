@@ -6,6 +6,8 @@ import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { toast } from 'sonner';
 import { productService } from '../../services/productService';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
+import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
+import { sortItems } from '../utils/sort';
 
 export const ProductList = () => {
   const navigate = useNavigate();
@@ -15,6 +17,10 @@ export const ProductList = () => {
     category: 'all',
     brand: 'all',
     gst: 'all',
+  });
+  const [sort, setSort] = useState<{ key: 'name' | 'category' | 'brand' | 'mrp' | 'usualSellingPrice' | 'leastSellingPrice' | 'gstPercent'; direction: SortDirection }>({
+    key: 'name',
+    direction: 'asc',
   });
   const [bulkUploading, setBulkUploading] = useState(false);
 
@@ -37,7 +43,9 @@ export const ProductList = () => {
     });
   }, [filters, products]);
 
-  const pagination = usePagination(filteredProducts, 10);
+  const sortedProducts = useMemo(() => sortItems(filteredProducts, (product) => product[sort.key], sort.direction), [filteredProducts, sort]);
+
+  const pagination = usePagination(sortedProducts, 10);
 
   const gstOptions = useMemo(() => {
     return Array.from(new Set(products.map((product) => Number(product.gstPercent)).filter((value) => !Number.isNaN(value))))
@@ -55,6 +63,13 @@ export const ProductList = () => {
       brand: 'all',
       gst: 'all',
     });
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   const handleBulkUpload = async (file: File | null) => {
@@ -174,13 +189,13 @@ export const ProductList = () => {
             <table className="min-w-[1040px] w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Category</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Brand</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">MRP</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Selling</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Least</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">GST / HSN</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Product" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Category" sortKey="category" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Brand" sortKey="brand" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="MRP" sortKey="mrp" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} align="right" /></th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Selling" sortKey="usualSellingPrice" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} align="right" /></th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Least" sortKey="leastSellingPrice" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} align="right" /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="GST / HSN" sortKey="gstPercent" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -249,7 +264,7 @@ export const ProductList = () => {
           </div>
 
           {loading && <LoadingState label="Loading products..." />}
-          {!loading && filteredProducts.length === 0 && (
+          {!loading && sortedProducts.length === 0 && (
             <EmptyState label="No products found. Add your first product to get started." />
           )}
         </div>

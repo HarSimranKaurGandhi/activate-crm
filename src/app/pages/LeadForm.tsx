@@ -140,8 +140,8 @@ export const LeadForm = () => {
     event.preventDefault();
     setErrors({});
 
-    if (!formData.phone.trim()) {
-      toast.error('Phone number is required');
+    if (!formData.phone.trim() && !formData.email.trim()) {
+      toast.error('Either phone number or email is required');
       return;
     }
 

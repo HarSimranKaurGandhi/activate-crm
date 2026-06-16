@@ -14,9 +14,16 @@ class ProductRequest extends FormRequest
 
     public function rules(): array
     {
+        $productId = $this->route('id');
+
         return [
             'product_name' => ['required', 'string', 'max:255'],
-            'model_number' => ['required', 'string', 'max:255'],
+            'model_number' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('products', 'model_number')->ignore($productId),
+            ],
             'category_id' => ['required', 'exists:categories,id'],
             'brand_id' => ['required', 'exists:brands,id'],
             'unit' => ['required', 'string', 'max:50', Rule::exists('measurement_units', 'code')->where(fn ($query) => $query->where('is_active', true))],

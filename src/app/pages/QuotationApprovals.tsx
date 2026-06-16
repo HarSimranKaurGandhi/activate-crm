@@ -6,6 +6,8 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../auth/AuthContext';
 import { LoadingState } from '../components/common/AsyncState';
 import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
+import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
+import { sortItems } from '../utils/sort';
 
 const normalizeRole = (user: any) =>
   String(user?.role?.code || user?.role?.name || '')
@@ -18,10 +20,14 @@ export const QuotationApprovals = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [sort, setSort] = useState<{ key: 'number' | 'customer' | 'date' | 'grandTotal' | 'status'; direction: SortDirection }>({
+    key: 'date',
+    direction: 'desc',
+  });
 
-  const canManageApprovals = ['admin', 'operations'].includes(normalizeRole(user));
+  const canManageApprovals = ['admin', 'operations', 'sales_manager'].includes(normalizeRole(user));
 
-  const pendingQuotations = useMemo(
+  const filteredPendingQuotations = useMemo(
     () =>
       quotations
         .filter((quotation) => quotation.status === 'pending')
@@ -38,8 +44,24 @@ export const QuotationApprovals = () => {
             quotation.customer.name.toLowerCase().includes(search)
           );
         })
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [quotations, searchTerm],
+  );
+
+  const pendingQuotations = useMemo(
+    () =>
+      sortItems(
+        filteredPendingQuotations,
+        (quotation) => {
+          switch (sort.key) {
+            case 'customer':
+              return quotation.customer.company || quotation.customer.name || '';
+            default:
+              return quotation[sort.key];
+          }
+        },
+        sort.direction,
+      ),
+    [filteredPendingQuotations, sort],
   );
 
   const recentDecisions = useMemo(
@@ -77,11 +99,18 @@ export const QuotationApprovals = () => {
     }
   };
 
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
   if (!canManageApprovals) {
     return (
       <div className="p-8">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
-          Only admin users can access quotation approvals.
+          Only authorized approval users can access quotation approvals.
         </div>
       </div>
     );
@@ -138,11 +167,11 @@ export const QuotationApprovals = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Quotation</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Customer</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Amount</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"><SortableHeader label="Quotation" sortKey="number" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"><SortableHeader label="Customer" sortKey="customer" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"><SortableHeader label="Date" sortKey="date" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"><SortableHeader label="Amount" sortKey="grandTotal" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"><SortableHeader label="Status" sortKey="status" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-600">Actions</th>
                 </tr>
               </thead>

@@ -7,6 +7,8 @@ import { PaginationControls, usePagination } from '../components/common/Paginati
 import { userService } from '../../services/userService';
 import { taskService } from '../../services/taskService';
 import { mapTask, taskPayload } from '../../services/mappers';
+import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
+import { sortItems } from '../utils/sort';
 
 const TASK_STATUS_OPTIONS = [
   { value: 'all', label: 'All Status' },
@@ -49,6 +51,10 @@ export const TaskList = () => {
     status: 'all',
     assignedTo: 'all',
   });
+  const [sort, setSort] = useState<{ key: 'name' | 'assignedTo' | 'dueDate' | 'status'; direction: SortDirection }>({
+    key: 'dueDate',
+    direction: 'asc',
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -87,7 +93,24 @@ export const TaskList = () => {
     });
   }, [filters, tasks]);
 
-  const pagination = usePagination(filteredTasks, 10);
+  const sortedTasks = useMemo(
+    () =>
+      sortItems(
+        filteredTasks,
+        (task) => {
+          switch (sort.key) {
+            case 'assignedTo':
+              return task.assignedUser?.name || '';
+            default:
+              return task[sort.key] || '';
+          }
+        },
+        sort.direction,
+      ),
+    [filteredTasks, sort],
+  );
+
+  const pagination = usePagination(sortedTasks, 10);
   const allPageTaskIds = pagination.pageItems.map((task) => task.id);
   const allPageSelected = allPageTaskIds.length > 0 && allPageTaskIds.every((id) => selectedTaskIds.includes(id));
 
@@ -139,6 +162,13 @@ export const TaskList = () => {
     } finally {
       setBulkUpdating(false);
     }
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -225,10 +255,10 @@ export const TaskList = () => {
                       className="h-4 w-4 rounded border-gray-300 text-blue-600"
                     />
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Task Name</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Assigned To</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Due Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Task Name" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Assigned To" sortKey="assignedTo" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Due Date" sortKey="dueDate" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Status" sortKey="status" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-gray-600">Actions</th>
                 </tr>
               </thead>
@@ -291,7 +321,7 @@ export const TaskList = () => {
           </div>
 
           {loading && <LoadingState label="Loading tasks..." />}
-          {!loading && filteredTasks.length === 0 && (
+          {!loading && sortedTasks.length === 0 && (
             <EmptyState label="No tasks found. Create your first task to get started." />
           )}
         </div>

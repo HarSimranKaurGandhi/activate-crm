@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
+import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
+import { sortItems } from '../utils/sort';
 
 export const CustomerList = () => {
   const navigate = useNavigate();
@@ -16,6 +18,10 @@ export const CustomerList = () => {
     phone: '',
     city: '',
     rating: 'all',
+  });
+  const [sort, setSort] = useState<{ key: 'company' | 'name' | 'phone' | 'location' | 'rating'; direction: SortDirection }>({
+    key: 'company',
+    direction: 'asc',
   });
 
   const filteredCustomers = useMemo(() => {
@@ -31,7 +37,20 @@ export const CustomerList = () => {
     });
   }, [customers, filters]);
 
-  const pagination = usePagination(filteredCustomers, 10);
+  const sortedCustomers = useMemo(
+    () =>
+      sortItems(
+        filteredCustomers,
+        (customer) =>
+          sort.key === 'location'
+            ? [customer.city, customer.state].filter(Boolean).join(', ')
+            : customer[sort.key],
+        sort.direction,
+      ),
+    [filteredCustomers, sort],
+  );
+
+  const pagination = usePagination(sortedCustomers, 10);
 
   const updateFilter = (key: keyof typeof filters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -46,6 +65,13 @@ export const CustomerList = () => {
       city: '',
       rating: 'all',
     });
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -127,11 +153,11 @@ export const CustomerList = () => {
             <table className="min-w-[920px] w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Company</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Contact</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Phone</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Location</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Rating</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Company" sortKey="company" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Contact" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Phone" sortKey="phone" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Location" sortKey="location" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Rating" sortKey="rating" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -184,7 +210,7 @@ export const CustomerList = () => {
           </div>
 
           {loading && <LoadingState label="Loading customers..." />}
-          {!loading && filteredCustomers.length === 0 && (
+          {!loading && sortedCustomers.length === 0 && (
             <EmptyState label="No customers found. Add your first customer to get started." />
           )}
         </div>

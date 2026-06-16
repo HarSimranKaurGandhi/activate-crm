@@ -12,7 +12,8 @@ class RoleDropdownResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'display_name' => $this->name,
+            'code' => $this->code,
+            'display_name' => $this->display_name,
         ];
     }
 }

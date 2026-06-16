@@ -52,6 +52,19 @@ const formatAddress = (lead: any) =>
     .filter(Boolean)
     .join(', ');
 
+const formatDisplayDate = (date?: string) => {
+  if (!date) return '-';
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+
+  return parsed.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
 export const LeadView = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -133,7 +146,7 @@ export const LeadView = () => {
 
               <div>
                 <div className="mb-1 text-sm font-medium text-gray-500">Follow Up Date</div>
-                <div className="text-gray-900">{lead.followUpDate || '-'}</div>
+                <div className="text-gray-900">{formatDisplayDate(lead.followUpDate)}</div>
               </div>
 
               <div>

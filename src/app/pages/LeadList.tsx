@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Edit, Eye, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Edit, Eye, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
 import { leadService } from '../../services/leadService';
 import { mapLead } from '../../services/mappers';
+import { userService } from '../../services/userService';
 
 const LEAD_SOURCE_OPTIONS = [
   { value: 'all', label: 'All Sources' },
@@ -54,15 +55,34 @@ const formatAddress = (lead: any) =>
     .filter(Boolean)
     .join(', ');
 
+const formatDisplayDate = (date?: string) => {
+  if (!date) return '-';
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+
+  return parsed.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
 export const LeadList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [filters, setFilters] = useState({
     search: '',
     leadSource: 'all',
     status: 'all',
     tag: 'all',
+    assignedTo: 'all',
+  });
+  const [sort, setSort] = useState<{ key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'status'; direction: 'asc' | 'desc' }>({
+    key: 'followUpDate',
+    direction: 'asc',
   });
 
   const handleDelete = async (leadId: string) => {
@@ -83,8 +103,12 @@ export const LeadList = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const result = await leadService.list();
-        setLeads((result.data || []).map(mapLead));
+        const [leadResult, userResult] = await Promise.all([
+          leadService.list(),
+          userService.dropdown(),
+        ]);
+        setLeads((leadResult.data || []).map(mapLead));
+        setUsers(Array.isArray(userResult) ? userResult : []);
       } catch (error) {
         toast.error('Unable to load leads');
       } finally {
@@ -109,12 +133,67 @@ export const LeadList = () => {
       const sourceMatch = filters.leadSource === 'all' || lead.leadSource === filters.leadSource;
       const statusMatch = filters.status === 'all' || lead.status === filters.status;
       const tagMatch = filters.tag === 'all' || lead.tags.includes(filters.tag);
+      const assignedMatch = filters.assignedTo === 'all' || lead.assignedTo === filters.assignedTo;
 
-      return searchMatch && sourceMatch && statusMatch && tagMatch;
+      return searchMatch && sourceMatch && statusMatch && tagMatch && assignedMatch;
     });
   }, [filters, leads]);
 
-  const pagination = usePagination(filteredLeads, 10);
+  const sortedLeads = useMemo(() => {
+    const valueForSort = (lead: any) => {
+      switch (sort.key) {
+        case 'name':
+          return (lead.name || '').toLowerCase();
+        case 'leadSource':
+          return sourceLabel(lead.leadSource).toLowerCase();
+        case 'assignedTo':
+          return (lead.assignedUser?.name || '').toLowerCase();
+        case 'followUpDate':
+          return lead.followUpDate ? new Date(lead.followUpDate).getTime() : Number.MAX_SAFE_INTEGER;
+        case 'status':
+          return statusLabel(lead.status).toLowerCase();
+        default:
+          return '';
+      }
+    };
+
+    return [...filteredLeads].sort((a, b) => {
+      const aValue = valueForSort(a);
+      const bValue = valueForSort(b);
+
+      if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredLeads, sort]);
+
+  const toggleSort = (key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'status') => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const SortableHeader = ({
+    label,
+    sortKey,
+    align = 'left',
+  }: {
+    label: string;
+    sortKey: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'status';
+    align?: 'left' | 'right';
+  }) => (
+    <button
+      type="button"
+      onClick={() => toggleSort(sortKey)}
+      className={`inline-flex items-center gap-1 ${align === 'right' ? 'ml-auto' : ''}`}
+    >
+      <span>{label}</span>
+      <ArrowUpDown className={`h-3.5 w-3.5 ${sort.key === sortKey ? 'text-slate-800' : 'text-gray-400'}`} />
+    </button>
+  );
+
+  const pagination = usePagination(sortedLeads, 10);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -131,7 +210,7 @@ export const LeadList = () => {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
-          <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-4">
+          <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-5">
             <div className="relative lg:col-span-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
@@ -169,6 +248,16 @@ export const LeadList = () => {
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
+            <select
+              value={filters.assignedTo}
+              onChange={(event) => setFilters((current) => ({ ...current, assignedTo: event.target.value }))}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Assignees</option>
+              {users.map((user) => (
+                <option key={user.id} value={String(user.id)}>{user.name}</option>
+              ))}
+            </select>
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200">
@@ -193,7 +282,7 @@ export const LeadList = () => {
                     </div>
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Follow Up</div>
-                      <div className="mt-1 font-medium text-slate-900">{lead.followUpDate || '-'}</div>
+                      <div className="mt-1 font-medium text-slate-900">{formatDisplayDate(lead.followUpDate)}</div>
                     </div>
                     <div className="col-span-2">
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Assigned To</div>
@@ -246,13 +335,13 @@ export const LeadList = () => {
               <table className="min-w-[1080px] w-full">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Lead</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Source</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Assigned To</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Lead" sortKey="name" /></th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Source" sortKey="leadSource" /></th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Assigned To" sortKey="assignedTo" /></th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Requirement</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Tags</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Follow Up</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Status</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Follow Up" sortKey="followUpDate" /></th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Status" sortKey="status" /></th>
                     <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-gray-600">Actions</th>
                   </tr>
                 </thead>
@@ -278,7 +367,7 @@ export const LeadList = () => {
                           )) : <span className="text-sm text-gray-500">-</span>}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-700">{lead.followUpDate || '-'}</td>
+                      <td className="px-6 py-4 text-gray-700">{formatDisplayDate(lead.followUpDate)}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[lead.status] || statusBadgeClass.new}`}>
                           {statusLabel(lead.status)}

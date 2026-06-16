@@ -17,8 +17,8 @@ class LeadRequest extends FormRequest
         return [
             'lead_source' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website'])],
             'name' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'max:30'],
-            'email' => ['sometimes', 'nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30', 'required_without:email'],
+            'email' => ['nullable', 'email', 'max:255', 'required_without:phone'],
             'address_line_1' => ['sometimes', 'nullable', 'string', 'max:255'],
             'address_line_2' => ['sometimes', 'nullable', 'string', 'max:255'],
             'city' => ['sometimes', 'nullable', 'string', 'max:100'],

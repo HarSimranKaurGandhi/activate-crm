@@ -1,9 +1,11 @@
 import { useData } from '../../context/DataContext';
 import { Plus, Edit, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../../components/common/Pagination';
+import { SortableHeader, type SortDirection } from '../../components/common/SortableHeader';
+import { sortItems } from '../../utils/sort';
 
 export const CustomFieldBuilder = () => {
   const { customFields, addCustomField, updateCustomField, deleteCustomField, loading } = useData();
@@ -16,7 +18,17 @@ export const CustomFieldBuilder = () => {
     required: false,
   });
   const [optionInput, setOptionInput] = useState('');
-  const pagination = usePagination(customFields, 10);
+  const [sort, setSort] = useState<{ key: 'name' | 'type' | 'required' | 'options'; direction: SortDirection }>({ key: 'name', direction: 'asc' });
+  const sortedFields = useMemo(
+    () =>
+      sortItems(
+        customFields,
+        (field) => (sort.key === 'options' ? (field.options || []).join(', ') : field[sort.key]),
+        sort.direction,
+      ),
+    [customFields, sort],
+  );
+  const pagination = usePagination(sortedFields, 10);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +68,13 @@ export const CustomFieldBuilder = () => {
 
   const removeOption = (index: number) => {
     setFormData({ ...formData, options: formData.options.filter((_, i) => i !== index) });
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -140,10 +159,10 @@ export const CustomFieldBuilder = () => {
           <table className="min-w-[820px] w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Field Name</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Required</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Options</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Field Name" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Type" sortKey="type" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Required" sortKey="required" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Options" sortKey="options" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
             </thead>

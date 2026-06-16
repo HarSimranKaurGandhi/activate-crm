@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Edit, Plus, Power, Trash2, UserCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../../components/common/Pagination';
 import { userService } from '../../../services/userService';
+import { SortableHeader, type SortDirection } from '../../components/common/SortableHeader';
+import { sortItems } from '../../utils/sort';
 
 const emptyForm = {
   name: '',
@@ -34,7 +36,9 @@ export const UserMaster = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [formData, setFormData] = useState(emptyForm);
-  const pagination = usePagination(users, 10);
+  const [sort, setSort] = useState<{ key: 'name' | 'roleName' | 'designation' | 'phone' | 'status'; direction: SortDirection }>({ key: 'name', direction: 'asc' });
+  const sortedUsers = useMemo(() => sortItems(users, (user) => user[sort.key], sort.direction), [users, sort]);
+  const pagination = usePagination(sortedUsers, 10);
 
   const loadData = async () => {
     setLoading(true);
@@ -115,6 +119,13 @@ export const UserMaster = () => {
     await userService.status(user.id, user.status !== 'active');
     toast.success(`User ${user.status === 'active' ? 'deactivated' : 'activated'} successfully`);
     await loadData();
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -198,11 +209,11 @@ export const UserMaster = () => {
           <table className="min-w-[860px] w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">User</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Role</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Designation</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Phone</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="User" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Role" sortKey="roleName" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Designation" sortKey="designation" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Phone" sortKey="phone" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Status" sortKey="status" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
             </thead>

@@ -13,8 +13,8 @@
     .watermark { position: fixed; top: 44%; left: 8%; width: 84%; text-align: center; z-index: 1; }
     .watermark span { display: inline-block; transform: rotate(-35deg); white-space: nowrap; font-size: 60px; font-weight: 900; letter-spacing: 0.16em; color: #e2e8f0; }
     .content { position: relative; z-index: 2; }
-    .letterhead { margin: 0 10px 6px; padding: 4px 0; background: #f8fafc; text-align: center; }
-    .letterhead img { display: inline-block; width: auto; max-width: 100%; max-height: 92px; height: auto; object-fit: contain; object-position: top; }
+    .letterhead { margin: 0 0 6px; padding: 0; background: #f8fafc; text-align: left; }
+    .letterhead img { display: block; width: 100%; height: auto; object-fit: cover; object-position: top; }
     .brand-header { width: calc(100% - 20px); margin: 0 10px 8px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
     .brand-header td { padding: 10px 10px; vertical-align: middle; }
     .brand-logo-cell { width: 22%; }
@@ -83,11 +83,14 @@
     .product-image-placeholder { width: 138px; height: 88px; margin: 0 auto 6px; border-radius: 8px; background: #f1f5f9; color: #94a3b8; font-size: 8px; font-weight: 700; text-align: center; line-height: 88px; }
     .product-name { font-size: 10px; font-weight: 900; color: #020617; text-align: center; line-height: 1.2; }
     .product-model { margin-top: 2px; text-align: center; font-size: 8px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #475569; }
-    .specs { font-size: 8.5px; line-height: 1.24; color: #334155; word-wrap: break-word; word-break: break-word; overflow-wrap: anywhere; white-space: normal; }
+    .specs { max-width: 100%; min-width: 0; overflow: hidden; font-size: 8.5px; line-height: 1.24; color: #334155; word-wrap: break-word; word-break: break-word; overflow-wrap: anywhere; white-space: normal; }
     .specs p { margin: 0 0 2px; }
     .specs ul, .specs ol { margin: 0; padding-left: 14px; }
     .specs li { margin-bottom: 2px; }
-    .specs * { max-width: 100%; white-space: normal !important; word-break: break-word !important; overflow-wrap: anywhere !important; font-family: inherit !important; font-size: inherit !important; line-height: inherit !important; color: inherit !important; }
+    .specs * { max-width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; white-space: normal !important; word-break: break-word !important; overflow-wrap: anywhere !important; font-family: inherit !important; font-size: inherit !important; line-height: inherit !important; color: inherit !important; }
+    .specs img, .specs svg, .specs video, .specs canvas, .specs iframe, .specs embed, .specs object { display: block; max-width: 100% !important; width: auto !important; height: auto !important; }
+    .specs table { width: 100% !important; max-width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
+    .specs th, .specs td, .specs pre, .specs code { white-space: pre-wrap !important; word-break: break-word !important; overflow-wrap: anywhere !important; }
     .amount-strong { font-size: 9.5px; font-weight: 900; color: #020617; }
     .gst-sub { margin-top: 2px; font-size: 8px; color: #64748b; }
     .totals { width: 420px; margin-left: auto; border: 1px solid #d1d5db; overflow: hidden; margin-bottom: 10px; }
@@ -126,11 +129,14 @@
     .footer-signatures-left { width: 62%; padding-right: 12px; }
     .footer-signatures-right { width: 38%; padding-left: 18px; }
     .salesperson-block { text-align: left; }
-    .salesperson-name { margin-top: 0; padding-top: 12px; border-top: 2px solid #dc2626; display: block; width: 220px; white-space: nowrap; font-size: 16px; font-weight: 900; text-transform: uppercase; color: #dc2626; text-align: left; }
+    .salesperson-signature-wrap { width: 220px; margin-top: 12px; }
+    .salesperson-line { width: 220px; margin: 0; border-top: 2px solid #dc2626; }
+    .salesperson-name { margin-top: 12px; display: block; width: 220px; white-space: nowrap; font-size: 16px; font-weight: 900; text-transform: uppercase; color: #dc2626; text-align: left; }
     .salesperson-meta { margin-top: 6px; font-size: 9px; color: #475569; }
     .salesperson-meta span { margin-right: 12px; }
-    .signature-wrap { width: 220px; margin-left: auto; }
-    .signature-line { width: 220px; margin: 0 0 0 auto; padding-top: 12px; border-top: 2px solid #dc2626; font-size: 10px; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase; color: #020617; text-align: center; }
+    .signature-wrap { width: 220px; margin-top: 12px; margin-left: auto; }
+    .signature-line { width: 220px; margin: 0 0 12px auto; border-top: 2px solid #dc2626; }
+    .signature-label { width: 220px; font-size: 10px; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase; color: #020617; text-align: center; }
   </style>
 </head>
 <body>
@@ -231,7 +237,7 @@
                 <th class="center col-qty">Qty</th>
                 @if($quotation['show_discount']) <th class="center col-discount">Disc%</th> @endif
                 @if($quotation['show_item_wise_gst']) <th class="right col-gst">GST</th> @endif
-                <th class="right col-total">Net Amount</th>
+                <th class="right col-total">{{ $quotation['gst_inclusive'] ? 'Amount' : 'Net Amount' }}</th>
               </tr>
             </thead>
             <tbody>
@@ -248,7 +254,7 @@
                   <td class="center amount-strong col-qty" style="white-space: nowrap;">{{ $item['quantity_label'] }}</td>
                   @if($quotation['show_discount']) <td class="center col-discount" style="white-space: nowrap;">{{ $item['discount_percent_label'] }}</td> @endif
                   @if($quotation['show_item_wise_gst']) <td class="right col-gst"><div>{{ $item['gst_percent_label'] }}</div><div class="gst-sub">{{ $item['tax_amount_label'] }}</div></td> @endif
-                  <td class="right amount-strong col-total">{{ $item['net_amount_label'] }}</td>
+                  <td class="right amount-strong col-total">{{ $quotation['gst_inclusive'] ? $item['line_total_label'] : $item['net_amount_label'] }}</td>
                 </tr>
               @endforeach
             </tbody>
@@ -259,9 +265,6 @@
             <tr class="totals-row muted"><td>Sub Total</td><td>{{ $quotation['subtotal_label'] }}</td></tr>
             @foreach($quotation['adjustments'] as $adjustment)<tr class="totals-row"><td>{{ $adjustment['name'] }}</td><td>{{ $adjustment['amount_label'] }}</td></tr>@endforeach
             @if($quotation['tax_amount'] > 0)
-              @if(!$quotation['gst_inclusive'])
-                <tr class="totals-row"><td>Total Before Tax</td><td>{{ $quotation['before_tax_total_label'] }}</td></tr>
-              @endif
               <tr class="totals-row"><td>GST</td><td>{{ $quotation['tax_amount_label'] }}</td></tr>
             @endif
             <tr class="totals-row grand-total"><td><span class="grand-label">Grand Total</span></td><td><span class="grand-value">{{ $quotation['grand_total_label'] }}</span></td></tr>
@@ -321,12 +324,18 @@
             <tr>
               <td class="footer-signatures-left">
                 <div class="salesperson-block">
-                  <div class="salesperson-name">{{ $quotation['salesperson']['name'] }}</div>
+                  <div class="salesperson-signature-wrap">
+                    <div class="salesperson-line"></div>
+                    <div class="salesperson-name">{{ $quotation['salesperson']['name'] }}</div>
+                  </div>
                   <div class="salesperson-meta">@if($quotation['salesperson']['phone']) <span>Phone: {{ $quotation['salesperson']['phone'] }}</span> @endif @if($quotation['salesperson']['email']) <span>Email: {{ $quotation['salesperson']['email'] }}</span> @endif</div>
                 </div>
               </td>
               <td class="footer-signatures-right">
-                <div class="signature-wrap"><div class="signature-line">Authorized Signature</div></div>
+                <div class="signature-wrap">
+                  <div class="signature-line"></div>
+                  <div class="signature-label">Authorized Signature</div>
+                </div>
               </td>
             </tr>
           </table>

@@ -123,9 +123,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('quotations/{id}/duplicate', [QuotationController::class, 'duplicate']);
     Route::patch('quotations/{id}/status', [QuotationController::class, 'status']);
     Route::post('quotations/{id}/submit-for-approval', [QuotationApprovalController::class, 'submit']);
-    Route::post('quotations/{id}/approve', [QuotationApprovalController::class, 'approve'])->middleware('role:admin,operations');
-    Route::post('quotations/{id}/reject', [QuotationApprovalController::class, 'reject'])->middleware('role:admin,operations');
-    Route::post('quotations/{id}/revise', [QuotationApprovalController::class, 'revise'])->middleware('role:admin,operations');
+    Route::post('quotations/{id}/approve', [QuotationApprovalController::class, 'approve'])->middleware('role:admin,operations,sales_manager');
+    Route::post('quotations/{id}/reject', [QuotationApprovalController::class, 'reject'])->middleware('role:admin,operations,sales_manager');
+    Route::post('quotations/{id}/revise', [QuotationApprovalController::class, 'revise'])->middleware('role:admin,operations,sales_manager');
     Route::get('quotations/{id}/activity', [QuotationApprovalController::class, 'activity']);
     Route::get('quotations', [QuotationController::class, 'index']);
     Route::post('quotations', [QuotationController::class, 'store']);

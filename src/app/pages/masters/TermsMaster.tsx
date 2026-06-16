@@ -1,16 +1,20 @@
 import { useData } from '../../context/DataContext';
 import { Plus, Edit, Trash2, Power } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../../components/common/Pagination';
+import { SortableHeader, type SortDirection } from '../../components/common/SortableHeader';
+import { sortItems } from '../../utils/sort';
 
 export const TermsMaster = () => {
   const { terms, addTerm, updateTerm, deleteTerm, loading } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ title: '', content: '', status: 'active' as 'active' | 'inactive' });
-  const pagination = usePagination(terms, 10);
+  const [sort, setSort] = useState<{ key: 'content' | 'title' | 'status'; direction: SortDirection }>({ key: 'title', direction: 'asc' });
+  const sortedTerms = useMemo(() => sortItems(terms, (term) => term[sort.key], sort.direction), [terms, sort]);
+  const pagination = usePagination(sortedTerms, 10);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +38,13 @@ export const TermsMaster = () => {
 
   const toggleStatus = async (term: any) => {
     await updateTerm(term.id, { ...term, status: term.status === 'active' ? 'inactive' : 'active' });
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -110,9 +121,9 @@ export const TermsMaster = () => {
           <table className="min-w-[760px] w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Term Content</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Title</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Term Content" sortKey="content" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Title" sortKey="title" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Status" sortKey="status" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
             </thead>

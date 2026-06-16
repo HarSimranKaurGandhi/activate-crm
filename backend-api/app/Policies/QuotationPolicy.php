@@ -20,6 +20,6 @@ class QuotationPolicy
 
     public function approve(User $user): bool
     {
-        return $user->hasAnyRole(['admin', 'operations']);
+        return $user->hasAnyRole(['admin', 'operations', 'sales_manager']);
     }
 }

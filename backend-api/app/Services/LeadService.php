@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Customer;
 use App\Models\Lead;
+use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -16,6 +18,20 @@ class LeadService extends CrudService
     protected array $searchColumns = ['name', 'phone', 'email', 'city', 'state', 'country', 'requirement'];
 
     protected array $relations = ['creator', 'assignedUser'];
+
+    public function paginate(Request $request): LengthAwarePaginator
+    {
+        return $this->visibleQuery($request)
+            ->latest('id')
+            ->paginate((int) $request->integer('per_page', 15));
+    }
+
+    public function find(int|string $id): Model
+    {
+        return $this->visibleQuery(request())
+            ->with($this->relations)
+            ->findOrFail($id);
+    }
 
     public function create(array $data): Model
     {
@@ -72,6 +88,24 @@ class LeadService extends CrudService
                 $request->filled('follow_up_to'),
                 fn (Builder $builder) => $builder->whereDate('follow_up_date', '<=', $request->date('follow_up_to'))
             );
+    }
+
+    private function visibleQuery(Request $request): Builder
+    {
+        $query = $this->query($request);
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return $query;
+        }
+
+        $user->loadMissing('role');
+
+        if ($user->hasAnyRole(['admin'])) {
+            return $query;
+        }
+
+        return $query->where('assigned_to', $user->getKey());
     }
 
     private function syncCustomerForClosedSuccess(Lead $lead): void

@@ -1,9 +1,11 @@
 import { useData } from '../../context/DataContext';
 import { Plus, Edit, Trash2, Power } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../../components/common/Pagination';
+import { SortableHeader, type SortDirection } from '../../components/common/SortableHeader';
+import { sortItems } from '../../utils/sort';
 
 export const BrandMaster = () => {
   const { brands, addBrand, updateBrand, deleteBrand, loading } = useData();
@@ -20,7 +22,9 @@ export const BrandMaster = () => {
     catalogFile: null as File | null,
     status: 'active' as 'active' | 'inactive',
   });
-  const pagination = usePagination(brands, 10);
+  const [sort, setSort] = useState<{ key: 'name' | 'supplierName' | 'status'; direction: SortDirection }>({ key: 'name', direction: 'asc' });
+  const sortedBrands = useMemo(() => sortItems(brands, (brand) => brand[sort.key], sort.direction), [brands, sort]);
+  const pagination = usePagination(sortedBrands, 10);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +73,13 @@ export const BrandMaster = () => {
 
   const toggleStatus = async (brand: any) => {
     await updateBrand(brand.id, { ...brand, status: brand.status === 'active' ? 'inactive' : 'active' });
+  };
+
+  const toggleSort = (key: typeof sort.key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   return (
@@ -177,10 +188,10 @@ export const BrandMaster = () => {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Logo</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Brand Name</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Supplier</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Brand Name" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Supplier" sortKey="supplierName" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Catalog</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Status" sortKey="status" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
             </thead>

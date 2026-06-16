@@ -93,7 +93,7 @@ class QuotationService extends CrudService
 
     public function paginate(Request $request): LengthAwarePaginator
     {
-        return $this->visibleQuery($request)
+        return $this->applyFilters($this->visibleQuery($request), $request)
             ->with($this->listRelations())
             ->latest('id')
             ->paginate((int) $request->integer('per_page', 15));
@@ -194,7 +194,7 @@ class QuotationService extends CrudService
 
     private function visibleQuery(Request $request): Builder
     {
-        $query = $this->applyFilters(Quotation::query(), $request);
+        $query = Quotation::query();
         $user = $request->user();
 
         if (! $user instanceof User) {
