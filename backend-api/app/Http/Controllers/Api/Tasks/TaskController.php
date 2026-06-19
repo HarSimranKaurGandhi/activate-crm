@@ -51,4 +51,11 @@ class TaskController extends ApiController
             new TaskResource($this->tasks->update($task, $request->validated()))
         );
     }
+
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->tasks->delete($this->tasks->find($id));
+
+        return $this->ok('Task deleted successfully');
+    }
 }

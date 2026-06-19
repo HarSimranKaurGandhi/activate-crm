@@ -13,4 +13,7 @@ export const taskService = {
   async update(id: string, payload: any) {
     return unwrap<any>(await apiClient.put(`/tasks/${id}`, payload));
   },
+  async remove(id: string) {
+    return unwrap<any>(await apiClient.delete(`/tasks/${id}`));
+  },
 };

@@ -28,6 +28,33 @@ const mapUser = (user: any) => ({
   status: user.is_active ? 'active' : 'inactive',
 });
 
+const mergeRoleOptions = (users: any[], roles: any[]) => {
+  const roleMap = new Map<string, any>();
+
+  (Array.isArray(roles) ? roles : []).forEach((role) => {
+    if (!role?.id) return;
+    roleMap.set(String(role.id), role);
+  });
+
+  (Array.isArray(users) ? users : []).forEach((user) => {
+    const role = user?.role;
+    const roleId = user?.role_id ?? role?.id;
+
+    if (!roleId || roleMap.has(String(roleId))) return;
+
+    roleMap.set(String(roleId), {
+      id: roleId,
+      name: role?.name || '',
+      code: role?.code || '',
+      display_name: role?.display_name || role?.name || role?.code || 'Role',
+    });
+  });
+
+  return Array.from(roleMap.values()).sort((a, b) =>
+    String(a.display_name || a.name || '').localeCompare(String(b.display_name || b.name || ''))
+  );
+};
+
 export const UserMaster = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
@@ -50,7 +77,7 @@ export const UserMaster = () => {
 
       const userList = Array.isArray(usersResponse?.data) ? usersResponse.data : Array.isArray(usersResponse) ? usersResponse : [];
       setUsers(userList.map(mapUser));
-      setRoles(rolesResponse);
+      setRoles(mergeRoleOptions(userList, rolesResponse));
     } finally {
       setLoading(false);
     }

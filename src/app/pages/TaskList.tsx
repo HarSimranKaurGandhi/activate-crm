@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Edit, Eye, Plus, Search } from 'lucide-react';
+import { Edit, Eye, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
@@ -9,6 +9,7 @@ import { taskService } from '../../services/taskService';
 import { mapTask, taskPayload } from '../../services/mappers';
 import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
 import { sortItems } from '../utils/sort';
+import { useAuth } from '../auth/AuthContext';
 
 const TASK_STATUS_OPTIONS = [
   { value: 'all', label: 'All Status' },
@@ -40,6 +41,7 @@ const statusLabel = (status: string) => {
 
 export const TaskList = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -55,6 +57,7 @@ export const TaskList = () => {
     key: 'dueDate',
     direction: 'asc',
   });
+  const isAdmin = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase() === 'admin';
 
   useEffect(() => {
     const load = async () => {
@@ -169,6 +172,21 @@ export const TaskList = () => {
       key,
       direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
     }));
+  };
+
+  const handleDelete = async (taskId: string) => {
+    if (!confirm('Delete this task permanently?')) {
+      return;
+    }
+
+    try {
+      await taskService.remove(taskId);
+      setTasks((current) => current.filter((task) => task.id !== taskId));
+      setSelectedTaskIds((current) => current.filter((id) => id !== taskId));
+      toast.success('Task deleted successfully');
+    } catch {
+      toast.error('Unable to delete task');
+    }
   };
 
   return (
@@ -304,6 +322,15 @@ export const TaskList = () => {
                         >
                           <Edit className="h-4 w-4" />
                         </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDelete(task.id)}
+                            className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -13,6 +13,21 @@ use Symfony\Component\Process\Process;
 
 class QuotationPdfService
 {
+    private function maskPhone(?string $value): string
+    {
+        $phone = trim((string) $value);
+
+        if ($phone === '') {
+            return '';
+        }
+
+        if (mb_strlen($phone) <= 1) {
+            return $phone.'****';
+        }
+
+        return mb_substr($phone, 0, 1).'****';
+    }
+
     public function render(Quotation $quotation): array
     {
         $baseDir = storage_path('app/pdf-temp');
@@ -184,7 +199,7 @@ class QuotationPdfService
             'customer' => [
                 'primary_name' => $customer?->primary_name ?: '',
                 'company_name' => $customer?->company_name ?: '',
-                'phone' => $customer?->phone ?: '',
+                'phone' => $this->maskPhone($customer?->phone),
                 'email' => $customer?->email ?: '',
                 'gst_number' => $customer?->gst_number ?: '',
                 'address' => collect([

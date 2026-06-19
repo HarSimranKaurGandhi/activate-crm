@@ -13,6 +13,12 @@ import { LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
 
 const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const maskPhone = (value?: string) => {
+  const phone = String(value || '').trim();
+  if (!phone) return '-';
+  if (phone.length <= 1) return `${phone}****`;
+  return `${phone.slice(0, 1)}****`;
+};
 
 const getQuotationBasePrice = (product: any) => Number(product?.mrp ?? product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
 const normalizeDiscount = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
@@ -394,6 +400,7 @@ export const QuotationBuilder = () => {
       product.brand.toLowerCase().includes(search)
     );
   });
+  const leadPagination = usePagination(filteredLeads, 8);
 
   if (loading && id) {
     return (
@@ -481,7 +488,7 @@ export const QuotationBuilder = () => {
                   <p className="font-medium text-gray-900 leading-tight truncate">{selectedLead.company || selectedLead.name}</p>
                   <div className="mt-1 grid gap-x-4 gap-y-0.5 text-sm text-gray-600 sm:grid-cols-2">
                     <span className="truncate">{selectedLead.name}</span>
-                    <span className="truncate">{selectedLead.phone}</span>
+                    <span className="truncate">{maskPhone(selectedLead.phone)}</span>
                     <span className="truncate sm:col-span-2">{selectedLead.email}</span>
                   </div>
                 </div>
@@ -807,7 +814,7 @@ export const QuotationBuilder = () => {
       {/* Lead Selection Modal */}
       {showLeadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4">
+          <div className="bg-white rounded-2xl p-6 max-w-5xl w-full mx-4 max-h-[85vh] overflow-hidden">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-gray-900">Select Lead</h3>
               <button
@@ -827,37 +834,68 @@ export const QuotationBuilder = () => {
                 className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div className="space-y-3 mb-4">
-              {filteredLeads.map(lead => (
-                <div
-                  key={lead.id}
-                  onClick={() => {
-                    setSelectedLead({
-                      id: String(lead.id),
-                      sourceType: 'lead',
-                      name: lead.name || '',
-                      phone: lead.phone || '',
-                      email: lead.email || '',
-                      company: '',
-                      address: [lead.address_line_1, lead.address_line_2, lead.city, lead.state, lead.pincode, lead.country].filter(Boolean).join(', '),
-                    });
-                    setLeadSearch('');
-                    setShowLeadModal(false);
-                  }}
-                  className="p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
-                >
-                  <p className="font-medium text-gray-900">{lead.name || lead.phone}</p>
-                  <p className="text-sm text-gray-600">{lead.phone}</p>
-                  <p className="text-sm text-gray-600">{lead.email}</p>
-                  <p className="text-sm text-gray-600">{lead.city || '-'}</p>
-                </div>
-              ))}
-              {filteredLeads.length === 0 && (
-                <div className="py-8 text-center text-sm text-gray-500">
-                  No in-progress leads matched your search.
-                </div>
-              )}
+            <div className="overflow-hidden rounded-xl border border-gray-200">
+              <div className="max-h-[52vh] overflow-auto">
+                <table className="min-w-full">
+                  <thead className="sticky top-0 z-10 bg-gray-50">
+                    <tr className="border-b border-gray-200">
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600">Lead</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600">Phone</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600">Email</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600">City</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600">Requirement</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {leadPagination.pageItems.map((lead) => (
+                      <tr
+                        key={lead.id}
+                        onClick={() => {
+                          setSelectedLead({
+                            id: String(lead.id),
+                            sourceType: 'lead',
+                            name: lead.name || '',
+                            phone: lead.phone || '',
+                            email: lead.email || '',
+                            company: '',
+                            address: [lead.address_line_1, lead.address_line_2, lead.city, lead.state, lead.pincode, lead.country].filter(Boolean).join(', '),
+                          });
+                          setLeadSearch('');
+                          setShowLeadModal(false);
+                        }}
+                        className="cursor-pointer transition-colors hover:bg-blue-50"
+                      >
+                        <td className="px-4 py-3 align-top">
+                          <div className="font-medium text-gray-900">{lead.name || 'Untitled Lead'}</div>
+                          <div className="mt-0.5 text-xs text-gray-500">{lead.lead_source?.replaceAll('_', ' ') || 'Lead'}</div>
+                        </td>
+                        <td className="px-4 py-3 align-top text-sm text-gray-700 whitespace-nowrap">{maskPhone(lead.phone)}</td>
+                        <td className="px-4 py-3 align-top text-sm text-gray-700 max-w-[220px] truncate">{lead.email || '-'}</td>
+                        <td className="px-4 py-3 align-top text-sm text-gray-700 whitespace-nowrap">{lead.city || '-'}</td>
+                        <td className="px-4 py-3 align-top text-sm text-gray-700 max-w-[320px] truncate">{lead.requirement || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredLeads.length === 0 && (
+                  <div className="py-10 text-center text-sm text-gray-500">
+                    No in-progress leads matched your search.
+                  </div>
+                )}
+              </div>
             </div>
+            {filteredLeads.length > 0 && (
+              <div className="mt-4">
+                <PaginationControls
+                  page={leadPagination.page}
+                  pageSize={leadPagination.pageSize}
+                  totalItems={leadPagination.totalItems}
+                  totalPages={leadPagination.totalPages}
+                  onPageChange={leadPagination.setPage}
+                  onPageSizeChange={leadPagination.setPageSize}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -264,7 +264,7 @@
           <table>
             <tr class="totals-row muted"><td>Sub Total</td><td>{{ $quotation['subtotal_label'] }}</td></tr>
             @foreach($quotation['adjustments'] as $adjustment)<tr class="totals-row"><td>{{ $adjustment['name'] }}</td><td>{{ $adjustment['amount_label'] }}</td></tr>@endforeach
-            @if($quotation['tax_amount'] > 0)
+            @if(!$quotation['gst_inclusive'] && $quotation['tax_amount'] > 0)
               <tr class="totals-row"><td>GST</td><td>{{ $quotation['tax_amount_label'] }}</td></tr>
             @endif
             <tr class="totals-row grand-total"><td><span class="grand-label">Grand Total</span></td><td><span class="grand-value">{{ $quotation['grand_total_label'] }}</span></td></tr>

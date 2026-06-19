@@ -136,6 +136,13 @@ export const QuotationPreview = () => {
     quotation.roundOffNetAmount ? Math.round(amount || 0) : amount
   );
 
+  const maskPhone = (value?: string) => {
+    const phone = String(value || '').trim();
+    if (!phone) return '';
+    if (phone.length <= 1) return `${phone}****`;
+    return `${phone.slice(0, 1)}****`;
+  };
+
   const formatMoney = (amount: number, options?: { whole?: boolean }) =>
     `₹${Number(amount || 0).toLocaleString('en-IN', {
       minimumFractionDigits: options?.whole ? 0 : 0,
@@ -409,7 +416,7 @@ export const QuotationPreview = () => {
                     {quotation.customer.company && <p className="text-sm font-semibold text-slate-700">{quotation.customer.name}</p>}
                     <p className="mt-3 text-sm font-medium leading-6 sm:leading-7 text-slate-700">{quotation.customer.address}</p>
                     <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
-                      {quotation.customer.phone && <span>Phone: {quotation.customer.phone}</span>}
+                      {quotation.customer.phone && <span>Phone: {maskPhone(quotation.customer.phone)}</span>}
                       {(quotation.customer.phone && quotation.customer.email) && <span className="text-slate-400">|</span>}
                       {quotation.customer.email && <span>Email: {quotation.customer.email}</span>}
                     </div>
@@ -633,7 +640,7 @@ export const QuotationPreview = () => {
                     );
                   })}
 
-                  {quotation.taxAmount > 0 && (
+                  {!quotation.gstInclusive && quotation.taxAmount > 0 && (
                     <>
                       <div className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
                         <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">GST</div>

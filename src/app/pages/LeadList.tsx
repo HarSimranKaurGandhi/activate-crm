@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowUpDown, Edit, Eye, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Edit, Eye, Phone, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
@@ -67,6 +67,8 @@ const formatDisplayDate = (date?: string) => {
     year: 'numeric',
   });
 };
+
+const phoneHref = (phone?: string) => `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
 
 export const LeadList = () => {
   const navigate = useNavigate();
@@ -267,7 +269,14 @@ export const LeadList = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="break-words text-base font-semibold text-gray-900">{lead.name}</div>
-                      <div className="mt-1 text-sm text-gray-500">{lead.phone}</div>
+                      {lead.phone && (
+                        <a
+                          href={phoneHref(lead.phone)}
+                          className="mt-1 inline-block text-sm text-blue-600 hover:underline"
+                        >
+                          {lead.phone}
+                        </a>
+                      )}
                       {lead.email && <div className="break-words text-sm text-gray-500">{lead.email}</div>}
                     </div>
                     <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[lead.status] || statusBadgeClass.new}`}>
@@ -305,6 +314,15 @@ export const LeadList = () => {
                   )}
 
                   <div className="flex items-center justify-end gap-2">
+                    {lead.phone && (
+                      <a
+                        href={phoneHref(lead.phone)}
+                        className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50"
+                        title="Call"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </a>
+                    )}
                     <button
                       onClick={() => navigate(`/leads/${lead.id}`)}
                       className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100"
@@ -350,7 +368,14 @@ export const LeadList = () => {
                     <tr key={lead.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{lead.name}</div>
-                        <div className="mt-1 text-sm text-gray-500">{lead.phone}</div>
+                        {lead.phone && (
+                          <a
+                            href={phoneHref(lead.phone)}
+                            className="mt-1 inline-block text-sm text-blue-600 hover:underline"
+                          >
+                            {lead.phone}
+                          </a>
+                        )}
                         {lead.email && <div className="text-sm text-gray-500">{lead.email}</div>}
                       </td>
                       <td className="px-6 py-4 text-gray-700">{sourceLabel(lead.leadSource)}</td>
@@ -375,6 +400,15 @@ export const LeadList = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
+                          {lead.phone && (
+                            <a
+                              href={phoneHref(lead.phone)}
+                              className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50"
+                              title="Call"
+                            >
+                              <Phone className="h-4 w-4" />
+                            </a>
+                          )}
                           <button
                             onClick={() => navigate(`/leads/${lead.id}`)}
                             className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100"

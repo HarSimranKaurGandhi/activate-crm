@@ -110,6 +110,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('tasks', [TaskController::class, 'store']);
     Route::get('tasks/{id}', [TaskController::class, 'show']);
     Route::put('tasks/{id}', [TaskController::class, 'update']);
+    Route::delete('tasks/{id}', [TaskController::class, 'destroy'])->middleware('role:admin');
 
     Route::get('leads', [LeadController::class, 'index']);
     Route::post('leads', [LeadController::class, 'store']);

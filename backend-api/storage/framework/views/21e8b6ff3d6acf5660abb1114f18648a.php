@@ -83,11 +83,14 @@
     .product-image-placeholder { width: 138px; height: 88px; margin: 0 auto 6px; border-radius: 8px; background: #f1f5f9; color: #94a3b8; font-size: 8px; font-weight: 700; text-align: center; line-height: 88px; }
     .product-name { font-size: 10px; font-weight: 900; color: #020617; text-align: center; line-height: 1.2; }
     .product-model { margin-top: 2px; text-align: center; font-size: 8px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #475569; }
-    .specs { font-size: 8.5px; line-height: 1.24; color: #334155; word-wrap: break-word; word-break: break-word; overflow-wrap: anywhere; white-space: normal; }
+    .specs { max-width: 100%; min-width: 0; overflow: hidden; font-size: 8.5px; line-height: 1.24; color: #334155; word-wrap: break-word; word-break: break-word; overflow-wrap: anywhere; white-space: normal; }
     .specs p { margin: 0 0 2px; }
     .specs ul, .specs ol { margin: 0; padding-left: 14px; }
     .specs li { margin-bottom: 2px; }
-    .specs * { max-width: 100%; white-space: normal !important; word-break: break-word !important; overflow-wrap: anywhere !important; font-family: inherit !important; font-size: inherit !important; line-height: inherit !important; color: inherit !important; }
+    .specs * { max-width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; white-space: normal !important; word-break: break-word !important; overflow-wrap: anywhere !important; font-family: inherit !important; font-size: inherit !important; line-height: inherit !important; color: inherit !important; }
+    .specs img, .specs svg, .specs video, .specs canvas, .specs iframe, .specs embed, .specs object { display: block; max-width: 100% !important; width: auto !important; height: auto !important; }
+    .specs table { width: 100% !important; max-width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
+    .specs th, .specs td, .specs pre, .specs code { white-space: pre-wrap !important; word-break: break-word !important; overflow-wrap: anywhere !important; }
     .amount-strong { font-size: 9.5px; font-weight: 900; color: #020617; }
     .gst-sub { margin-top: 2px; font-size: 8px; color: #64748b; }
     .totals { width: 420px; margin-left: auto; border: 1px solid #d1d5db; overflow: hidden; margin-bottom: 10px; }
@@ -261,10 +264,7 @@
           <table>
             <tr class="totals-row muted"><td>Sub Total</td><td><?php echo e($quotation['subtotal_label']); ?></td></tr>
             <?php $__currentLoopData = $quotation['adjustments']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $adjustment): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><tr class="totals-row"><td><?php echo e($adjustment['name']); ?></td><td><?php echo e($adjustment['amount_label']); ?></td></tr><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-            <?php if($quotation['tax_amount'] > 0): ?>
-              <?php if(!$quotation['gst_inclusive']): ?>
-                <tr class="totals-row"><td>Total Before Tax</td><td><?php echo e($quotation['before_tax_total_label']); ?></td></tr>
-              <?php endif; ?>
+            <?php if(!$quotation['gst_inclusive'] && $quotation['tax_amount'] > 0): ?>
               <tr class="totals-row"><td>GST</td><td><?php echo e($quotation['tax_amount_label']); ?></td></tr>
             <?php endif; ?>
             <tr class="totals-row grand-total"><td><span class="grand-label">Grand Total</span></td><td><span class="grand-value"><?php echo e($quotation['grand_total_label']); ?></span></td></tr>

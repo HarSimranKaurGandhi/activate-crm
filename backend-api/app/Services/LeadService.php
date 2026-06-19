@@ -21,7 +21,7 @@ class LeadService extends CrudService
 
     public function paginate(Request $request): LengthAwarePaginator
     {
-        return $this->visibleQuery($request)
+        return $this->applyFilters($this->visibleQuery($request), $request)
             ->latest('id')
             ->paginate((int) $request->integer('per_page', 15));
     }
@@ -92,7 +92,16 @@ class LeadService extends CrudService
 
     private function visibleQuery(Request $request): Builder
     {
-        $query = $this->query($request);
+        $query = Lead::query()->with($this->relations);
+
+        if ($request->filled('search') && $this->searchColumns !== []) {
+            $search = $request->string('search')->toString();
+            $query->where(function (Builder $builder) use ($search): void {
+                foreach ($this->searchColumns as $column) {
+                    $builder->orWhere($column, 'like', "%{$search}%");
+                }
+            });
+        }
         $user = $request->user();
 
         if (! $user instanceof User) {

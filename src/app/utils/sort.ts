@@ -16,11 +16,11 @@ const normalizeValue = (value: unknown): string | number => {
 };
 
 export const sortItems = <T>(
-  items: T[],
+  items: T[] | null | undefined,
   accessor: (item: T) => unknown,
   direction: SortDirection,
 ): T[] =>
-  [...items].sort((a, b) => {
+  [...(Array.isArray(items) ? items : [])].sort((a, b) => {
     const aValue = normalizeValue(accessor(a));
     const bValue = normalizeValue(accessor(b));
 
