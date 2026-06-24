@@ -21,14 +21,27 @@ class ProductService extends CrudService
 {
     protected string $modelClass = Product::class;
 
-    protected array $searchColumns = ['product_name', 'model_number'];
+    protected array $searchColumns = [];
 
     protected array $relations = ['category', 'brand', 'images'];
 
     public function paginate(Request $request): LengthAwarePaginator
     {
-        return $this->query($request)
-            ->latest('id')
+        $query = $this->query($request);
+
+        $this->applySorting($query, $request, [
+            'id' => 'products.id',
+            'product_name' => 'products.product_name',
+            'model_number' => 'products.model_number',
+            'category' => 'categories.name',
+            'brand' => 'brands.name',
+            'mrp' => 'products.mrp',
+            'usual_selling_price' => 'products.usual_selling_price',
+            'least_selling_price' => 'products.least_selling_price',
+            'gst_percent' => 'products.gst_percent',
+        ], 'products.id', 'desc');
+
+        return $query
             ->paginate((int) $request->integer('per_page', 15));
     }
 
@@ -47,6 +60,7 @@ class ProductService extends CrudService
             })
             ->when($request->filled('category_id'), fn (Builder $q) => $q->where('category_id', $request->integer('category_id')))
             ->when($request->filled('brand_id'), fn (Builder $q) => $q->where('brand_id', $request->integer('brand_id')))
+            ->when($request->filled('gst_percent'), fn (Builder $q) => $q->where('gst_percent', $request->input('gst_percent')))
             ->when(
                 $request->has('is_active'),
                 fn (Builder $q) => $q->where('is_active', $request->boolean('is_active')),
@@ -59,10 +73,13 @@ class ProductService extends CrudService
                 'image_path',
                 'mrp',
                 'usual_selling_price',
+                'least_selling_price',
                 'gst_percent',
                 'brand_id',
+                'category_id',
                 'unit',
                 'hsn_code',
+                'specifications',
             ])
             ->orderBy('product_name')
             ->paginate((int) $request->integer('per_page', 15));
@@ -133,8 +150,41 @@ class ProductService extends CrudService
     protected function applyFilters(Builder $query, Request $request): Builder
     {
         return $query
-            ->when($request->filled('category_id'), fn (Builder $q) => $q->where('category_id', $request->integer('category_id')))
-            ->when($request->filled('brand_id'), fn (Builder $q) => $q->where('brand_id', $request->integer('brand_id')));
+            ->select('products.*')
+            ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('brands', 'brands.id', '=', 'products.brand_id')
+            ->when($request->filled('search'), function (Builder $q) use ($request): void {
+                $search = $request->string('search')->toString();
+                $q->where(function (Builder $builder) use ($search): void {
+                    $builder
+                        ->where('products.product_name', 'like', "%{$search}%")
+                        ->orWhere('products.model_number', 'like', "%{$search}%")
+                        ->orWhere('products.hsn_code', 'like', "%{$search}%")
+                        ->orWhere('categories.name', 'like', "%{$search}%")
+                        ->orWhere('brands.name', 'like', "%{$search}%");
+                });
+            })
+            ->when($request->filled('category_id'), fn (Builder $q) => $q->where('products.category_id', $request->integer('category_id')))
+            ->when($request->filled('brand_id'), fn (Builder $q) => $q->where('products.brand_id', $request->integer('brand_id')))
+            ->when($request->filled('gst_percent'), fn (Builder $q) => $q->where('products.gst_percent', $request->input('gst_percent')));
+    }
+
+    private function applySorting(
+        Builder $query,
+        Request $request,
+        array $columns,
+        string $defaultColumn,
+        string $defaultDirection = 'asc'
+    ): void {
+        $sortBy = $request->string('sort_by', '')->toString();
+        $column = $columns[$sortBy] ?? $defaultColumn;
+        $direction = $request->string('sort_direction', $defaultDirection)->toString() === 'asc' ? 'asc' : 'desc';
+
+        $query->orderBy($column, $direction);
+
+        if ($column !== 'products.id') {
+            $query->orderBy('products.id', 'desc');
+        }
     }
 
     public function bulkUpsertFromCsv(string $path): array

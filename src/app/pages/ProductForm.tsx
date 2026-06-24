@@ -5,6 +5,8 @@ import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../components/common/AsyncState';
 import { measurementUnitService } from '../../services/masterService';
+import { productService } from '../../services/productService';
+import { mapProduct } from '../../services/mappers';
 
 const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const FONT_SIZE_OPTIONS = [
@@ -66,20 +68,46 @@ export const ProductForm = () => {
   }, []);
 
   useEffect(() => {
-    if (id) {
-      const product = products.find(p => p.id === id);
-      if (product) {
-        const matchingCategory = categories.find((category) => category.id === product.categoryId || category.name === product.category);
-        setFormData({
-          ...product,
-          categoryId: product.categoryId || matchingCategory?.id || '',
-          images: product.images || [],
-          primaryImageToken: product.images?.find((image: any) => image.isPrimary)?.id ? `existing:${product.images.find((image: any) => image.isPrimary)?.id}` : '',
-          newImageFiles: [],
-        });
-      }
+    if (!id) {
+      return;
     }
-  }, [categories, id, products]);
+
+    let ignore = false;
+    const applyProduct = (product: any) => {
+      const matchingCategory = categories.find((category) => category.id === product.categoryId || category.name === product.category);
+
+      setFormData({
+        ...product,
+        categoryId: product.categoryId || matchingCategory?.id || '',
+        images: product.images || [],
+        primaryImageToken: product.images?.find((image: any) => image.isPrimary)?.id ? `existing:${product.images.find((image: any) => image.isPrimary)?.id}` : '',
+        newImageFiles: [],
+      });
+    };
+
+    const cachedProduct = products.find(p => p.id === id);
+
+    if (cachedProduct) {
+      applyProduct(cachedProduct);
+      return;
+    }
+
+    productService
+      .get(id)
+      .then((product) => {
+        if (!ignore) {
+          applyProduct(mapProduct(product));
+        }
+      })
+      .catch((error: any) => {
+        toast.error(error.message || 'Product not found');
+        navigate('/products');
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [categories, id, navigate, products]);
 
   useEffect(() => {
     if (specsEditorRef.current && specsEditorRef.current.innerHTML !== formData.specifications) {

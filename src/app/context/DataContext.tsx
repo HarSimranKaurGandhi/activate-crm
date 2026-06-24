@@ -173,8 +173,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadProducts = useCallback(async (force = false) => {
     return runLoader('products', async () => {
-      const result = await productService.list();
-      setProducts(asArray(result.data).map(mapProduct));
+      const result = await productService.listAll();
+      setProducts(result.map(mapProduct));
     }, force);
   }, [runLoader]);
 
@@ -228,7 +228,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (pathname === '/quotations/new' || /^\/quotations\/[^/]+\/edit$/.test(pathname)) {
-        loaders.push(loadCategories(), loadBrands(), loadProducts(), loadAdjustments(), loadTerms(), loadSettings(), loadQuotations());
+        loaders.push(loadCategories(), loadBrands(), loadAdjustments(), loadTerms(), loadSettings(), loadQuotations());
       }
 
       if (/^\/quotations\/[^/]+\/preview$/.test(pathname)) {
@@ -244,7 +244,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (pathname.startsWith('/products')) {
-      loaders.push(loadProducts(), loadCategories(), loadBrands());
+      loaders.push(loadCategories(), loadBrands());
     }
 
     if (pathname === '/masters/categories') loaders.push(loadCategories());

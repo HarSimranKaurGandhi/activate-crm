@@ -1,10 +1,11 @@
 import { useNavigate, useParams } from 'react-router';
 import { useData } from '../context/DataContext';
 import { ArrowLeft, Plus, Search, GripVertical, Trash2, ChevronDown, Save } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { toast } from 'sonner';
 import { productService } from '../../services/productService';
+import type { PaginationMeta } from '../../services/productService';
 import { userService } from '../../services/userService';
 import { leadService } from '../../services/leadService';
 import { mapProduct } from '../../services/mappers';
@@ -22,6 +23,14 @@ const maskPhone = (value?: string) => {
 
 const getQuotationBasePrice = (product: any) => Number(product?.mrp ?? product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
 const normalizeDiscount = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
+const emptyProductPagination: PaginationMeta = {
+  current_page: 1,
+  per_page: 10,
+  total: 0,
+  last_page: 1,
+  from: null,
+  to: null,
+};
 
 const calculateItemAmounts = (item: QuotationItem, gstInclusive: boolean) => {
   const basePrice = item.price * item.quantity;
@@ -136,7 +145,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
 export const QuotationBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { products, quotations, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
+  const { quotations, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
   const { user } = useAuth();
 
   const [selectedLead, setSelectedLead] = useState<any>(null);
@@ -159,7 +168,10 @@ export const QuotationBuilder = () => {
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [leadSearch, setLeadSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState('');
   const [selectableProducts, setSelectableProducts] = useState<any[]>([]);
+  const [productPagination, setProductPagination] = useState(emptyProductPagination);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [inProgressLeads, setInProgressLeads] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const activeTermIds = masterTerms.filter((term) => term.status === 'active').map((term) => term.id);
@@ -264,16 +276,45 @@ export const QuotationBuilder = () => {
   }, [salesUsers, salesperson.email, salesperson.name, selectedSalespersonId]);
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedProductSearch(productSearch.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [productSearch]);
+
+  const fetchSelectableProducts = useCallback(async (page: number, perPage: number) => {
     if (!showProductModal) return;
 
-    productService
-      .selectable({ is_active: true })
-      .then((result) => {
-        const data = Array.isArray(result.data) ? result.data : [];
-        setSelectableProducts(data.map(mapProduct));
-      })
-      .catch(() => setSelectableProducts(products.filter((product) => product.status === 'active')));
-  }, [products, showProductModal]);
+    setProductsLoading(true);
+    try {
+      const result = await productService.selectable({
+        is_active: true,
+        page,
+        per_page: perPage,
+        ...(debouncedProductSearch ? { search: debouncedProductSearch } : {}),
+      });
+      const data = Array.isArray(result.data) ? result.data : [];
+      setSelectableProducts(data.map(mapProduct));
+      setProductPagination({
+        ...emptyProductPagination,
+        ...(result.meta?.pagination || {}),
+      });
+    } catch {
+      setSelectableProducts([]);
+      setProductPagination(emptyProductPagination);
+    } finally {
+      setProductsLoading(false);
+    }
+  }, [debouncedProductSearch, showProductModal]);
+
+  useEffect(() => {
+    if (!showProductModal) {
+      return;
+    }
+
+    fetchSelectableProducts(1, productPagination.per_page);
+  }, [debouncedProductSearch, fetchSelectableProducts, productPagination.per_page, showProductModal]);
 
   useEffect(() => {
     if (!showLeadModal) return;
@@ -385,19 +426,6 @@ export const QuotationBuilder = () => {
       String(lead.email || '').toLowerCase().includes(search) ||
       String(lead.city || '').toLowerCase().includes(search) ||
       String(lead.requirement || '').toLowerCase().includes(search)
-    );
-  });
-  const filteredProducts = (selectableProducts.length ? selectableProducts : products.filter((product) => product.status === 'active')).filter((product) => {
-    const search = productSearch.trim().toLowerCase();
-
-    if (!search) {
-      return true;
-    }
-
-    return (
-      product.name.toLowerCase().includes(search) ||
-      product.modelNumber.toLowerCase().includes(search) ||
-      product.brand.toLowerCase().includes(search)
     );
   });
   const leadPagination = usePagination(filteredLeads, 8);
@@ -762,6 +790,8 @@ export const QuotationBuilder = () => {
               <button
                 onClick={() => {
                   setProductSearch('');
+                  setSelectableProducts([]);
+                  setProductPagination(emptyProductPagination);
                   setShowProductModal(false);
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg"
@@ -780,12 +810,14 @@ export const QuotationBuilder = () => {
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredProducts.map(product => (
+              {selectableProducts.map(product => (
                 <div
                   key={product.id}
                   onClick={() => {
                     addProduct(product);
                     setProductSearch('');
+                    setSelectableProducts([]);
+                    setProductPagination(emptyProductPagination);
                   }}
                   className="flex gap-4 p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
                 >
@@ -802,9 +834,22 @@ export const QuotationBuilder = () => {
                 </div>
               ))}
             </div>
-            {filteredProducts.length === 0 && (
+            {productsLoading && <LoadingState label="Loading products..." />}
+            {!productsLoading && selectableProducts.length === 0 && (
               <div className="py-8 text-center text-sm text-gray-500">
                 No products matched your search.
+              </div>
+            )}
+            {productPagination.total > 0 && (
+              <div className="mt-4 overflow-hidden rounded-xl border border-gray-200">
+                <PaginationControls
+                  page={productPagination.current_page}
+                  pageSize={productPagination.per_page}
+                  totalItems={productPagination.total}
+                  totalPages={productPagination.last_page}
+                  onPageChange={(nextPage) => fetchSelectableProducts(nextPage, productPagination.per_page)}
+                  onPageSizeChange={(nextPageSize) => fetchSelectableProducts(1, nextPageSize)}
+                />
               </div>
             )}
           </div>

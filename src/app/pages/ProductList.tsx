@@ -1,56 +1,94 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
 import { Plus, Search, Edit, Trash2, ImageIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { toast } from 'sonner';
-import { productService } from '../../services/productService';
-import { PaginationControls, usePagination } from '../components/common/Pagination';
+import { productService, type PaginationMeta } from '../../services/productService';
+import { PaginationControls } from '../components/common/Pagination';
 import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
-import { sortItems } from '../utils/sort';
+import { mapProduct } from '../../services/mappers';
+
+const emptyPagination: PaginationMeta = {
+  current_page: 1,
+  per_page: 10,
+  total: 0,
+  last_page: 1,
+  from: null,
+  to: null,
+};
+
+const sortMap = {
+  name: 'product_name',
+  category: 'category',
+  brand: 'brand',
+  mrp: 'mrp',
+  usualSellingPrice: 'usual_selling_price',
+  leastSellingPrice: 'least_selling_price',
+  gstPercent: 'gst_percent',
+} as const;
 
 export const ProductList = () => {
   const navigate = useNavigate();
-  const { products, categories, brands, deleteProduct, loading, refreshAll } = useData();
+  const { categories, brands, deleteProduct, loading, refreshAll } = useData();
+  const [products, setProducts] = useState<any[]>([]);
+  const [pagination, setPagination] = useState(emptyPagination);
+  const [productLoading, setProductLoading] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     category: 'all',
     brand: 'all',
     gst: 'all',
   });
-  const [sort, setSort] = useState<{ key: 'name' | 'category' | 'brand' | 'mrp' | 'usualSellingPrice' | 'leastSellingPrice' | 'gstPercent'; direction: SortDirection }>({
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sort, setSort] = useState<{ key: keyof typeof sortMap; direction: SortDirection }>({
     key: 'name',
     direction: 'asc',
   });
   const [bulkUploading, setBulkUploading] = useState(false);
 
-  const filteredProducts = useMemo(() => {
-    const search = filters.search.trim().toLowerCase();
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(filters.search.trim());
+    }, 300);
 
-    return products.filter((product) => {
-      const matchesSearch = !search || [
-        product.name,
-        product.modelNumber,
-        product.category,
-        product.brand,
-        product.hsnCode,
-      ].some((value) => String(value || '').toLowerCase().includes(search));
-      const matchesCategory = filters.category === 'all' || product.category === filters.category;
-      const matchesBrand = filters.brand === 'all' || product.brand === filters.brand;
-      const matchesGst = filters.gst === 'all' || Number(product.gstPercent) === Number(filters.gst);
+    return () => window.clearTimeout(timeout);
+  }, [filters.search]);
 
-      return matchesSearch && matchesCategory && matchesBrand && matchesGst;
-    });
-  }, [filters, products]);
+  const fetchProducts = useCallback(async (page: number, perPage: number) => {
+    setProductLoading(true);
+    try {
+      const params: Record<string, unknown> = {
+        page,
+        per_page: perPage,
+        sort_by: sortMap[sort.key],
+        sort_direction: sort.direction,
+      };
 
-  const sortedProducts = useMemo(() => sortItems(filteredProducts, (product) => product[sort.key], sort.direction), [filteredProducts, sort]);
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (filters.category !== 'all') params.category_id = filters.category;
+      if (filters.brand !== 'all') params.brand_id = filters.brand;
+      if (filters.gst !== 'all') params.gst_percent = filters.gst;
 
-  const pagination = usePagination(sortedProducts, 10);
+      const result = await productService.list(params);
+      setProducts((Array.isArray(result.data) ? result.data : []).map(mapProduct));
+      setPagination({
+        ...emptyPagination,
+        ...(result.meta?.pagination || {}),
+      });
+    } finally {
+      setProductLoading(false);
+    }
+  }, [debouncedSearch, filters.brand, filters.category, filters.gst, sort.direction, sort.key]);
+
+  useEffect(() => {
+    fetchProducts(1, pagination.per_page);
+  }, [debouncedSearch, filters.category, filters.brand, filters.gst, sort, fetchProducts, pagination.per_page]);
 
   const gstOptions = useMemo(() => {
-    return Array.from(new Set(products.map((product) => Number(product.gstPercent)).filter((value) => !Number.isNaN(value))))
+    return Array.from(new Set(categories.map((category) => Number(category.gstPercent)).filter((value) => !Number.isNaN(value))))
       .sort((a, b) => a - b);
-  }, [products]);
+  }, [categories]);
 
   const updateFilter = (key: keyof typeof filters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -78,7 +116,7 @@ export const ProductList = () => {
     setBulkUploading(true);
     try {
       const result = await productService.bulkUpload(file);
-      await refreshAll();
+      await Promise.all([refreshAll(), fetchProducts(1, pagination.per_page)]);
       toast.success(`Bulk upload complete: ${result.created} created, ${result.updated} updated`);
     } catch (error: any) {
       toast.error(error.message || 'Bulk upload failed');
@@ -100,6 +138,14 @@ export const ProductList = () => {
       toast.error(error.message || 'Sample download failed');
     }
   };
+
+  const handleDelete = async (id: string) => {
+    await deleteProduct(id);
+    toast.success('Product deleted');
+    await fetchProducts(products.length === 1 ? Math.max(1, pagination.current_page - 1) : pagination.current_page, pagination.per_page);
+  };
+
+  const isLoading = loading || productLoading;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -151,7 +197,7 @@ export const ProductList = () => {
             >
               <option value="all">All Categories</option>
               {categories.map((category) => (
-                <option key={category.id} value={category.name}>{category.name}</option>
+                <option key={category.id} value={category.id}>{category.name}</option>
               ))}
             </select>
             <select
@@ -161,7 +207,7 @@ export const ProductList = () => {
             >
               <option value="all">All Brands</option>
               {brands.map((brand) => (
-                <option key={brand.id} value={brand.name}>{brand.name}</option>
+                <option key={brand.id} value={brand.id}>{brand.name}</option>
               ))}
             </select>
             <div className="flex gap-2">
@@ -200,7 +246,7 @@ export const ProductList = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {pagination.pageItems.map((product) => (
+                {products.map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -238,8 +284,7 @@ export const ProductList = () => {
                         <button
                           onClick={async () => {
                             if (confirm('Delete this product permanently?')) {
-                              await deleteProduct(product.id);
-                              toast.success('Product deleted');
+                              await handleDelete(product.id);
                             }
                           }}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -254,17 +299,17 @@ export const ProductList = () => {
               </tbody>
             </table>
             <PaginationControls
-              page={pagination.page}
-              pageSize={pagination.pageSize}
-              totalItems={pagination.totalItems}
-              totalPages={pagination.totalPages}
-              onPageChange={pagination.setPage}
-              onPageSizeChange={pagination.setPageSize}
+              page={pagination.current_page}
+              pageSize={pagination.per_page}
+              totalItems={pagination.total}
+              totalPages={pagination.last_page}
+              onPageChange={(nextPage) => fetchProducts(nextPage, pagination.per_page)}
+              onPageSizeChange={(nextPageSize) => fetchProducts(1, nextPageSize)}
             />
           </div>
 
-          {loading && <LoadingState label="Loading products..." />}
-          {!loading && sortedProducts.length === 0 && (
+          {isLoading && <LoadingState label="Loading products..." />}
+          {!isLoading && products.length === 0 && (
             <EmptyState label="No products found. Add your first product to get started." />
           )}
         </div>
