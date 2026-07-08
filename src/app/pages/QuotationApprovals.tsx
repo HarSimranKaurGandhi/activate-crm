@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Check, Eye, FilePenLine, Search } from 'lucide-react';
+import { Check, Eye, FilePenLine, Search, Filter, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../auth/AuthContext';
@@ -19,6 +19,7 @@ export const QuotationApprovals = () => {
   const { quotations, loading, approveQuotation, reviseQuotation } = useData();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: 'number' | 'customer' | 'date' | 'grandTotal' | 'status'; direction: SortDirection }>({
     key: 'date',
@@ -106,6 +107,8 @@ export const QuotationApprovals = () => {
     }));
   };
 
+  const activeFilterCount = searchTerm.trim() ? 1 : 0;
+
   if (!canManageApprovals) {
     return (
       <div className="p-8">
@@ -127,7 +130,7 @@ export const QuotationApprovals = () => {
             </p>
           </div>
 
-          <div className="relative w-full max-w-md">
+          <div className="hidden relative w-full max-w-md lg:block">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -136,6 +139,47 @@ export const QuotationApprovals = () => {
               placeholder="Search by quotation, customer, or company"
               className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 lg:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters((current) => !current)}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+            </button>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          <div className={`${showMobileFilters ? 'block' : 'hidden'} mt-4`}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by quotation, customer, or company"
+                className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
         </div>
 

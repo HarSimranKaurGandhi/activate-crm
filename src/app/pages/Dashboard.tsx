@@ -1,148 +1,94 @@
 import { useNavigate } from 'react-router';
-import { useData } from '../context/DataContext';
-import { Plus, FileText, Clock, Calendar, ListChecks } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Clock, ListChecks, PhoneCall } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { dashboardService } from '../../services/dashboardService';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
-import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
+import { useAuth } from '../auth/AuthContext';
+
+const emptySummary = {
+  total_quotations: 0,
+  pending_for_approval: 0,
+  tasks_due_today_count: 0,
+  tasks_due_today: [] as any[],
+  overdue_tasks_count: 0,
+  overdue_tasks: [] as any[],
+  follow_ups_due_today_count: 0,
+  follow_ups_due_today: [] as any[],
+  overdue_follow_ups_count: 0,
+  overdue_follow_ups: [] as any[],
+};
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { quotations, loading: dataLoading } = useData();
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
-  const [summary, setSummary] = useState({
-    total_quotations: 0,
-    pending_for_approval: 0,
-    tasks_due_today_count: 0,
-    tasks_due_today: [] as any[],
-  });
+  const { user } = useAuth();
+  const [summary, setSummary] = useState(emptySummary);
   const [summaryLoading, setSummaryLoading] = useState(false);
-
-  const dateRange = useMemo(() => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekAgo = new Date(today);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const monthAgo = new Date(today);
-    monthAgo.setMonth(monthAgo.getMonth() - 1);
-
-    const format = (date: Date) => date.toISOString().slice(0, 10);
-    if (dateFilter === 'today') return { from_date: format(today), to_date: format(now) };
-    if (dateFilter === 'week') return { from_date: format(weekAgo), to_date: format(now) };
-    if (dateFilter === 'month') return { from_date: format(monthAgo), to_date: format(now) };
-    return {};
-  }, [dateFilter]);
+  const isAdmin = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase() === 'admin';
+  const [viewScope, setViewScope] = useState<'all' | 'mine'>('mine');
 
   useEffect(() => {
     setSummaryLoading(true);
     dashboardService
-      .quotationSummary(dateRange)
+      .quotationSummary(isAdmin ? { scope: viewScope } : {})
       .then(setSummary)
-      .catch(() => setSummary({ total_quotations: 0, pending_for_approval: 0, tasks_due_today_count: 0, tasks_due_today: [] }))
+      .catch(() => setSummary(emptySummary))
       .finally(() => setSummaryLoading(false));
-  }, [dateRange]);
+  }, [isAdmin, viewScope]);
 
-  const filterQuotations = () => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekAgo = new Date(today);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const monthAgo = new Date(today);
-    monthAgo.setMonth(monthAgo.getMonth() - 1);
-
-    return quotations.filter(q => {
-      const qDate = new Date(q.date);
-      switch (dateFilter) {
-        case 'today':
-          return qDate >= today;
-        case 'week':
-          return qDate >= weekAgo;
-        case 'month':
-          return qDate >= monthAgo;
-        default:
-          return true;
-      }
-    });
-  };
-
-  const filteredQuotations = filterQuotations();
-  const isLoading = dataLoading || summaryLoading;
+  const isLoading = summaryLoading;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Welcome back!</h2>
-            <p className="text-gray-600 mt-1">Here's what's happening with your quotations today.</p>
+            <p className="text-gray-600 mt-1">Here&apos;s what needs your attention today.</p>
           </div>
-          <button
-            onClick={() => navigate('/quotations/new')}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto"
-          >
-            <Plus className="w-5 h-5" />
-            Create Quotation
-          </button>
-        </div>
-
-        {/* Date Filter */}
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-          <Calendar className="w-5 h-5 text-gray-400" />
-          <div className="flex flex-wrap gap-2">
-            {[
-              { label: 'All Time', value: 'all' },
-              { label: 'Today', value: 'today' },
-              { label: 'This Week', value: 'week' },
-              { label: 'This Month', value: 'month' },
-            ].map(filter => (
-              <button
-                key={filter.value}
-                onClick={() => setDateFilter(filter.value as any)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                  dateFilter === filter.value
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
+          {isAdmin && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              {[
+                { value: 'all' as const, label: 'All Users' },
+                { value: 'mine' as const, label: 'My Data' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setViewScope(option.value)}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                    viewScope === option.value
+                      ? 'bg-blue-600 text-white'
+                      : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {/* Total Quotations */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">Total Quotations</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.total_quotations}</p>
-                <p className="text-sm text-gray-500 mt-2">
-                  {dateFilter === 'all' ? 'All time' : `Last ${dateFilter === 'today' ? 'day' : dateFilter}`}
-                </p>
+        <div className={`grid grid-cols-1 gap-4 sm:gap-6 ${isAdmin ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => navigate('/approvals')}
+              className="w-full bg-white rounded-2xl border border-gray-200 p-6 text-left hover:shadow-lg transition-all"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm font-medium">Pending for Approval</p>
+                  <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.pending_for_approval}</p>
+                  <p className="text-sm text-gray-500 mt-2">Awaiting review</p>
+                </div>
+                <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center">
+                  <Clock className="w-7 h-7 text-amber-600" />
+                </div>
               </div>
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center">
-                <FileText className="w-7 h-7 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Pending Approval */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">Pending for Approval</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.pending_for_approval}</p>
-                <p className="text-sm text-gray-500 mt-2">Awaiting review</p>
-              </div>
-              <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center">
-                <Clock className="w-7 h-7 text-amber-600" />
-              </div>
-            </div>
-          </div>
-
+            </button>
+          )}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
             <div className="flex items-start justify-between">
               <div>
@@ -155,7 +101,181 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
+          <div className="bg-white rounded-2xl border border-rose-200 p-6 hover:shadow-lg transition-all">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-rose-700 text-sm font-medium">Past Due Tasks</p>
+                <p className="text-4xl font-bold text-rose-700 mt-2">{isLoading ? '...' : summary.overdue_tasks_count}</p>
+                <p className="text-sm text-rose-500 mt-2">Incomplete overdue tasks</p>
+              </div>
+              <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7 text-rose-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-gray-600 text-sm font-medium">Follow Ups Today</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.follow_ups_due_today_count}</p>
+                <p className="text-sm text-gray-500 mt-2">Leads needing follow-up today</p>
+              </div>
+              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center">
+                <PhoneCall className="w-7 h-7 text-blue-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-rose-200 p-6 hover:shadow-lg transition-all">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-rose-700 text-sm font-medium">Past Due Follow Ups</p>
+                <p className="text-4xl font-bold text-rose-700 mt-2">{isLoading ? '...' : summary.overdue_follow_ups_count}</p>
+                <p className="text-sm text-rose-500 mt-2">Overdue leads need attention</p>
+              </div>
+              <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7 text-rose-600" />
+              </div>
+            </div>
+          </div>
         </div>
+
+        {!isLoading && (
+          <div className="bg-white rounded-2xl border border-rose-200 p-4 sm:p-6">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-lg font-semibold text-rose-700">Past Due Tasks</h3>
+              <button
+                onClick={() => navigate('/tasks')}
+                className="text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:text-right"
+              >
+                View all tasks
+              </button>
+            </div>
+
+            {summary.overdue_tasks.length === 0 ? (
+              <EmptyState label="No overdue tasks." />
+            ) : (
+              <div className="space-y-3">
+                {summary.overdue_tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => navigate(`/tasks/${task.id}`)}
+                    className="flex cursor-pointer flex-col gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4 transition-all hover:bg-rose-100 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center">
+                        <AlertTriangle className="w-5 h-5 text-rose-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{task.name}</p>
+                        <p className="text-sm text-rose-700">
+                          {task.assigned_user?.name ? `Assigned to ${task.assigned_user.name}` : 'Unassigned'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 self-start sm:self-auto">
+                      <div className="text-left sm:text-right">
+                        <p className="text-sm font-medium text-rose-700">{task.due_date || '-'}</p>
+                        <p className="text-sm text-rose-600 line-clamp-1">{task.description || 'No description'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isLoading && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Follow Ups Due Today</h3>
+              <button
+                onClick={() => navigate('/leads')}
+                className="text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:text-right"
+              >
+                View all leads
+              </button>
+            </div>
+
+            {summary.follow_ups_due_today.length === 0 ? (
+              <EmptyState label="No follow ups due today." />
+            ) : (
+              <div className="space-y-3">
+                {summary.follow_ups_due_today.map((lead) => (
+                  <div
+                    key={lead.id}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
+                    className="flex cursor-pointer flex-col gap-3 rounded-xl p-4 transition-all hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                        <PhoneCall className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{lead.name || lead.phone || 'Unnamed lead'}</p>
+                        <p className="text-sm text-gray-500">
+                          {lead.assigned_user?.name ? `Assigned to ${lead.assigned_user.name}` : 'Unassigned'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 self-start sm:self-auto">
+                      <div className="text-left sm:text-right">
+                        <p className="text-sm font-medium text-gray-900">{lead.follow_up_date || '-'}</p>
+                        <p className="text-sm text-gray-500 line-clamp-1">{lead.requirement || 'No requirement added'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isLoading && (
+          <div className="bg-white rounded-2xl border border-rose-200 p-4 sm:p-6">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-lg font-semibold text-rose-700">Past Due Follow Ups</h3>
+              <button
+                onClick={() => navigate('/leads')}
+                className="text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:text-right"
+              >
+                View all leads
+              </button>
+            </div>
+
+            {summary.overdue_follow_ups.length === 0 ? (
+              <EmptyState label="No overdue follow ups." />
+            ) : (
+              <div className="space-y-3">
+                {summary.overdue_follow_ups.map((lead) => (
+                  <div
+                    key={lead.id}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
+                    className="flex cursor-pointer flex-col gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4 transition-all hover:bg-rose-100 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center">
+                        <AlertTriangle className="w-5 h-5 text-rose-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{lead.name || lead.phone || 'Unnamed lead'}</p>
+                        <p className="text-sm text-rose-700">
+                          {lead.assigned_user?.name ? `Assigned to ${lead.assigned_user.name}` : 'Unassigned'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 self-start sm:self-auto">
+                      <div className="text-left sm:text-right">
+                        <p className="text-sm font-medium text-rose-700">{lead.follow_up_date || '-'}</p>
+                        <p className="text-sm text-rose-600 line-clamp-1">{lead.requirement || 'No requirement added'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {!isLoading && (
           <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
@@ -213,49 +333,6 @@ export const Dashboard = () => {
                 ))}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Recent Quotations */}
-        {isLoading && <LoadingState label="Loading dashboard..." />}
-
-        {!isLoading && filteredQuotations.length === 0 && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <EmptyState label="No quotations found for this period." />
-          </div>
-        )}
-
-        {!isLoading && filteredQuotations.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Quotations</h3>
-            <div className="space-y-3">
-              {filteredQuotations.slice(0, 5).map(quotation => (
-                <div
-                  key={quotation.id}
-                  onClick={() => navigate(`/quotations/${quotation.id}/preview`)}
-                  className="flex cursor-pointer flex-col gap-3 rounded-xl p-4 transition-all hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                      <FileText className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{quotation.number}</p>
-                      <p className="text-sm text-gray-500">{quotation.customer.company}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 self-start sm:self-auto">
-                    <div className="text-left sm:text-right">
-                      <p className="font-semibold text-gray-900">₹{quotation.grandTotal.toLocaleString('en-IN')}</p>
-                      <p className="text-sm text-gray-500">{new Date(quotation.date).toLocaleDateString('en-IN')}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${quotationStatusClass(quotation.status)}`}>
-                      {quotationStatusLabel(quotation.status)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
       </div>

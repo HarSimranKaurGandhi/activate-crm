@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Edit, Eye, Plus, Search, Trash2 } from 'lucide-react';
+import { Edit, Eye, Plus, Search, Trash2, Filter, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
@@ -48,6 +48,7 @@ export const TaskList = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState('new');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     status: 'all',
@@ -174,6 +175,20 @@ export const TaskList = () => {
     }));
   };
 
+  const activeFilterCount = [
+    filters.search.trim() ? 1 : 0,
+    filters.status !== 'all' ? 1 : 0,
+    filters.assignedTo !== 'all' ? 1 : 0,
+  ].reduce((sum, count) => sum + count, 0);
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      status: 'all',
+      assignedTo: 'all',
+    });
+  };
+
   const handleDelete = async (taskId: string) => {
     if (!confirm('Delete this task permanently?')) {
       return;
@@ -204,7 +219,65 @@ export const TaskList = () => {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
-          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="mb-4 flex items-center justify-between gap-3 md:hidden">
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters((current) => !current)}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+            </button>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          <div className={`${showMobileFilters ? 'grid' : 'hidden'} mb-4 grid-cols-1 gap-3 md:hidden`}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search task, description, assignee"
+                value={filters.search}
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <select
+              value={filters.status}
+              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {TASK_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <select
+              value={filters.assignedTo}
+              onChange={(event) => setFilters((current) => ({ ...current, assignedTo: event.target.value }))}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Assignees</option>
+              {users.map((user) => (
+                <option key={user.id} value={String(user.id)}>{user.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-4 hidden grid-cols-1 gap-3 md:grid md:grid-cols-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input

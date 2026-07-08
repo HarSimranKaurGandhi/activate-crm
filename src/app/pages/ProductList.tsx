@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Edit, Trash2, ImageIcon } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, ImageIcon, Filter, ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ export const ProductList = () => {
     brand: 'all',
     gst: 'all',
   });
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sort, setSort] = useState<{ key: 'name' | 'category' | 'brand' | 'mrp' | 'usualSellingPrice' | 'leastSellingPrice' | 'gstPercent'; direction: SortDirection }>({
     key: 'name',
     direction: 'asc',
@@ -64,6 +65,13 @@ export const ProductList = () => {
       gst: 'all',
     });
   };
+
+  const activeFilterCount = [
+    filters.search.trim() ? 1 : 0,
+    filters.category !== 'all' ? 1 : 0,
+    filters.brand !== 'all' ? 1 : 0,
+    filters.gst !== 'all' ? 1 : 0,
+  ].reduce((sum, count) => sum + count, 0);
 
   const toggleSort = (key: typeof sort.key) => {
     setSort((current) => ({
@@ -133,7 +141,85 @@ export const ProductList = () => {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
-          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="mb-4 flex items-center justify-between gap-3 xl:hidden">
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters((current) => !current)}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+            </button>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          <div className={`${showMobileFilters ? 'grid' : 'hidden'} mb-4 grid-cols-1 gap-3 xl:hidden`}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search name, model, HSN..."
+                value={filters.search}
+                onChange={(event) => updateFilter('search', event.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <select
+              value={filters.category}
+              onChange={(event) => updateFilter('category', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.name}>{category.name}</option>
+              ))}
+            </select>
+            <select
+              value={filters.brand}
+              onChange={(event) => updateFilter('brand', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Brands</option>
+              {brands.map((brand) => (
+                <option key={brand.id} value={brand.name}>{brand.name}</option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <select
+                value={filters.gst}
+                onChange={(event) => updateFilter('gst', event.target.value)}
+                className="min-w-0 flex-1 px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All GST</option>
+                {gstOptions.map((gst) => (
+                  <option key={gst} value={gst}>{gst}%</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="px-3 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-4 hidden grid-cols-1 gap-3 md:grid-cols-3 xl:grid xl:grid-cols-6">
             <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input

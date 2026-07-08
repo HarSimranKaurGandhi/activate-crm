@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Filter, ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
@@ -19,6 +19,7 @@ export const CustomerList = () => {
     city: '',
     rating: 'all',
   });
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sort, setSort] = useState<{ key: 'company' | 'name' | 'phone' | 'location' | 'rating'; direction: SortDirection }>({
     key: 'company',
     direction: 'asc',
@@ -67,6 +68,15 @@ export const CustomerList = () => {
     });
   };
 
+  const activeFilterCount = [
+    filters.company.trim() ? 1 : 0,
+    filters.name.trim() ? 1 : 0,
+    filters.email.trim() ? 1 : 0,
+    filters.phone.trim() ? 1 : 0,
+    filters.city.trim() ? 1 : 0,
+    filters.rating !== 'all' ? 1 : 0,
+  ].reduce((sum, count) => sum + count, 0);
+
   const toggleSort = (key: typeof sort.key) => {
     setSort((current) => ({
       key,
@@ -89,7 +99,93 @@ export const CustomerList = () => {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
-          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-8">
+          <div className="mb-4 flex items-center justify-between gap-3 xl:hidden">
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters((current) => !current)}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+            </button>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          <div className={`${showMobileFilters ? 'grid' : 'hidden'} mb-4 grid-cols-1 gap-3 xl:hidden`}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Company"
+                value={filters.company}
+                onChange={(event) => updateFilter('company', event.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Contact name"
+              value={filters.name}
+              onChange={(event) => updateFilter('name', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              placeholder="Email"
+              value={filters.email}
+              onChange={(event) => updateFilter('email', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              placeholder="Phone"
+              value={filters.phone}
+              onChange={(event) => updateFilter('phone', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              placeholder="City"
+              value={filters.city}
+              onChange={(event) => updateFilter('city', event.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <div className="flex gap-2">
+              <select
+                value={filters.rating}
+                onChange={(event) => updateFilter('rating', event.target.value)}
+                className="min-w-0 flex-1 px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Ratings</option>
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <option key={rating} value={rating}>{rating} Star</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="px-3 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-4 hidden grid-cols-1 gap-3 md:grid-cols-3 xl:grid xl:grid-cols-8">
             <div className="relative md:col-span-2 xl:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input

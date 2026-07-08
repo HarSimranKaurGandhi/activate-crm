@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Calendar, Eye, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Calendar, Eye, Edit, Trash2, Filter, ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { LoadingState } from '../components/common/AsyncState';
 import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
@@ -15,6 +15,7 @@ export const QuotationList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sort, setSort] = useState<{ key: 'number' | 'date' | 'customer' | 'items' | 'grandTotal' | 'status'; direction: SortDirection }>({
     key: 'date',
     direction: 'desc',
@@ -76,6 +77,19 @@ export const QuotationList = () => {
     }));
   };
 
+  const activeFilterCount = [
+    searchTerm.trim() ? 1 : 0,
+    statusFilter !== 'all' ? 1 : 0,
+    dateRange.start ? 1 : 0,
+    dateRange.end ? 1 : 0,
+  ].reduce((sum, count) => sum + count, 0);
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setDateRange({ start: '', end: '' });
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -93,9 +107,35 @@ export const QuotationList = () => {
 
         {/* Filters */}
         <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="flex items-center justify-between gap-3 md:hidden">
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters((current) => !current)}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+            </button>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          <div className={`${showMobileFilters ? 'grid' : 'hidden'} grid-cols-1 gap-4 md:hidden`}>
             {/* Search */}
-            <div className="md:col-span-2">
+            <div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -124,6 +164,56 @@ export const QuotationList = () => {
             </div>
 
             {/* Date Range - Start */}
+            <div>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="flex flex-col items-start gap-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-600">End Date</span>
+              </div>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search quotations..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+
             <div className="flex gap-2">
               <input
                 type="date"
@@ -134,7 +224,7 @@ export const QuotationList = () => {
             </div>
           </div>
 
-          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+          <div className="hidden md:flex flex-col items-start gap-2 sm:flex-row sm:items-center">
             <Calendar className="w-4 h-4 text-gray-400" />
             <span className="text-sm text-gray-600">Date Range:</span>
             <input
