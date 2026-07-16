@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router';
-import { AlertTriangle, Clock, ListChecks, PhoneCall } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { AlertTriangle, Clock, FileText, ListChecks, PhoneCall, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { dashboardService } from '../../services/dashboardService';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { useAuth } from '../auth/AuthContext';
+import { PaginationControls, usePagination } from '../components/common/Pagination';
 
 const emptySummary = {
   total_quotations: 0,
@@ -23,6 +24,12 @@ export const Dashboard = () => {
   const { user } = useAuth();
   const [summary, setSummary] = useState(emptySummary);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [filters, setFilters] = useState({
+    overdueTasks: '',
+    todayFollowUps: '',
+    overdueFollowUps: '',
+    todayTasks: '',
+  });
   const isAdmin = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase() === 'admin';
   const [viewScope, setViewScope] = useState<'all' | 'mine'>('mine');
   const isAdminView = isAdmin && viewScope === 'all';
@@ -37,6 +44,76 @@ export const Dashboard = () => {
   }, [isAdmin, viewScope]);
 
   const isLoading = summaryLoading;
+  const formatDate = (value?: string | null) => {
+    if (!value) return '-';
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return parsed.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+  const formatTaskStatus = (status?: string | null) => {
+    if (!status) return 'New';
+    return status
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  };
+  const tableHeaderClassName = 'px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-600';
+  const tableCellClassName = 'px-4 py-3 text-sm text-gray-700';
+  const updateFilter = (key: keyof typeof filters, value: string) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+  const filteredOverdueTasks = useMemo(() => {
+    const search = filters.overdueTasks.trim().toLowerCase();
+    if (!search) return summary.overdue_tasks;
+
+    return summary.overdue_tasks.filter((task) =>
+      [task.name, task.description, task.assigned_user?.name, task.due_date]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search)),
+    );
+  }, [filters.overdueTasks, summary.overdue_tasks]);
+  const filteredTodayFollowUps = useMemo(() => {
+    const search = filters.todayFollowUps.trim().toLowerCase();
+    if (!search) return summary.follow_ups_due_today;
+
+    return summary.follow_ups_due_today.filter((lead) =>
+      [lead.name, lead.phone, lead.requirement, lead.assigned_user?.name, lead.follow_up_date]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search)),
+    );
+  }, [filters.todayFollowUps, summary.follow_ups_due_today]);
+  const filteredOverdueFollowUps = useMemo(() => {
+    const search = filters.overdueFollowUps.trim().toLowerCase();
+    if (!search) return summary.overdue_follow_ups;
+
+    return summary.overdue_follow_ups.filter((lead) =>
+      [lead.name, lead.phone, lead.requirement, lead.assigned_user?.name, lead.follow_up_date]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search)),
+    );
+  }, [filters.overdueFollowUps, summary.overdue_follow_ups]);
+  const filteredTodayTasks = useMemo(() => {
+    const search = filters.todayTasks.trim().toLowerCase();
+    if (!search) return summary.tasks_due_today;
+
+    return summary.tasks_due_today.filter((task) =>
+      [task.name, task.description, task.assigned_user?.name, task.status, task.due_date]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search)),
+    );
+  }, [filters.todayTasks, summary.tasks_due_today]);
+  const overdueTasksPagination = usePagination(filteredOverdueTasks, 10);
+  const todayFollowUpsPagination = usePagination(filteredTodayFollowUps, 10);
+  const overdueFollowUpsPagination = usePagination(filteredOverdueFollowUps, 10);
+  const todayTasksPagination = usePagination(filteredTodayTasks, 10);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -76,282 +153,360 @@ export const Dashboard = () => {
           )}
         </div>
 
-        {/* Stats Cards */}
         <div className={`grid grid-cols-1 gap-4 sm:gap-6 ${isAdmin ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
           {isAdminView ? (
             <button
               type="button"
-              onClick={() => navigate('/approvals')}
-              className="w-full bg-white rounded-2xl border border-gray-200 p-6 text-left hover:shadow-lg transition-all"
+              onClick={() => navigate('/quotations/approvals')}
+              className="w-full rounded-2xl border border-gray-200 bg-white p-6 text-left transition-all hover:shadow-lg"
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-gray-600 text-sm font-medium">Pending for Approval</p>
-                  <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.pending_for_approval}</p>
-                  <p className="text-sm text-gray-500 mt-2">Awaiting review</p>
+                  <p className="text-sm font-medium text-gray-600">Pending for Approval</p>
+                  <p className="mt-2 text-4xl font-bold text-gray-900">{isLoading ? '...' : summary.pending_for_approval}</p>
+                  <p className="mt-2 text-sm text-gray-500">Awaiting review</p>
                 </div>
-                <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center">
-                  <Clock className="w-7 h-7 text-amber-600" />
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50">
+                  <Clock className="h-7 w-7 text-amber-600" />
                 </div>
               </div>
             </button>
           ) : (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-gray-600 text-sm font-medium">My Quotations</p>
-                  <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.total_quotations}</p>
-                  <p className="text-sm text-gray-500 mt-2">Quotations created by me</p>
+                  <p className="text-sm font-medium text-gray-600">My Quotations Awaiting Approval</p>
+                  <p className="mt-2 text-4xl font-bold text-gray-900">{isLoading ? '...' : summary.pending_for_approval}</p>
+                  <p className="mt-2 text-sm text-gray-500">Pending on review</p>
                 </div>
-                <div className="w-14 h-14 bg-sky-50 rounded-2xl flex items-center justify-center">
-                  <FileText className="w-7 h-7 text-sky-600" />
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50">
+                  <FileText className="h-7 w-7 text-sky-600" />
                 </div>
               </div>
             </div>
           )}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">{isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.tasks_due_today_count}</p>
-                <p className="text-sm text-gray-500 mt-2">{isAdminView ? 'Assigned tasks across all users' : 'Assigned tasks for today'}</p>
+                <p className="text-sm font-medium text-gray-600">{isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}</p>
+                <p className="mt-2 text-4xl font-bold text-gray-900">{isLoading ? '...' : summary.tasks_due_today_count}</p>
+                <p className="mt-2 text-sm text-gray-500">{isAdminView ? 'Assigned tasks across all users' : 'Assigned tasks for today'}</p>
               </div>
-              <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center">
-                <ListChecks className="w-7 h-7 text-violet-600" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
+                <ListChecks className="h-7 w-7 text-violet-600" />
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-2xl border border-rose-200 p-6 hover:shadow-lg transition-all">
+          <div className="rounded-2xl border border-rose-200 bg-white p-6 transition-all hover:shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-rose-700 text-sm font-medium">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</p>
-                <p className="text-4xl font-bold text-rose-700 mt-2">{isLoading ? '...' : summary.overdue_tasks_count}</p>
-                <p className="text-sm text-rose-500 mt-2">{isAdminView ? 'Incomplete overdue tasks across all users' : 'My incomplete overdue tasks'}</p>
+                <p className="text-sm font-medium text-rose-700">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</p>
+                <p className="mt-2 text-4xl font-bold text-rose-700">{isLoading ? '...' : summary.overdue_tasks_count}</p>
+                <p className="mt-2 text-sm text-rose-500">{isAdminView ? 'Incomplete overdue tasks across all users' : 'My incomplete overdue tasks'}</p>
               </div>
-              <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center">
-                <AlertTriangle className="w-7 h-7 text-rose-600" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50">
+                <AlertTriangle className="h-7 w-7 text-rose-600" />
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">{isAdminView ? `Everyone's Follow Ups Today` : 'My Follow Ups Today'}</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.follow_ups_due_today_count}</p>
-                <p className="text-sm text-gray-500 mt-2">{isAdminView ? 'Leads needing follow-up across all users' : 'Leads needing my follow-up today'}</p>
+                <p className="text-sm font-medium text-gray-600">{isAdminView ? `Everyone's Follow Ups Today` : 'My Follow Ups Today'}</p>
+                <p className="mt-2 text-4xl font-bold text-gray-900">{isLoading ? '...' : summary.follow_ups_due_today_count}</p>
+                <p className="mt-2 text-sm text-gray-500">{isAdminView ? 'Leads needing follow-up across all users' : 'Leads needing my follow-up today'}</p>
               </div>
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center">
-                <PhoneCall className="w-7 h-7 text-blue-600" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
+                <PhoneCall className="h-7 w-7 text-blue-600" />
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-2xl border border-rose-200 p-6 hover:shadow-lg transition-all">
+          <div className="rounded-2xl border border-rose-200 bg-white p-6 transition-all hover:shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-rose-700 text-sm font-medium">{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</p>
-                <p className="text-4xl font-bold text-rose-700 mt-2">{isLoading ? '...' : summary.overdue_follow_ups_count}</p>
-                <p className="text-sm text-rose-500 mt-2">{isAdminView ? 'Overdue leads across all users' : 'My overdue leads needing attention'}</p>
+                <p className="text-sm font-medium text-rose-700">{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</p>
+                <p className="mt-2 text-4xl font-bold text-rose-700">{isLoading ? '...' : summary.overdue_follow_ups_count}</p>
+                <p className="mt-2 text-sm text-rose-500">{isAdminView ? 'Overdue leads across all users' : 'My overdue leads needing attention'}</p>
               </div>
-              <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center">
-                <AlertTriangle className="w-7 h-7 text-rose-600" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50">
+                <AlertTriangle className="h-7 w-7 text-rose-600" />
               </div>
             </div>
           </div>
         </div>
 
         {!isLoading && (
-          <div className="bg-white rounded-2xl border border-rose-200 p-4 sm:p-6">
+          <div className="overflow-hidden rounded-2xl border border-rose-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-semibold text-rose-700">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</h3>
+              <h3 className="px-4 pt-4 text-lg font-semibold text-rose-700 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</h3>
               <button
                 onClick={() => navigate('/tasks')}
-                className="text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:text-right"
+                className="px-4 text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:px-6 sm:text-right"
               >
                 View all tasks
               </button>
             </div>
 
             {summary.overdue_tasks.length === 0 ? (
-              <EmptyState label="No overdue tasks." />
-            ) : (
-              <div className="space-y-3">
-                {summary.overdue_tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    onClick={() => navigate(`/tasks/${task.id}`)}
-                    className="flex cursor-pointer flex-col gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4 transition-all hover:bg-rose-100 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center">
-                        <AlertTriangle className="w-5 h-5 text-rose-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{task.name}</p>
-                        <p className="text-sm text-rose-700">
-                          {task.assigned_user?.name ? `Assigned to ${task.assigned_user.name}` : 'Unassigned'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 self-start sm:self-auto">
-                      <div className="text-left sm:text-right">
-                        <p className="text-sm font-medium text-rose-700">{task.due_date || '-'}</p>
-                        <p className="text-sm text-rose-600 line-clamp-1">{task.description || 'No description'}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="p-4 sm:p-6">
+                <EmptyState label="No overdue tasks." />
               </div>
+            ) : (
+              <>
+                <div className="px-4 pb-4 sm:px-6">
+                  <div className="relative max-w-md">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={filters.overdueTasks}
+                      onChange={(event) => updateFilter('overdueTasks', event.target.value)}
+                      placeholder="Filter by task, assignee, due date, or description"
+                      className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 text-sm focus:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                  <thead className="bg-rose-50">
+                    <tr className="border-y border-rose-100">
+                      <th className={tableHeaderClassName}>Task</th>
+                      <th className={tableHeaderClassName}>Assigned To</th>
+                      <th className={tableHeaderClassName}>Due Date</th>
+                      <th className={tableHeaderClassName}>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rose-100 bg-white">
+                    {overdueTasksPagination.pageItems.map((task) => (
+                      <tr
+                        key={task.id}
+                        onClick={() => navigate(`/tasks/${task.id}`)}
+                        className="cursor-pointer hover:bg-rose-50"
+                      >
+                        <td className={`${tableCellClassName} font-medium text-gray-900`}>{task.name}</td>
+                        <td className={tableCellClassName}>{task.assigned_user?.name || 'Unassigned'}</td>
+                        <td className={`${tableCellClassName} font-medium text-rose-700`}>{formatDate(task.due_date)}</td>
+                        <td className={tableCellClassName}>{task.description || 'No description'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  </table>
+                </div>
+                <PaginationControls
+                  page={overdueTasksPagination.page}
+                  pageSize={overdueTasksPagination.pageSize}
+                  totalItems={overdueTasksPagination.totalItems}
+                  totalPages={overdueTasksPagination.totalPages}
+                  onPageChange={overdueTasksPagination.setPage}
+                  onPageSizeChange={overdueTasksPagination.setPageSize}
+                />
+              </>
             )}
           </div>
         )}
 
         {!isLoading && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">{isAdminView ? `Everyone's Follow Ups Due Today` : 'My Follow Ups Due Today'}</h3>
+              <h3 className="px-4 pt-4 text-lg font-semibold text-gray-900 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Follow Ups Due Today` : 'My Follow Ups Due Today'}</h3>
               <button
                 onClick={() => navigate('/leads')}
-                className="text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:text-right"
+                className="px-4 text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:px-6 sm:text-right"
               >
                 View all leads
               </button>
             </div>
 
             {summary.follow_ups_due_today.length === 0 ? (
-              <EmptyState label="No follow ups due today." />
-            ) : (
-              <div className="space-y-3">
-                {summary.follow_ups_due_today.map((lead) => (
-                  <div
-                    key={lead.id}
-                    onClick={() => navigate(`/leads/${lead.id}`)}
-                    className="flex cursor-pointer flex-col gap-3 rounded-xl p-4 transition-all hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                        <PhoneCall className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{lead.name || lead.phone || 'Unnamed lead'}</p>
-                        <p className="text-sm text-gray-500">
-                          {lead.assigned_user?.name ? `Assigned to ${lead.assigned_user.name}` : 'Unassigned'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 self-start sm:self-auto">
-                      <div className="text-left sm:text-right">
-                        <p className="text-sm font-medium text-gray-900">{lead.follow_up_date || '-'}</p>
-                        <p className="text-sm text-gray-500 line-clamp-1">{lead.requirement || 'No requirement added'}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="p-4 sm:p-6">
+                <EmptyState label="No follow ups due today." />
               </div>
+            ) : (
+              <>
+                <div className="px-4 pb-4 sm:px-6">
+                  <div className="relative max-w-md">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={filters.todayFollowUps}
+                      onChange={(event) => updateFilter('todayFollowUps', event.target.value)}
+                      placeholder="Filter by lead, assignee, date, or requirement"
+                      className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 text-sm focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr className="border-y border-gray-200">
+                      <th className={tableHeaderClassName}>Lead</th>
+                      <th className={tableHeaderClassName}>Assigned To</th>
+                      <th className={tableHeaderClassName}>Follow Up Date</th>
+                      <th className={tableHeaderClassName}>Requirement</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {todayFollowUpsPagination.pageItems.map((lead) => (
+                      <tr
+                        key={lead.id}
+                        onClick={() => navigate(`/leads/${lead.id}`)}
+                        className="cursor-pointer hover:bg-gray-50"
+                      >
+                        <td className={`${tableCellClassName} font-medium text-gray-900`}>{lead.name || lead.phone || 'Unnamed lead'}</td>
+                        <td className={tableCellClassName}>{lead.assigned_user?.name || 'Unassigned'}</td>
+                        <td className={`${tableCellClassName} font-medium text-gray-900`}>{formatDate(lead.follow_up_date)}</td>
+                        <td className={tableCellClassName}>{lead.requirement || 'No requirement added'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  </table>
+                </div>
+                <PaginationControls
+                  page={todayFollowUpsPagination.page}
+                  pageSize={todayFollowUpsPagination.pageSize}
+                  totalItems={todayFollowUpsPagination.totalItems}
+                  totalPages={todayFollowUpsPagination.totalPages}
+                  onPageChange={todayFollowUpsPagination.setPage}
+                  onPageSizeChange={todayFollowUpsPagination.setPageSize}
+                />
+              </>
             )}
           </div>
         )}
 
         {!isLoading && (
-          <div className="bg-white rounded-2xl border border-rose-200 p-4 sm:p-6">
+          <div className="overflow-hidden rounded-2xl border border-rose-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-semibold text-rose-700">{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</h3>
+              <h3 className="px-4 pt-4 text-lg font-semibold text-rose-700 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</h3>
               <button
                 onClick={() => navigate('/leads')}
-                className="text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:text-right"
+                className="px-4 text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:px-6 sm:text-right"
               >
                 View all leads
               </button>
             </div>
 
             {summary.overdue_follow_ups.length === 0 ? (
-              <EmptyState label="No overdue follow ups." />
-            ) : (
-              <div className="space-y-3">
-                {summary.overdue_follow_ups.map((lead) => (
-                  <div
-                    key={lead.id}
-                    onClick={() => navigate(`/leads/${lead.id}`)}
-                    className="flex cursor-pointer flex-col gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4 transition-all hover:bg-rose-100 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center">
-                        <AlertTriangle className="w-5 h-5 text-rose-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{lead.name || lead.phone || 'Unnamed lead'}</p>
-                        <p className="text-sm text-rose-700">
-                          {lead.assigned_user?.name ? `Assigned to ${lead.assigned_user.name}` : 'Unassigned'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 self-start sm:self-auto">
-                      <div className="text-left sm:text-right">
-                        <p className="text-sm font-medium text-rose-700">{lead.follow_up_date || '-'}</p>
-                        <p className="text-sm text-rose-600 line-clamp-1">{lead.requirement || 'No requirement added'}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="p-4 sm:p-6">
+                <EmptyState label="No overdue follow ups." />
               </div>
+            ) : (
+              <>
+                <div className="px-4 pb-4 sm:px-6">
+                  <div className="relative max-w-md">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={filters.overdueFollowUps}
+                      onChange={(event) => updateFilter('overdueFollowUps', event.target.value)}
+                      placeholder="Filter by lead, assignee, date, or requirement"
+                      className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 text-sm focus:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                  <thead className="bg-rose-50">
+                    <tr className="border-y border-rose-100">
+                      <th className={tableHeaderClassName}>Lead</th>
+                      <th className={tableHeaderClassName}>Assigned To</th>
+                      <th className={tableHeaderClassName}>Follow Up Date</th>
+                      <th className={tableHeaderClassName}>Requirement</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rose-100 bg-white">
+                    {overdueFollowUpsPagination.pageItems.map((lead) => (
+                      <tr
+                        key={lead.id}
+                        onClick={() => navigate(`/leads/${lead.id}`)}
+                        className="cursor-pointer hover:bg-rose-50"
+                      >
+                        <td className={`${tableCellClassName} font-medium text-gray-900`}>{lead.name || lead.phone || 'Unnamed lead'}</td>
+                        <td className={tableCellClassName}>{lead.assigned_user?.name || 'Unassigned'}</td>
+                        <td className={`${tableCellClassName} font-medium text-rose-700`}>{formatDate(lead.follow_up_date)}</td>
+                        <td className={tableCellClassName}>{lead.requirement || 'No requirement added'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  </table>
+                </div>
+                <PaginationControls
+                  page={overdueFollowUpsPagination.page}
+                  pageSize={overdueFollowUpsPagination.pageSize}
+                  totalItems={overdueFollowUpsPagination.totalItems}
+                  totalPages={overdueFollowUpsPagination.totalPages}
+                  onPageChange={overdueFollowUpsPagination.setPage}
+                  onPageSizeChange={overdueFollowUpsPagination.setPageSize}
+                />
+              </>
             )}
           </div>
         )}
 
         {!isLoading && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">{isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}</h3>
+              <h3 className="px-4 pt-4 text-lg font-semibold text-gray-900 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}</h3>
               <button
                 onClick={() => navigate('/tasks')}
-                className="text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:text-right"
+                className="px-4 text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:px-6 sm:text-right"
               >
                 View all tasks
               </button>
             </div>
 
             {summary.tasks_due_today.length === 0 ? (
-              <EmptyState label="No assigned tasks due today." />
-            ) : (
-              <div className="space-y-3">
-                {summary.tasks_due_today.map((task) => (
-                  <div
-                    key={task.id}
-                    onClick={() => navigate(`/tasks/${task.id}`)}
-                    className="flex cursor-pointer flex-col gap-3 rounded-xl p-4 transition-all hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center">
-                        <ListChecks className="w-5 h-5 text-violet-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{task.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {task.assigned_user?.name ? `Assigned to ${task.assigned_user.name}` : 'Unassigned'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 self-start sm:self-auto">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        task.status === 'completed'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : task.status === 'in_progress'
-                            ? 'bg-amber-50 text-amber-700'
-                            : task.status === 'on_hold'
-                              ? 'bg-slate-100 text-slate-700'
-                              : 'bg-sky-50 text-sky-700'
-                      }`}>
-                        {task.status === 'in_progress'
-                          ? 'In Progress'
-                          : task.status === 'on_hold'
-                            ? 'On Hold'
-                            : task.status === 'completed'
-                              ? 'Completed'
-                              : 'New'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              <div className="p-4 sm:p-6">
+                <EmptyState label="No assigned tasks due today." />
               </div>
+            ) : (
+              <>
+                <div className="px-4 pb-4 sm:px-6">
+                  <div className="relative max-w-md">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={filters.todayTasks}
+                      onChange={(event) => updateFilter('todayTasks', event.target.value)}
+                      placeholder="Filter by task, assignee, due date, or status"
+                      className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 text-sm focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr className="border-y border-gray-200">
+                      <th className={tableHeaderClassName}>Task</th>
+                      <th className={tableHeaderClassName}>Assigned To</th>
+                      <th className={tableHeaderClassName}>Due Date</th>
+                      <th className={tableHeaderClassName}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {todayTasksPagination.pageItems.map((task) => (
+                      <tr
+                        key={task.id}
+                        onClick={() => navigate(`/tasks/${task.id}`)}
+                        className="cursor-pointer hover:bg-gray-50"
+                      >
+                        <td className={`${tableCellClassName} font-medium text-gray-900`}>{task.name}</td>
+                        <td className={tableCellClassName}>{task.assigned_user?.name || 'Unassigned'}</td>
+                        <td className={tableCellClassName}>{formatDate(task.due_date)}</td>
+                        <td className={tableCellClassName}>{formatTaskStatus(task.status)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  </table>
+                </div>
+                <PaginationControls
+                  page={todayTasksPagination.page}
+                  pageSize={todayTasksPagination.pageSize}
+                  totalItems={todayTasksPagination.totalItems}
+                  totalPages={todayTasksPagination.totalPages}
+                  onPageChange={todayTasksPagination.setPage}
+                  onPageSizeChange={todayTasksPagination.setPageSize}
+                />
+              </>
             )}
           </div>
         )}

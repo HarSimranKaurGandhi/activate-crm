@@ -33,6 +33,7 @@ class ProductResource extends JsonResource
                 'logo_path' => $brandLogoUrl,
             ]),
             'unit' => $this->unit,
+            'unit_name' => $this->measurementUnit?->name ?: $this->unit,
             'mrp' => $this->mrp,
             'usual_selling_price' => $this->usual_selling_price,
             'least_selling_price' => $this->least_selling_price,

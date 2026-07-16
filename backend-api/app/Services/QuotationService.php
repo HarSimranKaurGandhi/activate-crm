@@ -159,6 +159,20 @@ class QuotationService extends CrudService
 
     public function defaults(): array
     {
+        $bankDetailColumns = Schema::hasTable('company_bank_details')
+            ? Schema::getColumnListing('company_bank_details')
+            : [];
+
+        $defaultBankDetailQuery = CompanyBankDetail::query();
+
+        if (in_array('is_default', $bankDetailColumns, true)) {
+            $defaultBankDetailQuery->where('is_default', true);
+        }
+
+        if (in_array('is_active', $bankDetailColumns, true)) {
+            $defaultBankDetailQuery->where('is_active', true);
+        }
+
         return [
             'company' => CompanySetting::first([
                 'company_name',
@@ -172,7 +186,7 @@ class QuotationService extends CrudService
                 'default_salesperson_phone',
                 'default_salesperson_email',
             ]),
-            'default_bank_detail' => CompanyBankDetail::where('is_default', true)->where('is_active', true)->first(),
+            'default_bank_detail' => $defaultBankDetailQuery->first(),
             'numbering' => QuotationNumberSetting::first(),
             'active_adjustments' => AdjustmentMaster::where('is_active', true)->orderBy('display_order')->orderBy('name')->get(),
             'active_terms' => TermMaster::where('is_active', true)->orderBy('display_order')->orderBy('title')->get(),
@@ -390,7 +404,7 @@ class QuotationService extends CrudService
         return [
             'customer' => fn ($query) => $query->select($this->customerColumns()),
             'brandBanner',
-            'items',
+            'items.product.measurementUnit',
             'adjustments',
             'terms',
         ];
@@ -401,6 +415,7 @@ class QuotationService extends CrudService
         return [
             'customer' => fn ($query) => $query->select($this->customerColumns()),
             'brandBanner',
+            'items.product.measurementUnit',
             Schema::hasTable('quotation_item_discount_overrides') ? 'items.discountOverrides' : 'items',
             'adjustments',
             'terms',

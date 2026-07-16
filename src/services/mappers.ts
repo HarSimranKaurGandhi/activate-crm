@@ -5,6 +5,30 @@ export type QuotationStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'r
 export type TaskStatus = 'new' | 'in_progress' | 'completed' | 'on_hold';
 export type LeadStatus = 'new' | 'in_progress' | 'on_hold' | 'closed_success' | 'closed_fail';
 
+const normalizeExpectedClosure = (value: unknown) => {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  switch (normalized) {
+    case '10 day':
+    case '10 days':
+      return '10 days';
+    case '20':
+    case '20 day':
+    case '20 days':
+      return '20 days';
+    case '30':
+    case '30 day':
+    case '30 days':
+      return '30 days';
+    case '90':
+    case '90 day':
+    case '90 days':
+      return '90 days';
+    default:
+      return String(value || '');
+  }
+};
+
 const asNumber = (value: unknown, fallback = 0) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -112,6 +136,7 @@ export const mapProduct = (product: any) => ({
   category: product.category?.name || '',
   brand: product.brand?.name || '',
   unit: product.unit || 'NOS',
+  unitName: product.unit_name || product.unit || 'NOS',
   mrp: asNumber(product.mrp),
   sellingPrice: asNumber(product.usual_selling_price),
   usualSellingPrice: asNumber(product.usual_selling_price),
@@ -278,7 +303,7 @@ export const mapLead = (lead: any) => ({
   country: lead.country || '',
   requirement: lead.requirement || '',
   expectedOrderValue: lead.expected_order_value || '',
-  expectedClosure: lead.expected_closure || '',
+  expectedClosure: normalizeExpectedClosure(lead.expected_closure),
   status: (lead.status || 'new') as LeadStatus,
   tags: Array.isArray(lead.tags) ? lead.tags : [],
   followUpDate: lead.follow_up_date || '',
@@ -317,7 +342,7 @@ export const leadPayload = (lead: any) => ({
   country: lead.country || null,
   requirement: lead.requirement || null,
   expected_order_value: lead.expectedOrderValue || null,
-  expected_closure: lead.expectedClosure || null,
+  expected_closure: normalizeExpectedClosure(lead.expectedClosure) || null,
   status: lead.status || 'new',
   tags: Array.isArray(lead.tags) ? lead.tags.filter(Boolean) : [],
   follow_up_date: lead.followUpDate || null,
@@ -391,6 +416,7 @@ export const mapQuotation = (quotation: any) => ({
       name: item.product_name || '',
       modelNumber: item.model_number || '',
       unit: item.unit || 'NOS',
+      unitName: item.unit_name || item.unit || 'NOS',
       mrp: asNumber(item.mrp),
       sellingPrice: asNumber(item.mrp ?? item.base_price),
       usualSellingPrice: asNumber(item.mrp ?? item.base_price),

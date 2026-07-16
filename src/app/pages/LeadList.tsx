@@ -26,23 +26,12 @@ const LEAD_STATUS_OPTIONS = [
   { value: 'closed_fail', label: 'Closed - Fail' },
 ];
 
-const LEAD_TAG_OPTIONS = [
-  { value: 'all', label: 'All Tags' },
-  { value: 'hot', label: 'Hot' },
-  { value: 'premium', label: 'Premium' },
-];
-
 const statusBadgeClass: Record<string, string> = {
   new: 'bg-sky-50 text-sky-700',
   in_progress: 'bg-amber-50 text-amber-700',
   on_hold: 'bg-slate-100 text-slate-700',
   closed_success: 'bg-emerald-50 text-emerald-700',
   closed_fail: 'bg-rose-50 text-rose-700',
-};
-
-const tagBadgeClass: Record<string, string> = {
-  hot: 'bg-orange-50 text-orange-700',
-  premium: 'bg-violet-50 text-violet-700',
 };
 
 const sourceLabel = (source: string) =>
@@ -68,6 +57,30 @@ const formatDisplayDate = (date?: string) => {
     year: 'numeric',
   });
 };
+const formatDisplayDateTime = (date?: string) => {
+  if (!date) return '-';
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+
+  return parsed.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+const TODAY = new Date('2026-07-16T00:00:00');
+const isPastDate = (date?: string) => {
+  if (!date) return false;
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  parsed.setHours(0, 0, 0, 0);
+  return parsed < TODAY;
+};
 
 const phoneHref = (phone?: string) => `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
 
@@ -83,7 +96,6 @@ export const LeadList = () => {
     search: '',
     leadSource: 'all',
     status: 'all',
-    tag: 'all',
     assignedTo: 'all',
   });
   const [sort, setSort] = useState<{ key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'status'; direction: 'asc' | 'desc' }>({
@@ -147,10 +159,9 @@ export const LeadList = () => {
 
       const sourceMatch = filters.leadSource === 'all' || lead.leadSource === filters.leadSource;
       const statusMatch = filters.status === 'all' || lead.status === filters.status;
-      const tagMatch = filters.tag === 'all' || lead.tags.includes(filters.tag);
       const assignedMatch = filters.assignedTo === 'all' || lead.assignedTo === filters.assignedTo;
 
-      return searchMatch && sourceMatch && statusMatch && tagMatch && assignedMatch;
+      return searchMatch && sourceMatch && statusMatch && assignedMatch;
     });
   }, [filters, leads]);
 
@@ -213,7 +224,6 @@ export const LeadList = () => {
     filters.search.trim() ? 1 : 0,
     filters.leadSource !== 'all' ? 1 : 0,
     filters.status !== 'all' ? 1 : 0,
-    filters.tag !== 'all' ? 1 : 0,
     filters.assignedTo !== 'all' ? 1 : 0,
   ].reduce((sum, count) => sum + count, 0);
 
@@ -255,7 +265,6 @@ export const LeadList = () => {
                     search: '',
                     leadSource: 'all',
                     status: 'all',
-                    tag: 'all',
                     assignedTo: 'all',
                   })
                 }
@@ -296,15 +305,6 @@ export const LeadList = () => {
               ))}
             </select>
             <select
-              value={filters.tag}
-              onChange={(event) => setFilters((current) => ({ ...current, tag: event.target.value }))}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {LEAD_TAG_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
               value={filters.assignedTo}
               onChange={(event) => setFilters((current) => ({ ...current, assignedTo: event.target.value }))}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -316,7 +316,7 @@ export const LeadList = () => {
             </select>
           </div>
 
-          <div className="mb-4 hidden grid-cols-1 gap-3 lg:grid lg:grid-cols-5">
+          <div className="mb-4 hidden grid-cols-1 gap-3 lg:grid lg:grid-cols-4">
             <div className="relative lg:col-span-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
@@ -342,15 +342,6 @@ export const LeadList = () => {
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {LEAD_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
-              value={filters.tag}
-              onChange={(event) => setFilters((current) => ({ ...current, tag: event.target.value }))}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {LEAD_TAG_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
@@ -409,7 +400,7 @@ export const LeadList = () => {
                     </div>
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Follow Up</div>
-                      <div className="mt-1 font-medium text-slate-900">{formatDisplayDate(lead.followUpDate)}</div>
+                      <div className={`mt-1 font-medium ${isPastDate(lead.followUpDate) ? 'text-rose-600' : 'text-slate-900'}`}>{formatDisplayDate(lead.followUpDate)}</div>
                     </div>
                     <div className="col-span-2">
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Assigned To</div>
@@ -419,17 +410,15 @@ export const LeadList = () => {
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Requirement</div>
                       <div className="mt-1 break-words text-slate-900">{lead.requirement || 'No requirement added'}</div>
                     </div>
-                  </div>
-
-                  {lead.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {lead.tags.map((tag: string) => (
-                        <span key={tag} className={`rounded-full px-3 py-1 text-xs font-medium ${tagBadgeClass[tag] || 'bg-gray-100 text-gray-700'}`}>
-                          {tag === 'hot' ? 'Hot' : 'Premium'}
-                        </span>
-                      ))}
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Created On</div>
+                      <div className="mt-1 font-medium text-slate-900">{formatDisplayDateTime(lead.createdAt)}</div>
                     </div>
-                  )}
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Last Updated</div>
+                      <div className="mt-1 font-medium text-slate-900">{formatDisplayDateTime(lead.updatedAt)}</div>
+                    </div>
+                  </div>
 
                   <div className="flex items-center justify-end gap-2">
                     <button
@@ -448,15 +437,16 @@ export const LeadList = () => {
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-              <table className="min-w-[1080px] w-full">
+              <table className="min-w-[1200px] w-full">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Lead" sortKey="name" /></th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Source" sortKey="leadSource" /></th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Assigned To" sortKey="assignedTo" /></th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Requirement</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Tags</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Follow Up" sortKey="followUpDate" /></th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Created On</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Last Updated On</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Status" sortKey="status" /></th>
                     <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-gray-600">Actions</th>
                   </tr>
@@ -487,16 +477,9 @@ export const LeadList = () => {
                       <td className="px-6 py-4">
                         <div className="line-clamp-2 text-sm text-gray-700">{lead.requirement || 'No requirement added'}</div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          {lead.tags.length > 0 ? lead.tags.map((tag: string) => (
-                            <span key={tag} className={`rounded-full px-3 py-1 text-xs font-medium ${tagBadgeClass[tag] || 'bg-gray-100 text-gray-700'}`}>
-                              {tag === 'hot' ? 'Hot' : 'Premium'}
-                            </span>
-                          )) : <span className="text-sm text-gray-500">-</span>}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-gray-700">{formatDisplayDate(lead.followUpDate)}</td>
+                      <td className={`px-6 py-4 ${isPastDate(lead.followUpDate) ? 'text-rose-600' : 'text-gray-700'}`}>{formatDisplayDate(lead.followUpDate)}</td>
+                      <td className="px-6 py-4 text-gray-700">{formatDisplayDateTime(lead.createdAt)}</td>
+                      <td className="px-6 py-4 text-gray-700">{formatDisplayDateTime(lead.updatedAt)}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[lead.status] || statusBadgeClass.new}`}>
                           {statusLabel(lead.status)}

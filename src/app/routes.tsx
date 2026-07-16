@@ -26,39 +26,45 @@ import { UserMaster } from "./pages/masters/UserMaster";
 import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
+import { AppProviders } from "./components/AppProviders";
 
 export const router = createBrowserRouter([
-  { path: "/login", Component: Login },
   {
-    Component: PrivateRoute,
+    Component: AppProviders,
     children: [
+      { path: "/login", Component: Login },
       {
-        path: "/",
-        Component: Layout,
+        Component: PrivateRoute,
         children: [
-          { index: true, Component: Dashboard },
-          { path: "quotations", Component: QuotationList },
-          { path: "quotations/new", Component: QuotationBuilder },
-          { path: "quotations/:id/edit", Component: QuotationBuilder },
-          { path: "quotations/:id/preview", Component: QuotationPreview },
-          { path: "quotations/approvals", Component: QuotationApprovals },
-          { path: "customers", Component: CustomerList },
-          { path: "customers/new", Component: CustomerForm },
-          { path: "customers/:id/edit", Component: CustomerForm },
-          { path: "tasks", Component: TaskList },
-          { path: "tasks/new", Component: TaskForm },
-          { path: "tasks/:id", Component: TaskView },
-          { path: "tasks/:id/edit", Component: TaskForm },
-          { path: "leads", Component: LeadList },
-          { path: "leads/new", Component: LeadForm },
-          { path: "leads/:id", Component: LeadView },
-          { path: "leads/:id/edit", Component: LeadForm },
-          { path: "products", Component: ProductList },
-          { path: "products/new", Component: ProductForm },
-          { path: "products/:id/edit", Component: ProductForm },
-          { path: "masters/categories", Component: CategoryMaster },
-          { path: "masters/brands", Component: BrandMaster },
-          { path: "masters/terms", Component: TermsMaster },
+          {
+            path: "/",
+            Component: Layout,
+            children: [
+              { index: true, Component: Dashboard },
+              { path: "quotations", Component: QuotationList },
+              { path: "quotations/new", Component: QuotationBuilder },
+              { path: "quotations/:id/edit", Component: QuotationBuilder },
+              { path: "quotations/:id/preview", Component: QuotationPreview },
+              { path: "quotations/approvals", Component: QuotationApprovals },
+              { path: "customers", Component: CustomerList },
+              { path: "customers/new", Component: CustomerForm },
+              { path: "customers/:id/edit", Component: CustomerForm },
+              { path: "tasks", Component: TaskList },
+              { path: "tasks/new", Component: TaskForm },
+              { path: "tasks/:id", Component: TaskView },
+              { path: "tasks/:id/edit", Component: TaskForm },
+              { path: "leads", Component: LeadList },
+              { path: "leads/new", Component: LeadForm },
+              { path: "leads/:id", Component: LeadView },
+              { path: "leads/:id/edit", Component: LeadForm },
+              { path: "products", Component: ProductList },
+              { path: "products/new", Component: ProductForm },
+              { path: "products/:id/edit", Component: ProductForm },
+              { path: "masters/categories", Component: CategoryMaster },
+              { path: "masters/brands", Component: BrandMaster },
+              { path: "masters/terms", Component: TermsMaster },
+            ],
+          },
         ],
       },
       {

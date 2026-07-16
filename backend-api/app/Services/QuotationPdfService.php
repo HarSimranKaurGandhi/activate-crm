@@ -162,6 +162,7 @@ class QuotationPdfService
     private function buildHtml(Quotation $quotation): string
     {
         $quotation->loadMissing(['customer', 'items', 'adjustments', 'terms', 'brandBanner']);
+        $quotation->loadMissing(['items.product.measurementUnit']);
         $company = CompanySetting::query()->first();
         $bank = CompanyBankDetail::query()->where('is_default', true)->first() ?? CompanyBankDetail::query()->first();
 
@@ -220,6 +221,7 @@ class QuotationPdfService
                 'email' => $quotation->salesperson_email ?: '',
             ],
             'items' => $items->map(function ($item) use ($roundOffNetAmount) {
+                $unitLabel = trim((string) ($item->product?->measurementUnit?->name ?: $item->unit ?: ''));
                 return [
                     'product_name' => $item->product_name,
                     'model_number' => $item->model_number,
@@ -234,7 +236,7 @@ class QuotationPdfService
                         $roundOffNetAmount ? 0 : 2
                     ),
                     'quantity_label' => $this->number($item->quantity),
-                    'quantity_with_unit_label' => trim($this->number($item->quantity).' '.strtoupper((string) ($item->unit ?? ''))),
+                    'quantity_with_unit_label' => trim($this->number($item->quantity).' '.$unitLabel),
                     'discount_percent_label' => (float) $item->discount_percent > 0 ? $this->number($item->discount_percent).'%' : '-',
                     'gst_percent_label' => $this->number($item->gst_percent).'%',
                     'tax_amount_label' => $this->money(

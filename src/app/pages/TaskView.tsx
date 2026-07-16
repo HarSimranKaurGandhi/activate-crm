@@ -25,6 +25,16 @@ const statusLabel = (status: string) => {
       return 'New';
   }
 };
+const TODAY = new Date('2026-07-16T00:00:00');
+const isPastDate = (date?: string) => {
+  if (!date) return false;
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  parsed.setHours(0, 0, 0, 0);
+  return parsed < TODAY;
+};
 
 export const TaskView = () => {
   const navigate = useNavigate();
@@ -92,7 +102,7 @@ export const TaskView = () => {
 
               <div>
                 <div className="mb-1 text-sm font-medium text-gray-500">Due Date</div>
-                <div className="text-gray-900">{task.dueDate || '-'}</div>
+                <div className={isPastDate(task.dueDate) ? 'text-rose-600' : 'text-gray-900'}>{task.dueDate || '-'}</div>
               </div>
 
               <div className="md:col-span-2">

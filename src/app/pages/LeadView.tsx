@@ -82,6 +82,16 @@ const formatDisplayDateTime = (date?: string) => {
     minute: '2-digit',
   });
 };
+const TODAY = new Date('2026-07-16T00:00:00');
+const isPastDate = (date?: string) => {
+  if (!date) return false;
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  parsed.setHours(0, 0, 0, 0);
+  return parsed < TODAY;
+};
 
 export const LeadView = () => {
   const navigate = useNavigate();
@@ -164,7 +174,7 @@ export const LeadView = () => {
 
               <div>
                 <div className="mb-1 text-sm font-medium text-gray-500">Follow Up Date</div>
-                <div className="text-gray-900">{formatDisplayDate(lead.followUpDate)}</div>
+                <div className={isPastDate(lead.followUpDate) ? 'text-rose-600' : 'text-gray-900'}>{formatDisplayDate(lead.followUpDate)}</div>
               </div>
 
               <div>

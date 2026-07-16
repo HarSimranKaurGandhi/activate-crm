@@ -48,7 +48,7 @@ class ProductService extends CrudService
     public function selectable(Request $request): LengthAwarePaginator
     {
         return Product::query()
-            ->with('brand')
+            ->with(['brand', 'measurementUnit'])
             ->when($request->filled('search'), function (Builder $query) use ($request): void {
                 $search = $request->string('search')->toString();
                 $query->where(function (Builder $builder) use ($search): void {

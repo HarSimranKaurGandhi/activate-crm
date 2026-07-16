@@ -34,10 +34,10 @@ const LEAD_EXPECTED_ORDER_VALUE_OPTIONS = [
 ];
 
 const LEAD_EXPECTED_CLOSURE_OPTIONS = [
-  { value: '10 day', label: '10 day' },
-  { value: '20', label: '20' },
-  { value: '30', label: '30' },
-  { value: '90', label: '90' },
+  { value: '10 days', label: '10 days' },
+  { value: '20 days', label: '20 days' },
+  { value: '30 days', label: '30 days' },
+  { value: '90 days', label: '90 days' },
 ];
 
 const statusBadgeClass: Record<string, string> = {
@@ -258,7 +258,7 @@ export const LeadDetailsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-5xl gap-0 overflow-hidden border-gray-200 p-0">
+      <DialogContent className="max-h-[95vh] max-w-[96vw] gap-0 overflow-hidden border-gray-200 p-0 xl:max-w-6xl 2xl:max-w-7xl">
         <DialogHeader className="border-b border-gray-200 px-6 py-4">
           <DialogTitle>{lead?.name ? `Lead: ${lead.name}` : 'Lead Details'}</DialogTitle>
         </DialogHeader>
@@ -269,14 +269,14 @@ export const LeadDetailsDialog = ({
           </div>
         ) : lead ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 flex-1 overflow-hidden">
-            <div className="border-b border-gray-200 px-6 py-3">
+            <div className="border-b border-gray-200 px-6 py-2.5">
               <TabsList className="w-full max-w-sm">
                 <TabsTrigger value="preview">Preview</TabsTrigger>
                 <TabsTrigger value="edit">Edit</TabsTrigger>
               </TabsList>
             </div>
 
-            <div className="max-h-[calc(90vh-8.5rem)] overflow-y-auto px-6 py-5">
+            <div className="max-h-[calc(95vh-8rem)] overflow-y-auto px-6 py-4">
               <TabsContent value="preview">
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>

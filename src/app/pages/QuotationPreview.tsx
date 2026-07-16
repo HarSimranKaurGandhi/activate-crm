@@ -142,7 +142,7 @@ export const QuotationPreview = () => {
       return String(item.quantity);
     }
 
-    return [item.quantity, item.product.unit].filter(Boolean).join(' ');
+    return [item.quantity, item.product.unitName || item.product.unit].filter(Boolean).join(' ');
   };
 
   const maskPhone = (value?: string) => {

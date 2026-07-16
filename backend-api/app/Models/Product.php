@@ -37,6 +37,11 @@ class Product extends Model
         return $this->belongsTo(Brand::class);
     }
 
+    public function measurementUnit(): BelongsTo
+    {
+        return $this->belongsTo(MeasurementUnit::class, 'unit', 'code');
+    }
+
     public function quotationItems(): HasMany
     {
         return $this->hasMany(QuotationItem::class);

@@ -35,10 +35,10 @@ const LEAD_EXPECTED_ORDER_VALUE_OPTIONS = [
 ];
 
 const LEAD_EXPECTED_CLOSURE_OPTIONS = [
-  { value: '10 day', label: '10 day' },
-  { value: '20', label: '20' },
-  { value: '30', label: '30' },
-  { value: '90', label: '90' },
+  { value: '10 days', label: '10 days' },
+  { value: '20 days', label: '20 days' },
+  { value: '30 days', label: '30 days' },
+  { value: '90 days', label: '90 days' },
 ];
 
 const formatDateInput = (date: Date) => date.toISOString().split('T')[0];

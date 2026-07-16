@@ -10,6 +10,16 @@ class QuotationItemResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $unitName = $this->unit;
+
+        if ($this->relationLoaded('product') && $this->product) {
+            $measurementUnit = $this->product->relationLoaded('measurementUnit')
+                ? $this->product->measurementUnit
+                : null;
+
+            $unitName = $measurementUnit?->name ?: $this->unit;
+        }
+
         return [
             'id' => $this->id,
             'product_id' => $this->product_id,
@@ -21,6 +31,7 @@ class QuotationItemResource extends JsonResource
                 ? $request->getSchemeAndHttpHost().Storage::url($this->product_image_path)
                 : null,
             'unit' => $this->unit,
+            'unit_name' => $unitName,
             'quantity' => $this->quantity,
             'mrp' => $this->mrp,
             'base_price' => $this->base_price,

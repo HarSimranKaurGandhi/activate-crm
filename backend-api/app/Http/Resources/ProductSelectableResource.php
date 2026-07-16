@@ -25,6 +25,7 @@ class ProductSelectableResource extends JsonResource
             'usual_selling_price' => $this->usual_selling_price,
             'least_selling_price' => $this->least_selling_price,
             'unit' => $this->unit,
+            'unit_name' => $this->measurementUnit?->name ?: $this->unit,
             'gst_percent' => $this->gst_percent,
             'hsn_code' => $this->hsn_code,
             'specifications' => $this->specifications,

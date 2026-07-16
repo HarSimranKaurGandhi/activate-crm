@@ -38,6 +38,16 @@ const statusLabel = (status: string) => {
       return 'New';
   }
 };
+const TODAY = new Date('2026-07-16T00:00:00');
+const isPastDate = (date?: string) => {
+  if (!date) return false;
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  parsed.setHours(0, 0, 0, 0);
+  return parsed < TODAY;
+};
 
 export const TaskList = () => {
   const navigate = useNavigate();
@@ -371,7 +381,7 @@ export const TaskList = () => {
                     <td className="px-6 py-4 text-gray-700">
                       {task.assignedUser?.name || '-'}
                     </td>
-                    <td className="px-6 py-4 text-gray-700">
+                    <td className={`px-6 py-4 ${isPastDate(task.dueDate) ? 'text-rose-600' : 'text-gray-700'}`}>
                       {task.dueDate || '-'}
                     </td>
                     <td className="px-6 py-4">
