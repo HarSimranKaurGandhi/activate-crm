@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Calendar, Eye, Edit, Trash2, Filter, ChevronDown } from 'lucide-react';
+import { Plus, Search, Calendar, Eye, Edit, Trash2, Filter, ChevronDown, Copy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { LoadingState } from '../components/common/AsyncState';
 import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
@@ -11,7 +11,7 @@ import { sortItems } from '../utils/sort';
 
 export const QuotationList = () => {
   const navigate = useNavigate();
-  const { quotations, loading, deleteQuotation } = useData();
+  const { quotations, loading, deleteQuotation, duplicateQuotation } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -67,6 +67,16 @@ export const QuotationList = () => {
       toast.success('Quotation deleted');
     } catch {
       toast.error('Unable to delete quotation');
+    }
+  };
+
+  const handleDuplicate = async (quotationId: string) => {
+    try {
+      const duplicated = await duplicateQuotation(quotationId);
+      toast.success('Quotation duplicated');
+      navigate(`/quotations/${duplicated.id}/edit`);
+    } catch {
+      toast.error('Unable to duplicate quotation');
     }
   };
 
@@ -306,6 +316,13 @@ export const QuotationList = () => {
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => void handleDuplicate(quotation.id)}
+                          className="p-2 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                          title="Duplicate"
+                        >
+                          <Copy className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => void handleDelete(quotation.id)}

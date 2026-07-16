@@ -116,6 +116,7 @@ export const QuotationPreview = () => {
 
   const hasLetterhead = Boolean(settings.letterhead);
   const isPdfLetterhead = hasLetterhead && settings.letterhead.toLowerCase().includes('.pdf');
+  const showBrandBanner = quotation.showBrandBanner && (quotation.brandBanner?.logoPath || quotation.brandBanner?.name);
 
   const calculateItemAmounts = (item: any) => {
     const basePrice = item.price * item.quantity;
@@ -135,6 +136,14 @@ export const QuotationPreview = () => {
   const displayRoundedAmount = (amount: number) => (
     quotation.roundOffNetAmount ? Math.round(amount || 0) : amount
   );
+
+  const quantityLabel = (item: any) => {
+    if (!quotation.showUom) {
+      return String(item.quantity);
+    }
+
+    return [item.quantity, item.product.unit].filter(Boolean).join(' ');
+  };
 
   const maskPhone = (value?: string) => {
     const phone = String(value || '').trim();
@@ -297,6 +306,25 @@ export const QuotationPreview = () => {
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {showBrandBanner && (
+            <div className="mx-3 mb-3 border border-slate-200 bg-white sm:mx-5 sm:mb-4 print:mx-7">
+              <div className="flex items-center justify-center gap-4 px-4 py-3">
+                {quotation.brandBanner?.logoPath && (
+                  <img
+                    src={quotation.brandBanner.logoPath}
+                    alt={quotation.brandBanner.name || 'Brand Banner'}
+                    className="max-h-14 max-w-[180px] object-contain"
+                  />
+                )}
+                {quotation.brandBanner?.name && (
+                  <div className="text-lg font-black uppercase tracking-[0.12em] text-slate-950">
+                    {quotation.brandBanner.name}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -542,7 +570,7 @@ export const QuotationPreview = () => {
                           <td className="border-r border-slate-200 px-3 py-4 text-right font-black text-slate-950">
                             {formatMoney(displayPrice, { whole: quotation.roundOffNetAmount })}
                           </td>
-                          <td className="border-r border-slate-200 px-2 py-4 text-center font-black text-slate-950">{item.quantity}</td>
+                          <td className="border-r border-slate-200 px-2 py-4 text-center font-black text-slate-950">{quantityLabel(item)}</td>
                           {quotation.showDiscount && (
                             <td className="border-r border-slate-200 px-2 py-4 text-center font-bold text-slate-700">
                               {item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'}
@@ -602,7 +630,7 @@ export const QuotationPreview = () => {
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                           <MobileMetric label="Price" value={formatMoney(displayPrice, { whole: quotation.roundOffNetAmount })} />
-                          <MobileMetric label="Qty" value={String(item.quantity)} />
+                          <MobileMetric label="Qty" value={quantityLabel(item)} />
                           {quotation.showDiscount && <MobileMetric label="Disc%" value={item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'} />}
                           {quotation.showItemWiseGst && <MobileMetric label="GST" value={`${item.product.gstPercent}% (${formatMoney(gstAmount, { whole: quotation.roundOffNetAmount })})`} />}
                           <MobileMetric

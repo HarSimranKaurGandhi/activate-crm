@@ -36,6 +36,12 @@ class QuotationService extends CrudService
 
     private ?bool $supportsRoundOffNetAmountColumn = null;
 
+    private ?bool $supportsShowUomColumn = null;
+
+    private ?bool $supportsShowBrandBannerColumn = null;
+
+    private ?bool $supportsBrandBannerIdColumn = null;
+
     public function __construct(private QuotationCalculator $calculator)
     {
     }
@@ -55,6 +61,9 @@ class QuotationService extends CrudService
             $data['show_mrp_to_customer'] = $data['show_mrp_to_customer'] ?? true;
             $data['show_item_wise_gst_to_customer'] = $data['show_item_wise_gst_to_customer'] ?? false;
             $data['round_off_net_amount_to_customer'] = $data['round_off_net_amount_to_customer'] ?? false;
+            $data['show_uom_to_customer'] = $data['show_uom_to_customer'] ?? false;
+            $data['show_brand_banner_to_customer'] = $data['show_brand_banner_to_customer'] ?? false;
+            $data['brand_banner_id'] = ($data['show_brand_banner_to_customer'] ?? false) ? ($data['brand_banner_id'] ?? null) : null;
             $data = $this->sanitizeForCurrentSchema($data);
 
             $quotation = Quotation::create($data);
@@ -75,6 +84,9 @@ class QuotationService extends CrudService
             $data['show_mrp_to_customer'] = $data['show_mrp_to_customer'] ?? true;
             $data['show_item_wise_gst_to_customer'] = $data['show_item_wise_gst_to_customer'] ?? false;
             $data['round_off_net_amount_to_customer'] = $data['round_off_net_amount_to_customer'] ?? false;
+            $data['show_uom_to_customer'] = $data['show_uom_to_customer'] ?? false;
+            $data['show_brand_banner_to_customer'] = $data['show_brand_banner_to_customer'] ?? false;
+            $data['brand_banner_id'] = ($data['show_brand_banner_to_customer'] ?? false) ? ($data['brand_banner_id'] ?? null) : null;
             $data = $this->sanitizeForCurrentSchema($data);
 
             $model->update($data);
@@ -224,6 +236,18 @@ class QuotationService extends CrudService
             unset($data['round_off_net_amount_to_customer']);
         }
 
+        if (! $this->supportsShowUomColumn()) {
+            unset($data['show_uom_to_customer']);
+        }
+
+        if (! $this->supportsShowBrandBannerColumn()) {
+            unset($data['show_brand_banner_to_customer']);
+        }
+
+        if (! $this->supportsBrandBannerIdColumn()) {
+            unset($data['brand_banner_id']);
+        }
+
         return $data;
     }
 
@@ -258,6 +282,39 @@ class QuotationService extends CrudService
         $this->supportsRoundOffNetAmountColumn = Schema::hasColumn('quotations', 'round_off_net_amount_to_customer');
 
         return $this->supportsRoundOffNetAmountColumn;
+    }
+
+    private function supportsShowUomColumn(): bool
+    {
+        if ($this->supportsShowUomColumn !== null) {
+            return $this->supportsShowUomColumn;
+        }
+
+        $this->supportsShowUomColumn = Schema::hasColumn('quotations', 'show_uom_to_customer');
+
+        return $this->supportsShowUomColumn;
+    }
+
+    private function supportsShowBrandBannerColumn(): bool
+    {
+        if ($this->supportsShowBrandBannerColumn !== null) {
+            return $this->supportsShowBrandBannerColumn;
+        }
+
+        $this->supportsShowBrandBannerColumn = Schema::hasColumn('quotations', 'show_brand_banner_to_customer');
+
+        return $this->supportsShowBrandBannerColumn;
+    }
+
+    private function supportsBrandBannerIdColumn(): bool
+    {
+        if ($this->supportsBrandBannerIdColumn !== null) {
+            return $this->supportsBrandBannerIdColumn;
+        }
+
+        $this->supportsBrandBannerIdColumn = Schema::hasColumn('quotations', 'brand_banner_id');
+
+        return $this->supportsBrandBannerIdColumn;
     }
 
     private function syncLines(Quotation $quotation, array $items, array $adjustments, array $terms): void
@@ -332,6 +389,7 @@ class QuotationService extends CrudService
     {
         return [
             'customer' => fn ($query) => $query->select($this->customerColumns()),
+            'brandBanner',
             'items',
             'adjustments',
             'terms',
@@ -342,6 +400,7 @@ class QuotationService extends CrudService
     {
         return [
             'customer' => fn ($query) => $query->select($this->customerColumns()),
+            'brandBanner',
             Schema::hasTable('quotation_item_discount_overrides') ? 'items.discountOverrides' : 'items',
             'adjustments',
             'terms',

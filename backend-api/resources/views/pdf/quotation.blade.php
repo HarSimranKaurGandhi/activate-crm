@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ $quotation['number'] }}</title>
   <style>
-    @page { size: A4; margin: 18mm 6mm 8mm; }
+    @page { size: A4; margin: 24mm 6mm 8mm; }
+    @page :first { margin-top: 18mm; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #fff; }
     body { font-family: DejaVu Sans, Arial, Helvetica, sans-serif; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 11px; line-height: 1.4; }
@@ -13,8 +14,12 @@
     .watermark { position: fixed; top: 44%; left: 8%; width: 84%; text-align: center; z-index: 1; }
     .watermark span { display: inline-block; transform: rotate(-35deg); white-space: nowrap; font-size: 60px; font-weight: 900; letter-spacing: 0.16em; color: #e2e8f0; }
     .content { position: relative; z-index: 2; }
-    .letterhead { margin: 0 0 6px; padding: 0; background: #f8fafc; text-align: left; }
-    .letterhead img { display: block; width: 100%; height: auto; object-fit: cover; object-position: top; }
+    .letterhead { margin: 0 0 6px; padding: 0; background: #f8fafc; text-align: center; }
+    .letterhead img { display: block; width: auto; max-width: 100%; height: auto; margin: 0 auto; object-fit: contain; object-position: center top; }
+    .brand-banner { width: calc(100% - 20px); margin: 0 10px 10px; border: 1px solid #e2e8f0; background: #fff; text-align: center; }
+    .brand-banner-inner { display: inline-flex; align-items: center; justify-content: center; gap: 14px; width: 100%; padding: 10px 16px; }
+    .brand-banner-logo { display: block; max-width: 160px; max-height: 54px; object-fit: contain; }
+    .brand-banner-name { font-size: 18px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #020617; }
     .brand-header { width: calc(100% - 20px); margin: 0 10px 8px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
     .brand-header td { padding: 10px 10px; vertical-align: middle; }
     .brand-logo-cell { width: 22%; }
@@ -150,6 +155,18 @@
       @elseif($company['letterhead_type'] === 'pdf' && $company['letterhead_src'])
         <div class="letterhead-fallback">A print-safe branded header is used below for PDF rendering.</div>
       @endif
+      @if($quotation['show_brand_banner'] && ($company['brand_banner']['logo_src'] || $company['brand_banner']['name']))
+        <div class="brand-banner">
+          <div class="brand-banner-inner">
+            @if($company['brand_banner']['logo_src'])
+              <img class="brand-banner-logo" src="{{ $company['brand_banner']['logo_src'] }}" alt="{{ $company['brand_banner']['name'] ?: 'Brand Banner' }}">
+            @endif
+            @if($company['brand_banner']['name'])
+              <div class="brand-banner-name">{{ $company['brand_banner']['name'] }}</div>
+            @endif
+          </div>
+        </div>
+      @endif
       @if(!$company['letterhead_src'])
       <table class="brand-header">
         <tr>
@@ -251,7 +268,7 @@
                   </td>
                   <td class="specs col-specs">{!! $item['specifications_html'] !!}</td>
                   <td class="right amount-strong col-price">{{ $quotation['show_mrp'] ? $item['edited_price_label'] : $item['discounted_price_label'] }}</td>
-                  <td class="center amount-strong col-qty" style="white-space: nowrap;">{{ $item['quantity_label'] }}</td>
+                  <td class="center amount-strong col-qty" style="white-space: nowrap;">{{ $quotation['show_uom'] ? $item['quantity_with_unit_label'] : $item['quantity_label'] }}</td>
                   @if($quotation['show_discount']) <td class="center col-discount" style="white-space: nowrap;">{{ $item['discount_percent_label'] }}</td> @endif
                   @if($quotation['show_item_wise_gst']) <td class="right col-gst"><div>{{ $item['gst_percent_label'] }}</div><div class="gst-sub">{{ $item['tax_amount_label'] }}</div></td> @endif
                   <td class="right amount-strong col-total">{{ $quotation['gst_inclusive'] ? $item['line_total_label'] : $item['net_amount_label'] }}</td>

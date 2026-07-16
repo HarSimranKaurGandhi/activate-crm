@@ -47,6 +47,9 @@ const statusLabel = (status: string) => {
   }
 };
 
+const expectedOrderValueLabel = (value?: string) => value || '-';
+const expectedClosureLabel = (value?: string) => value || '-';
+
 const formatAddress = (lead: any) =>
   [lead.addressLine1, lead.addressLine2, lead.city, lead.state, lead.pincode, lead.country]
     .filter(Boolean)
@@ -62,6 +65,21 @@ const formatDisplayDate = (date?: string) => {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+  });
+};
+
+const formatDisplayDateTime = (date?: string) => {
+  if (!date) return '-';
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+
+  return parsed.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 };
 
@@ -150,9 +168,29 @@ export const LeadView = () => {
               </div>
 
               <div>
+                <div className="mb-1 text-sm font-medium text-gray-500">Lead Expected Order Value</div>
+                <div className="text-gray-900">{expectedOrderValueLabel(lead.expectedOrderValue)}</div>
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-gray-500">Expected Closure</div>
+                <div className="text-gray-900">{expectedClosureLabel(lead.expectedClosure)}</div>
+              </div>
+
+              <div>
                 <div className="mb-1 text-sm font-medium text-gray-500">Assigned To</div>
                 <div className="text-gray-900">{lead.assignedUser?.name || '-'}</div>
                 {lead.assignedUser?.email && <div className="mt-1 text-sm text-gray-500">{lead.assignedUser.email}</div>}
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-gray-500">Created On</div>
+                <div className="text-gray-900">{formatDisplayDateTime(lead.createdAt)}</div>
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-gray-500">Last Updated On</div>
+                <div className="text-gray-900">{formatDisplayDateTime(lead.updatedAt)}</div>
               </div>
 
               <div className="md:col-span-2">

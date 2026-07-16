@@ -26,6 +26,8 @@ class LeadRequest extends FormRequest
             'pincode' => ['sometimes', 'nullable', 'string', 'max:20'],
             'country' => ['sometimes', 'nullable', 'string', 'max:100'],
             'requirement' => ['required', 'string'],
+            'expected_order_value' => ['nullable', 'string', Rule::in(['5L-10L', '10L-30L', '30L+']), 'required_if:status,in_progress'],
+            'expected_closure' => ['nullable', 'string', Rule::in(['10 day', '20', '30', '90']), 'required_if:status,in_progress'],
             'status' => ['required', Rule::in(['new', 'in_progress', 'on_hold', 'closed_success', 'closed_fail'])],
             'tags' => ['sometimes', 'nullable', 'array'],
             'tags.*' => ['string', Rule::in(['hot', 'premium'])],

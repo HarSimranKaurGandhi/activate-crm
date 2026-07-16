@@ -25,6 +25,7 @@ export const Dashboard = () => {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const isAdmin = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase() === 'admin';
   const [viewScope, setViewScope] = useState<'all' | 'mine'>('mine');
+  const isAdminView = isAdmin && viewScope === 'all';
 
   useEffect(() => {
     setSummaryLoading(true);
@@ -43,14 +44,20 @@ export const Dashboard = () => {
         {/* Header */}
         <div className="flex flex-col gap-2">
           <div className="min-w-0">
-            <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Welcome back!</h2>
-            <p className="text-gray-600 mt-1">Here&apos;s what needs your attention today.</p>
+            <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">
+              {isAdminView ? 'Admin Dashboard' : 'My Dashboard'}
+            </h2>
+            <p className="text-gray-600 mt-1">
+              {isAdminView
+                ? 'Here is the organization-wide view of approvals, tasks, and follow ups.'
+                : 'Here is what needs your attention in your own work today.'}
+            </p>
           </div>
           {isAdmin && (
             <div className="flex flex-wrap gap-2 pt-2">
               {[
-                { value: 'all' as const, label: 'All Users' },
-                { value: 'mine' as const, label: 'My Data' },
+                { value: 'all' as const, label: 'Admin Dashboard' },
+                { value: 'mine' as const, label: 'My Dashboard' },
               ].map((option) => (
                 <button
                   key={option.value}
@@ -71,7 +78,7 @@ export const Dashboard = () => {
 
         {/* Stats Cards */}
         <div className={`grid grid-cols-1 gap-4 sm:gap-6 ${isAdmin ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
-          {isAdmin && (
+          {isAdminView ? (
             <button
               type="button"
               onClick={() => navigate('/approvals')}
@@ -88,13 +95,26 @@ export const Dashboard = () => {
                 </div>
               </div>
             </button>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm font-medium">My Quotations</p>
+                  <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.total_quotations}</p>
+                  <p className="text-sm text-gray-500 mt-2">Quotations created by me</p>
+                </div>
+                <div className="w-14 h-14 bg-sky-50 rounded-2xl flex items-center justify-center">
+                  <FileText className="w-7 h-7 text-sky-600" />
+                </div>
+              </div>
+            </div>
           )}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Tasks Due Today</p>
+                <p className="text-gray-600 text-sm font-medium">{isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}</p>
                 <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.tasks_due_today_count}</p>
-                <p className="text-sm text-gray-500 mt-2">Assigned tasks for today</p>
+                <p className="text-sm text-gray-500 mt-2">{isAdminView ? 'Assigned tasks across all users' : 'Assigned tasks for today'}</p>
               </div>
               <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center">
                 <ListChecks className="w-7 h-7 text-violet-600" />
@@ -104,9 +124,9 @@ export const Dashboard = () => {
           <div className="bg-white rounded-2xl border border-rose-200 p-6 hover:shadow-lg transition-all">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-rose-700 text-sm font-medium">Past Due Tasks</p>
+                <p className="text-rose-700 text-sm font-medium">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</p>
                 <p className="text-4xl font-bold text-rose-700 mt-2">{isLoading ? '...' : summary.overdue_tasks_count}</p>
-                <p className="text-sm text-rose-500 mt-2">Incomplete overdue tasks</p>
+                <p className="text-sm text-rose-500 mt-2">{isAdminView ? 'Incomplete overdue tasks across all users' : 'My incomplete overdue tasks'}</p>
               </div>
               <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center">
                 <AlertTriangle className="w-7 h-7 text-rose-600" />
@@ -116,9 +136,9 @@ export const Dashboard = () => {
           <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-all">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Follow Ups Today</p>
+                <p className="text-gray-600 text-sm font-medium">{isAdminView ? `Everyone's Follow Ups Today` : 'My Follow Ups Today'}</p>
                 <p className="text-4xl font-bold text-gray-900 mt-2">{isLoading ? '...' : summary.follow_ups_due_today_count}</p>
-                <p className="text-sm text-gray-500 mt-2">Leads needing follow-up today</p>
+                <p className="text-sm text-gray-500 mt-2">{isAdminView ? 'Leads needing follow-up across all users' : 'Leads needing my follow-up today'}</p>
               </div>
               <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center">
                 <PhoneCall className="w-7 h-7 text-blue-600" />
@@ -128,9 +148,9 @@ export const Dashboard = () => {
           <div className="bg-white rounded-2xl border border-rose-200 p-6 hover:shadow-lg transition-all">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-rose-700 text-sm font-medium">Past Due Follow Ups</p>
+                <p className="text-rose-700 text-sm font-medium">{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</p>
                 <p className="text-4xl font-bold text-rose-700 mt-2">{isLoading ? '...' : summary.overdue_follow_ups_count}</p>
-                <p className="text-sm text-rose-500 mt-2">Overdue leads need attention</p>
+                <p className="text-sm text-rose-500 mt-2">{isAdminView ? 'Overdue leads across all users' : 'My overdue leads needing attention'}</p>
               </div>
               <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center">
                 <AlertTriangle className="w-7 h-7 text-rose-600" />
@@ -142,7 +162,7 @@ export const Dashboard = () => {
         {!isLoading && (
           <div className="bg-white rounded-2xl border border-rose-200 p-4 sm:p-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-semibold text-rose-700">Past Due Tasks</h3>
+              <h3 className="text-lg font-semibold text-rose-700">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</h3>
               <button
                 onClick={() => navigate('/tasks')}
                 className="text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:text-right"
@@ -188,7 +208,7 @@ export const Dashboard = () => {
         {!isLoading && (
           <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Follow Ups Due Today</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{isAdminView ? `Everyone's Follow Ups Due Today` : 'My Follow Ups Due Today'}</h3>
               <button
                 onClick={() => navigate('/leads')}
                 className="text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:text-right"
@@ -234,7 +254,7 @@ export const Dashboard = () => {
         {!isLoading && (
           <div className="bg-white rounded-2xl border border-rose-200 p-4 sm:p-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-semibold text-rose-700">Past Due Follow Ups</h3>
+              <h3 className="text-lg font-semibold text-rose-700">{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</h3>
               <button
                 onClick={() => navigate('/leads')}
                 className="text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:text-right"
@@ -280,7 +300,7 @@ export const Dashboard = () => {
         {!isLoading && (
           <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Assigned Tasks Due Today</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}</h3>
               <button
                 onClick={() => navigate('/tasks')}
                 className="text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:text-right"

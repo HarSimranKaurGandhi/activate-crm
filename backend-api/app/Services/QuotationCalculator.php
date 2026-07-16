@@ -8,12 +8,15 @@ class QuotationCalculator
 {
     public function buildItemSnapshot(array $item, array $defaults): array
     {
-        $product = Product::query()->with('images')->findOrFail($item['product_id']);
+        $product = Product::query()->with(['images', 'brand'])->findOrFail($item['product_id']);
         $quantity = (float) ($item['quantity'] ?? 1);
         $basePrice = (float) ($product->mrp ?? $product->usual_selling_price);
         $editedPrice = (float) ($item['edited_price'] ?? $basePrice);
         $discountPercent = (float) ($item['discount_percent'] ?? $defaults['default_discount_percent'] ?? 0);
         $discountAmount = (float) ($item['discount_amount'] ?? $defaults['default_discount_amount'] ?? 0);
+        $brandName = trim((string) ($product->brand?->name ?? ''));
+        $productName = trim((string) $product->product_name);
+        $quotationItemName = $brandName !== '' ? "{$brandName} {$productName}" : $productName;
 
         if ($discountAmount <= 0 && $discountPercent > 0) {
             $discountAmount = round(($editedPrice * $discountPercent) / 100, 2);
@@ -42,7 +45,7 @@ class QuotationCalculator
         return [
             'product_id' => $product->id,
             'sort_order' => (int) ($item['sort_order'] ?? 0),
-            'product_name' => $product->product_name,
+            'product_name' => $quotationItemName,
             'model_number' => $product->model_number,
             'specifications' => $product->specifications,
             'product_image_path' => $primaryImagePath,

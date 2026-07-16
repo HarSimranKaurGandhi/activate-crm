@@ -26,7 +26,7 @@ export interface ApiErrorPayload {
   status?: number;
 }
 
-export const defaultBaseUrl = 'http://localhost:8000/api';
+export const defaultBaseUrl = 'http://localhost:8001/api';
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || defaultBaseUrl;
 export const apiOrigin = new URL(apiBaseUrl).origin;
 

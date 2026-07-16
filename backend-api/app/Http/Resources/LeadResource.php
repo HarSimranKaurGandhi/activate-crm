@@ -22,6 +22,8 @@ class LeadResource extends JsonResource
             'pincode' => $this->pincode,
             'country' => $this->country,
             'requirement' => $this->requirement,
+            'expected_order_value' => $this->expected_order_value,
+            'expected_closure' => $this->expected_closure,
             'status' => $this->status,
             'tags' => $this->tags ?? [],
             'follow_up_date' => optional($this->follow_up_date)?->format('Y-m-d'),

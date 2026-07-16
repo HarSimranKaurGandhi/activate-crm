@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Brand;
 use App\Models\CompanyBankDetail;
 use App\Models\CompanySetting;
 use App\Models\Quotation;
@@ -160,7 +161,7 @@ class QuotationPdfService
 
     private function buildHtml(Quotation $quotation): string
     {
-        $quotation->loadMissing(['customer', 'items', 'adjustments', 'terms']);
+        $quotation->loadMissing(['customer', 'items', 'adjustments', 'terms', 'brandBanner']);
         $company = CompanySetting::query()->first();
         $bank = CompanyBankDetail::query()->where('is_default', true)->first() ?? CompanyBankDetail::query()->first();
 
@@ -187,6 +188,8 @@ class QuotationPdfService
             'show_mrp' => $quotation->show_mrp_to_customer === null ? true : (bool) $quotation->show_mrp_to_customer,
             'show_item_wise_gst' => $quotation->show_item_wise_gst_to_customer === null ? false : (bool) $quotation->show_item_wise_gst_to_customer,
             'round_off_net_amount' => $roundOffNetAmount,
+            'show_uom' => $quotation->show_uom_to_customer === null ? false : (bool) $quotation->show_uom_to_customer,
+            'show_brand_banner' => $quotation->show_brand_banner_to_customer === null ? false : (bool) $quotation->show_brand_banner_to_customer,
             'gst_inclusive' => $gstInclusive,
             'tax_amount' => (float) $quotation->total_tax,
             'subtotal_label' => $this->money($quotation->subtotal_after_discount),
@@ -231,6 +234,7 @@ class QuotationPdfService
                         $roundOffNetAmount ? 0 : 2
                     ),
                     'quantity_label' => $this->number($item->quantity),
+                    'quantity_with_unit_label' => trim($this->number($item->quantity).' '.strtoupper((string) ($item->unit ?? ''))),
                     'discount_percent_label' => (float) $item->discount_percent > 0 ? $this->number($item->discount_percent).'%' : '-',
                     'gst_percent_label' => $this->number($item->gst_percent).'%',
                     'tax_amount_label' => $this->money(
@@ -260,11 +264,17 @@ class QuotationPdfService
             ])->all(),
         ];
 
+        $brandBanner = $quotation->brandBanner instanceof Brand ? $quotation->brandBanner : null;
+
         $companyPayload = [
             'company_name' => $company?->company_name ?: 'Quotation',
             'logo_src' => $this->assetSource($company?->logo_path),
             'letterhead_type' => $this->assetType($company?->letterhead_path),
             'letterhead_src' => $this->assetSource($company?->letterhead_path),
+            'brand_banner' => [
+                'name' => $brandBanner?->name ?: '',
+                'logo_src' => $this->assetSource($brandBanner?->logo),
+            ],
             'address_lines' => array_values(array_filter([
                 $company?->address_line_1,
                 $company?->address_line_2,

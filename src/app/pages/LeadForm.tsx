@@ -28,6 +28,19 @@ const LEAD_TAG_OPTIONS = [
   { value: 'premium', label: 'Premium' },
 ];
 
+const LEAD_EXPECTED_ORDER_VALUE_OPTIONS = [
+  { value: '5L-10L', label: '5L-10L' },
+  { value: '10L-30L', label: '10L-30L' },
+  { value: '30L+', label: '30L+' },
+];
+
+const LEAD_EXPECTED_CLOSURE_OPTIONS = [
+  { value: '10 day', label: '10 day' },
+  { value: '20', label: '20' },
+  { value: '30', label: '30' },
+  { value: '90', label: '90' },
+];
+
 const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
 const today = formatDateInput(new Date());
 const defaultFollowUpDate = (() => {
@@ -56,6 +69,8 @@ export const LeadForm = () => {
     pincode: '',
     country: 'India',
     requirement: '',
+    expectedOrderValue: '',
+    expectedClosure: '',
     status: 'new',
     tags: [] as string[],
     followUpDate: defaultFollowUpDate,
@@ -85,6 +100,8 @@ export const LeadForm = () => {
           pincode: mapped.pincode,
           country: mapped.country || 'India',
           requirement: mapped.requirement,
+          expectedOrderValue: mapped.expectedOrderValue,
+          expectedClosure: mapped.expectedClosure,
           status: mapped.status,
           tags: mapped.tags,
           followUpDate: mapped.followUpDate,
@@ -150,6 +167,16 @@ export const LeadForm = () => {
       return;
     }
 
+    if (formData.status === 'in_progress' && !formData.expectedOrderValue) {
+      toast.error('Lead expected order value is required for in-progress leads');
+      return;
+    }
+
+    if (formData.status === 'in_progress' && !formData.expectedClosure) {
+      toast.error('Expected closure is required for in-progress leads');
+      return;
+    }
+
     if (!formData.followUpDate) {
       toast.error('Follow up date is required');
       return;
@@ -193,6 +220,23 @@ export const LeadForm = () => {
           <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Assigned To</label>
+                <select
+                  value={formData.assignedTo}
+                  onChange={(event) => setFormData((current) => ({ ...current, assignedTo: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select user</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={String(user.id)}>
+                      {[user.name, user.designation].filter(Boolean).join(' - ')}
+                    </option>
+                  ))}
+                </select>
+                {errors.assigned_to?.[0] && <p className="mt-1 text-sm text-red-600">{errors.assigned_to[0]}</p>}
+              </div>
+
+              <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">Lead Source *</label>
                 <select
                   value={formData.leadSource}
@@ -221,6 +265,44 @@ export const LeadForm = () => {
               </div>
 
               <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Lead Expected Order Value {formData.status === 'in_progress' ? '*' : ''}
+                </label>
+                <select
+                  value={formData.expectedOrderValue}
+                  required={formData.status === 'in_progress'}
+                  onChange={(event) => setFormData((current) => ({ ...current, expectedOrderValue: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select order value</option>
+                  {LEAD_EXPECTED_ORDER_VALUE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">Mandatory when the lead status is In Progress.</p>
+                {errors.expected_order_value?.[0] && <p className="mt-1 text-sm text-red-600">{errors.expected_order_value[0]}</p>}
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Expected Closure {formData.status === 'in_progress' ? '*' : ''}
+                </label>
+                <select
+                  value={formData.expectedClosure}
+                  required={formData.status === 'in_progress'}
+                  onChange={(event) => setFormData((current) => ({ ...current, expectedClosure: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select expected closure</option>
+                  {LEAD_EXPECTED_CLOSURE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">Mandatory when the lead status is In Progress.</p>
+                {errors.expected_closure?.[0] && <p className="mt-1 text-sm text-red-600">{errors.expected_closure[0]}</p>}
+              </div>
+
+              <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">Name</label>
                 <input
                   type="text"
@@ -232,10 +314,9 @@ export const LeadForm = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Phone No. *</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Phone No.</label>
                 <input
                   type="text"
-                  required
                   value={formData.phone}
                   onChange={(event) => setFormData((current) => ({ ...current, phone: event.target.value }))}
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -245,6 +326,7 @@ export const LeadForm = () => {
 
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-medium text-gray-700">Email</label>
+                <p className="mb-2 text-xs text-gray-500">Either email or phone number is required.</p>
                 <input
                   type="email"
                   value={formData.email}
@@ -343,23 +425,6 @@ export const LeadForm = () => {
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {errors.follow_up_date?.[0] && <p className="mt-1 text-sm text-red-600">{errors.follow_up_date[0]}</p>}
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Assigned To</label>
-                <select
-                  value={formData.assignedTo}
-                  onChange={(event) => setFormData((current) => ({ ...current, assignedTo: event.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select user</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={String(user.id)}>
-                      {[user.name, user.designation].filter(Boolean).join(' - ')}
-                    </option>
-                  ))}
-                </select>
-                {errors.assigned_to?.[0] && <p className="mt-1 text-sm text-red-600">{errors.assigned_to[0]}</p>}
               </div>
 
               <div>

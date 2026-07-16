@@ -277,6 +277,8 @@ export const mapLead = (lead: any) => ({
   pincode: lead.pincode || '',
   country: lead.country || '',
   requirement: lead.requirement || '',
+  expectedOrderValue: lead.expected_order_value || '',
+  expectedClosure: lead.expected_closure || '',
   status: (lead.status || 'new') as LeadStatus,
   tags: Array.isArray(lead.tags) ? lead.tags : [],
   followUpDate: lead.follow_up_date || '',
@@ -314,6 +316,8 @@ export const leadPayload = (lead: any) => ({
   pincode: lead.pincode || null,
   country: lead.country || null,
   requirement: lead.requirement || null,
+  expected_order_value: lead.expectedOrderValue || null,
+  expected_closure: lead.expectedClosure || null,
   status: lead.status || 'new',
   tags: Array.isArray(lead.tags) ? lead.tags.filter(Boolean) : [],
   follow_up_date: lead.followUpDate || null,
@@ -386,6 +390,7 @@ export const mapQuotation = (quotation: any) => ({
       image: assetUrl(item.product_image_path),
       name: item.product_name || '',
       modelNumber: item.model_number || '',
+      unit: item.unit || 'NOS',
       mrp: asNumber(item.mrp),
       sellingPrice: asNumber(item.mrp ?? item.base_price),
       usualSellingPrice: asNumber(item.mrp ?? item.base_price),
@@ -415,6 +420,20 @@ export const mapQuotation = (quotation: any) => ({
   roundOffNetAmount: quotation.round_off_net_amount_to_customer === undefined || quotation.round_off_net_amount_to_customer === null
     ? false
     : Boolean(quotation.round_off_net_amount_to_customer),
+  showUom: quotation.show_uom_to_customer === undefined || quotation.show_uom_to_customer === null
+    ? false
+    : Boolean(quotation.show_uom_to_customer),
+  showBrandBanner: quotation.show_brand_banner_to_customer === undefined || quotation.show_brand_banner_to_customer === null
+    ? false
+    : Boolean(quotation.show_brand_banner_to_customer),
+  brandBannerId: quotation.brand_banner_id ? String(quotation.brand_banner_id) : '',
+  brandBanner: quotation.brand_banner
+    ? {
+        id: String(quotation.brand_banner.id),
+        name: quotation.brand_banner.name || '',
+        logoPath: assetUrl(quotation.brand_banner.logo_path),
+      }
+    : null,
   terms: (quotation.terms || []).map((term: any) => String(term.term_master_id)),
   status: toFrontendQuotationStatus(quotation.status || 'draft'),
   subtotal: asNumber(quotation.subtotal_after_discount ?? quotation.subtotal),
@@ -441,6 +460,9 @@ export const quotationPayload = (quotation: any) => ({
   show_mrp_to_customer: quotation.showMrp === undefined ? true : Boolean(quotation.showMrp),
   show_item_wise_gst_to_customer: quotation.showItemWiseGst === undefined ? false : Boolean(quotation.showItemWiseGst),
   round_off_net_amount_to_customer: quotation.roundOffNetAmount === undefined ? false : Boolean(quotation.roundOffNetAmount),
+  show_uom_to_customer: quotation.showUom === undefined ? false : Boolean(quotation.showUom),
+  show_brand_banner_to_customer: quotation.showBrandBanner === undefined ? false : Boolean(quotation.showBrandBanner),
+  brand_banner_id: quotation.showBrandBanner && quotation.brandBannerId ? Number(quotation.brandBannerId) : null,
   default_discount_percent: quotation.globalDiscount || null,
   default_discount_amount: null,
   status: toApiQuotationStatus(quotation.status || 'draft'),

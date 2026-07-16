@@ -1,10 +1,11 @@
 import { useNavigate, useParams } from 'react-router';
 import { useData } from '../context/DataContext';
 import { ArrowLeft, Plus, Search, GripVertical, Trash2, ChevronDown, Save } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { toast } from 'sonner';
 import { productService } from '../../services/productService';
+import type { PaginationMeta } from '../../services/productService';
 import { userService } from '../../services/userService';
 import { leadService } from '../../services/leadService';
 import { mapProduct } from '../../services/mappers';
@@ -22,6 +23,14 @@ const maskPhone = (value?: string) => {
 
 const getQuotationBasePrice = (product: any) => Number(product?.mrp ?? product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
 const normalizeDiscount = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
+const emptyProductPagination: PaginationMeta = {
+  current_page: 1,
+  per_page: 10,
+  total: 0,
+  last_page: 1,
+  from: null,
+  to: null,
+};
 
 const calculateItemAmounts = (item: QuotationItem, gstInclusive: boolean) => {
   const basePrice = item.price * item.quantity;
@@ -136,7 +145,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
 export const QuotationBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { products, quotations, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
+  const { quotations, brands, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
   const { user } = useAuth();
 
   const [selectedLead, setSelectedLead] = useState<any>(null);
@@ -154,15 +163,20 @@ export const QuotationBuilder = () => {
   const [showMrp, setShowMrp] = useState(false);
   const [showItemWiseGst, setShowItemWiseGst] = useState(false);
   const [roundOffNetAmount, setRoundOffNetAmount] = useState(false);
+  const [showUom, setShowUom] = useState(false);
+  const [showBrandBanner, setShowBrandBanner] = useState(false);
+  const [brandBannerId, setBrandBannerId] = useState('');
   const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [leadSearch, setLeadSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState('');
   const [selectableProducts, setSelectableProducts] = useState<any[]>([]);
+  const [productPagination, setProductPagination] = useState(emptyProductPagination);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [inProgressLeads, setInProgressLeads] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
-  const activeTermIds = masterTerms.filter((term) => term.status === 'active').map((term) => term.id);
 
   useEffect(() => {
     userService
@@ -193,6 +207,9 @@ export const QuotationBuilder = () => {
         setShowMrp(quotation.showMrp ?? true);
         setShowItemWiseGst(quotation.showItemWiseGst ?? false);
         setRoundOffNetAmount(quotation.roundOffNetAmount ?? false);
+        setShowUom(quotation.showUom ?? false);
+        setShowBrandBanner(quotation.showBrandBanner ?? false);
+        setBrandBannerId(quotation.brandBannerId || '');
         setSelectedTerms(quotation.terms);
       }
     } else {
@@ -200,6 +217,9 @@ export const QuotationBuilder = () => {
       setShowMrp(false);
       setShowItemWiseGst(false);
       setRoundOffNetAmount(false);
+      setShowUom(false);
+      setShowBrandBanner(false);
+      setBrandBannerId('');
 
       if (user) {
         setSelectedSalespersonId(String(user.id || ''));
@@ -218,20 +238,6 @@ export const QuotationBuilder = () => {
     }
 
   }, [id, quotations, settings, masterTerms, user]);
-
-  useEffect(() => {
-    if (id || activeTermIds.length === 0) {
-      return;
-    }
-
-    const hasAllActiveTermsSelected =
-      selectedTerms.length === activeTermIds.length
-      && activeTermIds.every((termId) => selectedTerms.includes(termId));
-
-    if (!hasAllActiveTermsSelected) {
-      setSelectedTerms(activeTermIds);
-    }
-  }, [id, activeTermIds, selectedTerms]);
 
   useEffect(() => {
     if (id || !user || selectedSalespersonId) {
@@ -264,16 +270,45 @@ export const QuotationBuilder = () => {
   }, [salesUsers, salesperson.email, salesperson.name, selectedSalespersonId]);
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedProductSearch(productSearch.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [productSearch]);
+
+  const fetchSelectableProducts = useCallback(async (page: number, perPage: number) => {
     if (!showProductModal) return;
 
-    productService
-      .selectable({ is_active: true })
-      .then((result) => {
-        const data = Array.isArray(result.data) ? result.data : [];
-        setSelectableProducts(data.map(mapProduct));
-      })
-      .catch(() => setSelectableProducts(products.filter((product) => product.status === 'active')));
-  }, [products, showProductModal]);
+    setProductsLoading(true);
+    try {
+      const result = await productService.selectable({
+        is_active: true,
+        page,
+        per_page: perPage,
+        ...(debouncedProductSearch ? { search: debouncedProductSearch } : {}),
+      });
+      const data = Array.isArray(result.data) ? result.data : [];
+      setSelectableProducts(data.map(mapProduct));
+      setProductPagination({
+        ...emptyProductPagination,
+        ...(result.meta?.pagination || {}),
+      });
+    } catch {
+      setSelectableProducts([]);
+      setProductPagination(emptyProductPagination);
+    } finally {
+      setProductsLoading(false);
+    }
+  }, [debouncedProductSearch, showProductModal]);
+
+  useEffect(() => {
+    if (!showProductModal) {
+      return;
+    }
+
+    fetchSelectableProducts(1, productPagination.per_page);
+  }, [debouncedProductSearch, fetchSelectableProducts, productPagination.per_page, showProductModal]);
 
   useEffect(() => {
     if (!showLeadModal) return;
@@ -387,19 +422,6 @@ export const QuotationBuilder = () => {
       String(lead.requirement || '').toLowerCase().includes(search)
     );
   });
-  const filteredProducts = (selectableProducts.length ? selectableProducts : products.filter((product) => product.status === 'active')).filter((product) => {
-    const search = productSearch.trim().toLowerCase();
-
-    if (!search) {
-      return true;
-    }
-
-    return (
-      product.name.toLowerCase().includes(search) ||
-      product.modelNumber.toLowerCase().includes(search) ||
-      product.brand.toLowerCase().includes(search)
-    );
-  });
   const leadPagination = usePagination(filteredLeads, 8);
 
   if (loading && id) {
@@ -419,6 +441,10 @@ export const QuotationBuilder = () => {
       toast.error('Please add at least one product');
       return;
     }
+    if (showBrandBanner && !brandBannerId) {
+      toast.error('Please select a brand for the brand banner');
+      return;
+    }
 
     const quotationData = {
       date: new Date().toISOString(),
@@ -431,6 +457,9 @@ export const QuotationBuilder = () => {
       showMrp,
       showItemWiseGst,
       roundOffNetAmount,
+      showUom,
+      showBrandBanner,
+      brandBannerId,
       terms: selectedTerms,
       status: 'draft' as const,
       subtotal: totals.subtotal,
@@ -692,6 +721,51 @@ export const QuotationBuilder = () => {
               </label>
 
               <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-medium text-gray-700">Show UOM in Quotation</span>
+                <input
+                  type="checkbox"
+                  checked={showUom}
+                  onChange={(e) => setShowUom(e.target.checked)}
+                  className="w-11 h-6 bg-gray-200 rounded-full appearance-none cursor-pointer relative checked:bg-blue-600 transition-colors
+                           after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-5"
+                />
+              </label>
+
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-medium text-gray-700">Show Brand Logo Banner</span>
+                <input
+                  type="checkbox"
+                  checked={showBrandBanner}
+                  onChange={(e) => {
+                    setShowBrandBanner(e.target.checked);
+                    if (!e.target.checked) {
+                      setBrandBannerId('');
+                    }
+                  }}
+                  className="w-11 h-6 bg-gray-200 rounded-full appearance-none cursor-pointer relative checked:bg-blue-600 transition-colors
+                           after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-5"
+                />
+              </label>
+
+              {showBrandBanner && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Banner Brand</label>
+                  <select
+                    value={brandBannerId}
+                    onChange={(e) => setBrandBannerId(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2"
+                  >
+                    <option value="">Select brand</option>
+                    {brands
+                      .filter((brand) => brand.status === 'active')
+                      .map((brand) => (
+                        <option key={brand.id} value={brand.id}>{brand.name}</option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              <label className="flex items-center justify-between cursor-pointer">
                 <span className="text-sm font-medium text-gray-700">Round Off Net Amount in Quotation</span>
                 <input
                   type="checkbox"
@@ -762,6 +836,8 @@ export const QuotationBuilder = () => {
               <button
                 onClick={() => {
                   setProductSearch('');
+                  setSelectableProducts([]);
+                  setProductPagination(emptyProductPagination);
                   setShowProductModal(false);
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg"
@@ -780,12 +856,14 @@ export const QuotationBuilder = () => {
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredProducts.map(product => (
+              {selectableProducts.map(product => (
                 <div
                   key={product.id}
                   onClick={() => {
                     addProduct(product);
                     setProductSearch('');
+                    setSelectableProducts([]);
+                    setProductPagination(emptyProductPagination);
                   }}
                   className="flex gap-4 p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
                 >
@@ -802,9 +880,22 @@ export const QuotationBuilder = () => {
                 </div>
               ))}
             </div>
-            {filteredProducts.length === 0 && (
+            {productsLoading && <LoadingState label="Loading products..." />}
+            {!productsLoading && selectableProducts.length === 0 && (
               <div className="py-8 text-center text-sm text-gray-500">
                 No products matched your search.
+              </div>
+            )}
+            {productPagination.total > 0 && (
+              <div className="mt-4 overflow-hidden rounded-xl border border-gray-200">
+                <PaginationControls
+                  page={productPagination.current_page}
+                  pageSize={productPagination.per_page}
+                  totalItems={productPagination.total}
+                  totalPages={productPagination.last_page}
+                  onPageChange={(nextPage) => fetchSelectableProducts(nextPage, productPagination.per_page)}
+                  onPageSizeChange={(nextPageSize) => fetchSelectableProducts(1, nextPageSize)}
+                />
               </div>
             )}
           </div>

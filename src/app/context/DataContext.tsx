@@ -66,6 +66,7 @@ interface DataContextType {
   addQuotation: (quotation: any) => Promise<void>;
   updateQuotation: (id: string, quotation: any) => Promise<void>;
   deleteQuotation: (id: string) => Promise<void>;
+  duplicateQuotation: (id: string) => Promise<any>;
   submitQuotationForApproval: (id: string) => Promise<void>;
   approveQuotation: (id: string, remarks?: string) => Promise<void>;
   rejectQuotation: (id: string, remarks: string) => Promise<void>;
@@ -173,8 +174,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadProducts = useCallback(async (force = false) => {
     return runLoader('products', async () => {
-      const result = await productService.list();
-      setProducts(asArray(result.data).map(mapProduct));
+      const result = await productService.listAll();
+      setProducts(result.map(mapProduct));
     }, force);
   }, [runLoader]);
 
@@ -228,7 +229,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (pathname === '/quotations/new' || /^\/quotations\/[^/]+\/edit$/.test(pathname)) {
-        loaders.push(loadCategories(), loadBrands(), loadProducts(), loadAdjustments(), loadTerms(), loadSettings(), loadQuotations());
+        loaders.push(loadCategories(), loadBrands(), loadAdjustments(), loadTerms(), loadSettings(), loadQuotations());
       }
 
       if (/^\/quotations\/[^/]+\/preview$/.test(pathname)) {
@@ -244,7 +245,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (pathname.startsWith('/products')) {
-      loaders.push(loadProducts(), loadCategories(), loadBrands());
+      loaders.push(loadCategories(), loadBrands());
     }
 
     if (pathname === '/masters/categories') loaders.push(loadCategories());
@@ -402,6 +403,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async deleteQuotation(id) {
       await quotationService.remove(id);
       setQuotations((current) => current.filter((quotation) => quotation.id !== id));
+    },
+    async duplicateQuotation(id) {
+      const duplicated = await quotationService.duplicate(id);
+      const mapped = mapQuotation(duplicated);
+      setQuotations((current) => [mapped, ...current]);
+      return mapped;
     },
     async submitQuotationForApproval(id) {
       const updated = await quotationService.submitForApproval(id);

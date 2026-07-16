@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowUpDown, ChevronDown, Edit, Eye, Filter, Phone, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, Filter, Phone, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
+import { LeadDetailsDialog } from '../components/leads/LeadDetailsDialog';
 import { leadService } from '../../services/leadService';
 import { mapLead } from '../../services/mappers';
 import { userService } from '../../services/userService';
@@ -76,6 +77,8 @@ export const LeadList = () => {
   const [leads, setLeads] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     leadSource: 'all',
@@ -87,6 +90,15 @@ export const LeadList = () => {
     key: 'followUpDate',
     direction: 'asc',
   });
+
+  const openLeadDialog = (leadId: string) => {
+    setSelectedLeadId(leadId);
+    setIsLeadDialogOpen(true);
+  };
+
+  const updateLeadInList = (updatedLead: any) => {
+    setLeads((current) => current.map((lead) => (lead.id === updatedLead.id ? updatedLead : lead)));
+  };
 
   const handleDelete = async (leadId: string) => {
     if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
@@ -357,15 +369,29 @@ export const LeadList = () => {
           <div className="overflow-hidden rounded-xl border border-gray-200">
             <div className="divide-y divide-gray-200 md:hidden">
               {pagination.pageItems.map((lead) => (
-                <div key={lead.id} className="space-y-4 p-4">
+                <div
+                  key={lead.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openLeadDialog(lead.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openLeadDialog(lead.id);
+                    }
+                  }}
+                  className="space-y-4 p-4 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="break-words text-base font-semibold text-gray-900">{lead.name}</div>
                       {lead.phone && (
                         <a
                           href={phoneHref(lead.phone)}
-                          className="mt-1 inline-block text-sm text-blue-600 hover:underline"
+                          onClick={(event) => event.stopPropagation()}
+                          className="mt-1 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
                         >
+                          <Phone className="h-3.5 w-3.5" />
                           {lead.phone}
                         </a>
                       )}
@@ -406,31 +432,11 @@ export const LeadList = () => {
                   )}
 
                   <div className="flex items-center justify-end gap-2">
-                    {lead.phone && (
-                      <a
-                        href={phoneHref(lead.phone)}
-                        className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50"
-                        title="Call"
-                      >
-                        <Phone className="h-4 w-4" />
-                      </a>
-                    )}
                     <button
-                      onClick={() => navigate(`/leads/${lead.id}`)}
-                      className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100"
-                      title="View"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => navigate(`/leads/${lead.id}/edit`)}
-                      className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50"
-                      title="Edit"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => void handleDelete(lead.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleDelete(lead.id);
+                      }}
                       className="rounded-lg p-2 text-rose-600 transition-colors hover:bg-rose-50"
                       title="Delete"
                     >
@@ -457,14 +463,20 @@ export const LeadList = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {pagination.pageItems.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-gray-50">
+                    <tr
+                      key={lead.id}
+                      onClick={() => openLeadDialog(lead.id)}
+                      className="cursor-pointer hover:bg-gray-50"
+                    >
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{lead.name}</div>
                         {lead.phone && (
                           <a
                             href={phoneHref(lead.phone)}
-                            className="mt-1 inline-block text-sm text-blue-600 hover:underline"
+                            onClick={(event) => event.stopPropagation()}
+                            className="mt-1 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
                           >
+                            <Phone className="h-3.5 w-3.5" />
                             {lead.phone}
                           </a>
                         )}
@@ -492,31 +504,11 @@ export const LeadList = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          {lead.phone && (
-                            <a
-                              href={phoneHref(lead.phone)}
-                              className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50"
-                              title="Call"
-                            >
-                              <Phone className="h-4 w-4" />
-                            </a>
-                          )}
                           <button
-                            onClick={() => navigate(`/leads/${lead.id}`)}
-                            className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100"
-                            title="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => navigate(`/leads/${lead.id}/edit`)}
-                            className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50"
-                            title="Edit"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => void handleDelete(lead.id)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleDelete(lead.id);
+                            }}
                             className="rounded-lg p-2 text-rose-600 transition-colors hover:bg-rose-50"
                             title="Delete"
                           >
@@ -546,6 +538,19 @@ export const LeadList = () => {
           )}
         </div>
       </div>
+
+      <LeadDetailsDialog
+        leadId={selectedLeadId}
+        open={isLeadDialogOpen}
+        users={users}
+        onOpenChange={(open) => {
+          setIsLeadDialogOpen(open);
+          if (!open) {
+            setSelectedLeadId(null);
+          }
+        }}
+        onSaved={updateLeadInList}
+      />
     </div>
   );
 };

@@ -19,6 +19,8 @@ class Lead extends Model
         'pincode',
         'country',
         'requirement',
+        'expected_order_value',
+        'expected_closure',
         'status',
         'tags',
         'follow_up_date',
