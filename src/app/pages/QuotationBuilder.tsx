@@ -22,7 +22,15 @@ const maskPhone = (value?: string) => {
 };
 
 const getQuotationBasePrice = (product: any) => Number(product?.mrp ?? product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
-const normalizeDiscount = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
+const normalizeDiscount = (value: number) => Math.min(100, Math.max(0, Number(value.toFixed(2))));
+const normalizeAmount = (value: number) => Math.max(0, Number.isFinite(value) ? value : 0);
+const getDiscountedUnitPrice = (item: Pick<QuotationItem, 'price' | 'discount' | 'discountedPrice'>) => {
+  if (Number.isFinite(item.discountedPrice)) {
+    return normalizeAmount(item.discountedPrice);
+  }
+
+  return Math.max(item.price - (item.price * item.discount) / 100, 0);
+};
 const emptyProductPagination: PaginationMeta = {
   current_page: 1,
   per_page: 10,
@@ -33,9 +41,7 @@ const emptyProductPagination: PaginationMeta = {
 };
 
 const calculateItemAmounts = (item: QuotationItem, gstInclusive: boolean) => {
-  const basePrice = item.price * item.quantity;
-  const discountAmount = basePrice * (item.discount / 100);
-  const afterDiscount = basePrice - discountAmount;
+  const afterDiscount = getDiscountedUnitPrice(item) * item.quantity;
   const gstAmount = gstInclusive ? 0 : afterDiscount * (item.product.gstPercent / 100);
 
   return {
@@ -50,6 +56,7 @@ interface QuotationItem {
   quantity: number;
   price: number;
   discount: number;
+  discountedPrice: number;
   specifications: string;
 }
 
@@ -70,8 +77,13 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
   });
 
   const productMrp = getQuotationBasePrice(item.product);
-  const discountedUnitPrice = Math.max(item.price - (item.price * item.discount) / 100, 0);
+  const discountedUnitPrice = getDiscountedUnitPrice(item);
   const { gstAmount, lineTotal } = calculateItemAmounts(item, gstInclusive);
+  const [discountedPriceInput, setDiscountedPriceInput] = useState(() => String(discountedUnitPrice || ''));
+
+  useEffect(() => {
+    setDiscountedPriceInput(String(Number(discountedUnitPrice.toFixed(2))));
+  }, [discountedUnitPrice]);
 
   return (
     <tr ref={(node) => { drag(drop(node)); }} className="border-b border-gray-200 last:border-0 hover:bg-gray-50">
@@ -103,8 +115,38 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
         </div>
       </td>
       <td className="px-2 py-3 align-middle text-right">
-        <div className="font-medium text-sm text-gray-900 whitespace-nowrap">
-          ₹{discountedUnitPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+        <div className="flex justify-end">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={discountedPriceInput}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              if (nextValue !== '' && !/^\d*\.?\d{0,2}$/.test(nextValue)) {
+                return;
+              }
+              setDiscountedPriceInput(nextValue);
+              if (nextValue === '') {
+                onUpdate(item.id, { discountedPrice: 0 });
+                return;
+              }
+
+              onUpdate(item.id, { discountedPrice: normalizeAmount(parseFloat(nextValue)) });
+            }}
+            onBlur={() => {
+              const enteredPrice = normalizeAmount(parseFloat(discountedPriceInput));
+              const calculatedDiscount = item.price > 0
+                ? ((item.price - enteredPrice) / item.price) * 100
+                : 0;
+
+              onUpdate(item.id, {
+                discount: normalizeDiscount(calculatedDiscount),
+                discountedPrice: enteredPrice,
+              });
+              setDiscountedPriceInput(String(Number(enteredPrice.toFixed(2))));
+            }}
+            className="w-28 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-right"
+          />
         </div>
       </td>
       <td className="px-2 py-3 align-middle text-center text-sm text-gray-600 whitespace-nowrap">
@@ -115,16 +157,22 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
       </td>
       <td className="px-2 py-3 align-middle text-center">
         <input
-          type="number"
+          type="text"
+          inputMode="decimal"
           value={item.discount}
           onChange={(e) => {
-            const newDiscount = parseInt(e.target.value, 10) || 0;
-            onUpdate(item.id, { discount: normalizeDiscount(newDiscount) });
+            const nextValue = e.target.value;
+            if (nextValue !== '' && !/^\d*\.?\d{0,2}$/.test(nextValue)) {
+              return;
+            }
+
+            const newDiscount = parseFloat(nextValue) || 0;
+            onUpdate(item.id, {
+              discount: normalizeDiscount(newDiscount),
+              discountedPrice: Math.max(item.price - (item.price * normalizeDiscount(newDiscount)) / 100, 0),
+            });
           }}
           className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-center"
-          min="0"
-          max="100"
-          step="1"
         />
       </td>
       <td className="px-2 py-3 align-middle text-right font-semibold text-sm text-gray-900 whitespace-nowrap">
@@ -167,6 +215,8 @@ export const QuotationBuilder = () => {
   const [showBrandBanner, setShowBrandBanner] = useState(false);
   const [brandBannerId, setBrandBannerId] = useState('');
   const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
+  const [customTermEnabled, setCustomTermEnabled] = useState(false);
+  const [customTermText, setCustomTermText] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [leadSearch, setLeadSearch] = useState('');
@@ -211,6 +261,8 @@ export const QuotationBuilder = () => {
         setShowBrandBanner(quotation.showBrandBanner ?? false);
         setBrandBannerId(quotation.brandBannerId || '');
         setSelectedTerms(quotation.terms);
+        setCustomTermEnabled(quotation.customTermEnabled ?? false);
+        setCustomTermText(quotation.customTermText || '');
       }
     } else {
       setShowDiscount(false);
@@ -220,6 +272,8 @@ export const QuotationBuilder = () => {
       setShowUom(false);
       setShowBrandBanner(false);
       setBrandBannerId('');
+      setCustomTermEnabled(false);
+      setCustomTermText('');
 
       if (user) {
         setSelectedSalespersonId(String(user.id || ''));
@@ -335,6 +389,7 @@ export const QuotationBuilder = () => {
       quantity: 1,
       price: getQuotationBasePrice(product),
       discount: 0,
+      discountedPrice: getQuotationBasePrice(product),
       specifications: product.specifications,
     };
     setItems([...items, newItem]);
@@ -378,6 +433,7 @@ export const QuotationBuilder = () => {
       currentItems.map((item) => ({
         ...item,
         discount: normalizedValue,
+        discountedPrice: Math.max(item.price - (item.price * normalizedValue) / 100, 0),
       })),
     );
   };
@@ -385,18 +441,13 @@ export const QuotationBuilder = () => {
   const calculateTotals = () => {
     let subtotal = 0;
     items.forEach(item => {
-      const basePrice = item.price * item.quantity;
-      const discountAmount = basePrice * (item.discount / 100);
-      subtotal += basePrice - discountAmount;
+      subtotal += item.discountedPrice * item.quantity;
     });
 
     let taxAmount = 0;
     if (!gstInclusive) {
       items.forEach(item => {
-        const basePrice = item.price * item.quantity;
-        const discountAmount = basePrice * (item.discount / 100);
-        const afterDiscount = basePrice - discountAmount;
-        taxAmount += afterDiscount * (item.product.gstPercent / 100);
+        taxAmount += (item.discountedPrice * item.quantity) * (item.product.gstPercent / 100);
       });
     }
 
@@ -461,6 +512,8 @@ export const QuotationBuilder = () => {
       showBrandBanner,
       brandBannerId,
       terms: selectedTerms,
+      customTermEnabled,
+      customTermText,
       status: 'draft' as const,
       subtotal: totals.subtotal,
       taxAmount: totals.taxAmount,
@@ -660,14 +713,19 @@ export const QuotationBuilder = () => {
               <h3 className="font-semibold text-gray-900 mb-3">Global Discount</h3>
               <div className="flex items-center gap-2">
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={globalDiscount}
-                  onChange={(e) => handleGlobalDiscountChange(parseInt(e.target.value, 10) || 0)}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    if (nextValue !== '' && !/^\d*\.?\d{0,2}$/.test(nextValue)) {
+                      return;
+                    }
+
+                    handleGlobalDiscountChange(parseFloat(nextValue) || 0);
+                  }}
                   className="min-w-0 flex-1 px-3 py-2 border border-gray-200 rounded-lg"
                   placeholder="0"
-                  min="0"
-                  max="100"
-                  step="1"
                 />
                 <span className="text-gray-600">%</span>
               </div>
@@ -798,6 +856,29 @@ export const QuotationBuilder = () => {
                     <span className="text-sm text-gray-700">{term.content}</span>
                   </label>
                 ))}
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={customTermEnabled}
+                    onChange={(e) => {
+                      setCustomTermEnabled(e.target.checked);
+                      if (!e.target.checked) {
+                        setCustomTermText('');
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 rounded mt-0.5"
+                  />
+                  <span className="text-sm text-gray-700">Add additional custom term</span>
+                </label>
+                {customTermEnabled && (
+                  <textarea
+                    value={customTermText}
+                    onChange={(e) => setCustomTermText(e.target.value)}
+                    placeholder="Enter additional terms and conditions"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    rows={3}
+                  />
+                )}
               </div>
             </div>
 

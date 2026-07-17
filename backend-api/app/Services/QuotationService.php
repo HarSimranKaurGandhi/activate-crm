@@ -15,6 +15,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -504,6 +505,15 @@ class QuotationService extends CrudService
 
     private function buildTermSnapshot(array $input): array
     {
+        if (empty($input['term_master_id'])) {
+            return [
+                'term_master_id' => null,
+                'title' => trim((string) ($input['title'] ?? 'Additional Term')),
+                'content' => trim((string) ($input['content'] ?? '')),
+                'display_order' => (int) ($input['display_order'] ?? 0),
+            ];
+        }
+
         $term = TermMaster::findOrFail($input['term_master_id']);
 
         return [
@@ -518,9 +528,9 @@ class QuotationService extends CrudService
     {
         $setting = QuotationNumberSetting::query()->firstOrNew(['id' => 1]);
         $columns = Schema::getColumnListing('quotation_number_settings');
-        $prefix = in_array('prefix', $columns, true) ? ($setting->prefix ?: 'QT-') : 'QT-';
-        $padding = 5;
-        $next = in_array('current_sequence', $columns, true) ? max((int) ($setting->current_sequence ?: 1), 1) : 1;
+        $prefix = $this->quotationNumberPrefix();
+        $padding = 3;
+        $next = 1;
 
         while (Quotation::query()->where('quotation_number', $prefix.str_pad((string) $next, $padding, '0', STR_PAD_LEFT))->exists()) {
             $next++;
@@ -542,5 +552,13 @@ class QuotationService extends CrudService
         }
 
         return $prefix.str_pad((string) $next, $padding, '0', STR_PAD_LEFT);
+    }
+
+    private function quotationNumberPrefix(): string
+    {
+        $today = Carbon::today();
+        $financialYearStart = $today->month >= 4 ? $today->year : $today->year - 1;
+
+        return sprintf('R3M/%02d/%02d/', $financialYearStart % 100, $today->month);
     }
 }

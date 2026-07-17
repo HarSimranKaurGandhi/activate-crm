@@ -396,7 +396,12 @@ export const termPayload = (term: any) => ({
   is_active: toIsActive(term.status),
 });
 
-export const mapQuotation = (quotation: any) => ({
+export const mapQuotation = (quotation: any) => {
+  const customTerm = (quotation.terms || []).find((term: any) => !term.term_master_id);
+
+  return {
+  customTermEnabled: Boolean(customTerm),
+  customTermText: customTerm?.content || '',
   id: String(quotation.id),
   number: quotation.quotation_number || '',
   date: quotation.quote_date || quotation.created_at || '',
@@ -427,6 +432,12 @@ export const mapQuotation = (quotation: any) => ({
     quantity: asNumber(item.quantity, 1),
     price: asNumber(item.edited_price || item.mrp || item.base_price),
     discount: asNumber(item.discount_percent),
+    discountedPrice: asNumber(
+      item.price_after_discount
+      ?? ((asNumber(item.edited_price || item.mrp || item.base_price)) - (asNumber(item.discount_amount)))
+      ?? item.edited_price
+      ?? item.base_price
+    ),
     specifications: item.specifications || '',
     lineTotal: asNumber(item.line_total),
   })),
@@ -460,12 +471,13 @@ export const mapQuotation = (quotation: any) => ({
         logoPath: assetUrl(quotation.brand_banner.logo_path),
       }
     : null,
-  terms: (quotation.terms || []).map((term: any) => String(term.term_master_id)),
+  terms: (quotation.terms || []).filter((term: any) => Boolean(term.term_master_id)).map((term: any) => String(term.term_master_id)),
   status: toFrontendQuotationStatus(quotation.status || 'draft'),
   subtotal: asNumber(quotation.subtotal_after_discount ?? quotation.subtotal),
   taxAmount: asNumber(quotation.total_tax ?? quotation.tax_total),
   grandTotal: asNumber(quotation.grand_total),
-});
+  };
+};
 
 export const quotationPayload = (quotation: any) => ({
   customer_id:
@@ -507,10 +519,20 @@ export const quotationPayload = (quotation: any) => ({
       value: asNumber(value.amount),
       display_order: index,
     })),
-  terms: (quotation.terms || []).map((termId: string, index: number) => ({
-    term_master_id: Number(termId),
-    display_order: index,
-  })),
+  terms: [
+    ...(quotation.terms || []).map((termId: string, index: number) => ({
+      term_master_id: Number(termId),
+      display_order: index,
+    })),
+    ...(quotation.customTermEnabled && String(quotation.customTermText || '').trim() !== ''
+      ? [{
+          term_master_id: null,
+          title: 'Additional Term',
+          content: String(quotation.customTermText || '').trim(),
+          display_order: (quotation.terms || []).length,
+        }]
+      : []),
+  ],
 });
 
 export const mapCompanySettings = (company: any, bank: any, numbering: any) => {

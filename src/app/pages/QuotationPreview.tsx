@@ -114,6 +114,13 @@ export const QuotationPreview = () => {
     return term?.content || termId;
   };
 
+  const previewTerms = [
+    ...quotation.terms.map((termId: string) => getTermContent(termId)),
+    ...(quotation.customTermEnabled && String(quotation.customTermText || '').trim() !== ''
+      ? [String(quotation.customTermText || '').trim()]
+      : []),
+  ];
+
   const hasLetterhead = Boolean(settings.letterhead);
   const isPdfLetterhead = hasLetterhead && settings.letterhead.toLowerCase().includes('.pdf');
   const showBrandBanner = quotation.showBrandBanner && (quotation.brandBanner?.logoPath || quotation.brandBanner?.name);
@@ -686,7 +693,7 @@ export const QuotationPreview = () => {
 
               {/* Terms + Company Details */}
               <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2">
-                {quotation.terms.length > 0 && (
+                {previewTerms.length > 0 && (
                   <section className="border border-slate-300 bg-white px-4 py-4 sm:px-5">
                     <div className="mb-5">
                       <h3 className="text-[1.05rem] font-black uppercase tracking-wide text-slate-950">Terms and Conditions</h3>
@@ -694,10 +701,10 @@ export const QuotationPreview = () => {
                       <div className="mt-[-1px] h-px w-28 bg-red-500" />
                     </div>
                     <div className="space-y-3 text-sm text-slate-800">
-                      {quotation.terms.map((termId: string, index: number) => (
-                        <div key={termId} className="flex items-start gap-3">
+                      {previewTerms.map((termContent: string, index: number) => (
+                        <div key={`${termContent}-${index}`} className="flex items-start gap-3">
                           <span className="mt-[7px] h-1.5 w-1.5 shrink-0 bg-red-500" />
-                          <span className="leading-6">{getTermContent(termId)}</span>
+                          <span className="leading-6">{termContent}</span>
                         </div>
                       ))}
                     </div>

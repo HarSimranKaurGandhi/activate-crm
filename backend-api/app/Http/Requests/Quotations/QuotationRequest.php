@@ -49,7 +49,9 @@ class QuotationRequest extends FormRequest
             'adjustments.*.value' => ['nullable', 'numeric'],
             'adjustments.*.display_order' => ['sometimes', 'integer', 'min:0'],
             'terms' => ['sometimes', 'array'],
-            'terms.*.term_master_id' => ['required_with:terms', 'exists:term_masters,id'],
+            'terms.*.term_master_id' => ['nullable', 'integer', 'exists:term_masters,id', 'required_without:terms.*.content'],
+            'terms.*.title' => ['nullable', 'string', 'max:255'],
+            'terms.*.content' => ['nullable', 'string', 'required_without:terms.*.term_master_id'],
             'terms.*.display_order' => ['sometimes', 'integer', 'min:0'],
         ];
     }
