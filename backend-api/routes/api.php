@@ -115,6 +115,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('leads', [LeadController::class, 'index']);
     Route::post('leads', [LeadController::class, 'store']);
     Route::delete('leads/{id}', [LeadController::class, 'destroy']);
+    Route::get('leads/{id}/activity', [LeadController::class, 'activity']);
+    Route::post('leads/{id}/comments', [LeadController::class, 'comment']);
     Route::get('leads/{id}', [LeadController::class, 'show']);
     Route::put('leads/{id}', [LeadController::class, 'update']);
 

@@ -321,7 +321,7 @@
                   </td>
                   <td class="specs col-specs" style="width: {{ $columnWidths['specs'] }};">{!! $item['specifications_html'] !!}</td>
                   <td class="right amount-strong col-price" style="width: {{ $columnWidths['price'] }};">{{ $quotation['show_mrp'] ? $item['edited_price_label'] : $item['discounted_price_label'] }}</td>
-                  <td class="center amount-strong col-qty" style="width: {{ $columnWidths['qty'] }}; white-space: nowrap;">{{ $quotation['show_uom'] ? $item['quantity_with_unit_label'] : $item['quantity_label'] }}</td>
+                  <td class="center amount-strong col-qty" style="width: {{ $columnWidths['qty'] }}; white-space: nowrap;">{{ $item['quantity_with_unit_label'] }}</td>
                   @if($quotation['show_discount']) <td class="center col-discount" style="width: {{ $columnWidths['discount'] }}; white-space: nowrap;">{{ $item['discount_percent_label'] }}</td> @endif
                   @if($quotation['show_item_wise_gst']) <td class="right col-gst" style="width: {{ $columnWidths['gst'] }};"><div>{{ $item['gst_percent_label'] }}</div><div class="gst-sub">{{ $item['tax_amount_label'] }}</div></td> @endif
                   <td class="right amount-strong col-total" style="width: {{ $columnWidths['total'] }};">{{ $quotation['gst_inclusive'] ? $item['line_total_label'] : $item['net_amount_label'] }}</td>

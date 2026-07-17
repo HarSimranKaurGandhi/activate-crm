@@ -114,6 +114,8 @@ export const Dashboard = () => {
   const todayFollowUpsPagination = usePagination(filteredTodayFollowUps, 10);
   const overdueFollowUpsPagination = usePagination(filteredOverdueFollowUps, 10);
   const todayTasksPagination = usePagination(filteredTodayTasks, 10);
+  const overdueTasksResolved = !isLoading && summary.overdue_tasks_count === 0;
+  const overdueFollowUpsResolved = !isLoading && summary.overdue_follow_ups_count === 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -197,15 +199,15 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-rose-200 bg-white p-6 transition-all hover:shadow-lg">
+          <div className={`rounded-2xl bg-white p-6 transition-all hover:shadow-lg ${overdueTasksResolved ? 'border border-emerald-200' : 'border border-rose-200'}`}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-rose-700">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</p>
-                <p className="mt-2 text-4xl font-bold text-rose-700">{isLoading ? '...' : summary.overdue_tasks_count}</p>
-                <p className="mt-2 text-sm text-rose-500">{isAdminView ? 'Incomplete overdue tasks across all users' : 'My incomplete overdue tasks'}</p>
+                <p className={`text-sm font-medium ${overdueTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</p>
+                <p className={`mt-2 text-4xl font-bold ${overdueTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isLoading ? '...' : summary.overdue_tasks_count}</p>
+                <p className={`mt-2 text-sm ${overdueTasksResolved ? 'text-emerald-600' : 'text-rose-500'}`}>{isAdminView ? 'Incomplete overdue tasks across all users' : 'My incomplete overdue tasks'}</p>
               </div>
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50">
-                <AlertTriangle className="h-7 w-7 text-rose-600" />
+              <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${overdueTasksResolved ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                <AlertTriangle className={`h-7 w-7 ${overdueTasksResolved ? 'text-emerald-600' : 'text-rose-600'}`} />
               </div>
             </div>
           </div>
@@ -221,15 +223,15 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-rose-200 bg-white p-6 transition-all hover:shadow-lg">
+          <div className={`rounded-2xl bg-white p-6 transition-all hover:shadow-lg ${overdueFollowUpsResolved ? 'border border-emerald-200' : 'border border-rose-200'}`}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-rose-700">{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</p>
-                <p className="mt-2 text-4xl font-bold text-rose-700">{isLoading ? '...' : summary.overdue_follow_ups_count}</p>
-                <p className="mt-2 text-sm text-rose-500">{isAdminView ? 'Overdue leads across all users' : 'My overdue leads needing attention'}</p>
+                <p className={`text-sm font-medium ${overdueFollowUpsResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</p>
+                <p className={`mt-2 text-4xl font-bold ${overdueFollowUpsResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isLoading ? '...' : summary.overdue_follow_ups_count}</p>
+                <p className={`mt-2 text-sm ${overdueFollowUpsResolved ? 'text-emerald-600' : 'text-rose-500'}`}>{isAdminView ? 'Overdue leads across all users' : 'My overdue leads needing attention'}</p>
               </div>
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50">
-                <AlertTriangle className="h-7 w-7 text-rose-600" />
+              <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${overdueFollowUpsResolved ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                <AlertTriangle className={`h-7 w-7 ${overdueFollowUpsResolved ? 'text-emerald-600' : 'text-rose-600'}`} />
               </div>
             </div>
           </div>

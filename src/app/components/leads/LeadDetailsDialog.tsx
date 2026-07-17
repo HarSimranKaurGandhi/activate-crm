@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LoaderCircle, Save } from 'lucide-react';
+import { LoaderCircle, MessageSquareText, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { leadPayload, mapLead } from '../../../services/mappers';
 import { leadService } from '../../../services/leadService';
@@ -95,6 +95,68 @@ const formatDisplayDateTime = (date?: string) => {
   });
 };
 
+const leadActivityActionLabel = (action?: string) => {
+  switch (action) {
+    case 'created':
+      return 'Lead created';
+    case 'updated':
+      return 'Lead updated';
+    case 'commented':
+      return 'Comment added';
+    default:
+      return 'Lead activity';
+  }
+};
+
+const leadTimelineFieldLabel = (field: string) => {
+  switch (field) {
+    case 'lead_source':
+      return 'Lead Source';
+    case 'name':
+      return 'Name';
+    case 'phone':
+      return 'Phone No.';
+    case 'email':
+      return 'Email';
+    case 'address_line_1':
+      return 'Address Line 1';
+    case 'address_line_2':
+      return 'Address Line 2';
+    case 'city':
+      return 'City';
+    case 'state':
+      return 'State';
+    case 'pincode':
+      return 'Pincode';
+    case 'country':
+      return 'Country';
+    case 'requirement':
+      return 'Requirement';
+    case 'expected_order_value':
+      return 'Lead Expected Order Value';
+    case 'expected_closure':
+      return 'Expected Closure';
+    case 'status':
+      return 'Status';
+    case 'tags':
+      return 'Tags';
+    case 'follow_up_date':
+      return 'Follow Up Date';
+    case 'assigned_to':
+      return 'Assigned To';
+    default:
+      return field;
+  }
+};
+
+const leadTimelineDescription = (item: any) => {
+  if (item?.action === 'commented') {
+    return item?.description || item?.new_values?.comment || '-';
+  }
+
+  return item?.description || '-';
+};
+
 const createEmptyFormData = () => ({
   leadSource: 'walk_in',
   name: '',
@@ -134,13 +196,19 @@ export const LeadDetailsDialog = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lead, setLead] = useState<any | null>(null);
+  const [activityItems, setActivityItems] = useState<any[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentSaving, setCommentSaving] = useState(false);
   const [formData, setFormData] = useState(createEmptyFormData);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     if (!open || !leadId) {
       setLead(null);
+      setActivityItems([]);
       setErrors({});
+      setCommentText('');
       setFormData(createEmptyFormData());
       setActiveTab('preview');
       return;
@@ -148,10 +216,15 @@ export const LeadDetailsDialog = ({
 
     const load = async () => {
       setLoading(true);
+      setActivityLoading(true);
       try {
-        const result = await leadService.show(leadId);
+        const [result, activity] = await Promise.all([
+          leadService.show(leadId),
+          leadService.activity(leadId),
+        ]);
         const mapped = mapLead(result);
         setLead(mapped);
+        setActivityItems(Array.isArray(activity) ? activity : []);
         setFormData({
           leadSource: mapped.leadSource,
           name: mapped.name,
@@ -176,6 +249,7 @@ export const LeadDetailsDialog = ({
         onOpenChange(false);
       } finally {
         setLoading(false);
+        setActivityLoading(false);
       }
     };
 
@@ -225,8 +299,10 @@ export const LeadDetailsDialog = ({
     setSaving(true);
     try {
       const result = await leadService.update(leadId, leadPayload(formData));
+      const activity = await leadService.activity(leadId);
       const mapped = mapLead(result);
       setLead(mapped);
+      setActivityItems(Array.isArray(activity) ? activity : []);
       setFormData({
         leadSource: mapped.leadSource,
         name: mapped.name,
@@ -256,6 +332,29 @@ export const LeadDetailsDialog = ({
     }
   };
 
+  const handleAddComment = async () => {
+    if (!leadId) return;
+
+    const comment = commentText.trim();
+
+    if (!comment) {
+      toast.error('Please enter a comment');
+      return;
+    }
+
+    setCommentSaving(true);
+    try {
+      const activity = await leadService.addComment(leadId, comment);
+      setActivityItems((current) => [activity, ...current]);
+      setCommentText('');
+      toast.success('Comment added');
+    } catch {
+      toast.error('Unable to add comment');
+    } finally {
+      setCommentSaving(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[95vh] max-w-[96vw] gap-0 overflow-hidden border-gray-200 p-0 xl:max-w-6xl 2xl:max-w-7xl">
@@ -278,11 +377,12 @@ export const LeadDetailsDialog = ({
 
             <div className="max-h-[calc(95vh-8rem)] overflow-y-auto px-6 py-4">
               <TabsContent value="preview">
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <div>
-                    <div className="mb-1 text-sm font-medium text-gray-500">Lead Source</div>
-                    <div className="text-gray-900">{sourceLabel(lead.leadSource)}</div>
-                  </div>
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div>
+                      <div className="mb-1 text-sm font-medium text-gray-500">Lead Source</div>
+                      <div className="text-gray-900">{sourceLabel(lead.leadSource)}</div>
+                    </div>
 
                   <div>
                     <div className="mb-1 text-sm font-medium text-gray-500">Status</div>
@@ -361,6 +461,85 @@ export const LeadDetailsDialog = ({
                       )) : <span className="text-gray-500">No tags added.</span>}
                     </div>
                   </div>
+                </div>
+
+                  <section className="rounded-2xl border border-gray-200 bg-white">
+                    <div className="border-b border-gray-200 px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <MessageSquareText className="h-5 w-5 text-blue-600" />
+                        <h3 className="text-base font-semibold text-gray-900">Lead Timeline</h3>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500">Latest changes and comments appear at the top.</p>
+                    </div>
+
+                    <div className="space-y-4 px-5 py-4">
+                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Add Comment</label>
+                        <textarea
+                          rows={3}
+                          value={commentText}
+                          onChange={(event) => setCommentText(event.target.value)}
+                          placeholder="Add a note about this lead..."
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={handleAddComment}
+                            disabled={commentSaving}
+                            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {commentSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                            {commentSaving ? 'Posting...' : 'Post Comment'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {activityLoading ? (
+                        <LoadingState label="Loading timeline..." />
+                      ) : activityItems.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                          No timeline entries yet.
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {activityItems.map((item) => (
+                            <div key={String(item.id)} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                  <div className="text-sm font-semibold text-gray-900">
+                                    {leadActivityActionLabel(item.action)}
+                                  </div>
+                                  <div className="mt-1 text-sm text-gray-600 whitespace-pre-wrap">
+                                    {leadTimelineDescription(item)}
+                                  </div>
+                                </div>
+                                <div className="text-left text-xs text-gray-500 sm:text-right">
+                                  <div>{item.actor?.name || item.actor?.email || 'System'}</div>
+                                  <div className="mt-1">{formatDisplayDateTime(item.occurred_at)}</div>
+                                </div>
+                              </div>
+
+                              {item.action === 'updated' && Object.keys(item.new_values || {}).length > 0 ? (
+                                <div className="mt-4 space-y-2 rounded-xl bg-gray-50 p-3">
+                                  {Object.entries(item.new_values || {}).map(([field, value]) => (
+                                    <div key={field} className="grid grid-cols-1 gap-1 text-sm md:grid-cols-[180px_1fr]">
+                                      <div className="font-medium text-gray-700">{leadTimelineFieldLabel(field)}</div>
+                                      <div className="text-gray-600">
+                                        <span className="text-gray-400">{String(item.old_values?.[field] || '-')}</span>
+                                        <span className="mx-2 text-gray-400">→</span>
+                                        <span className="font-medium text-gray-900">{String(value || '-')}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </section>
                 </div>
               </TabsContent>
 

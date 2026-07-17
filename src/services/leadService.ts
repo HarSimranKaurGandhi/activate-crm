@@ -13,6 +13,12 @@ export const leadService = {
   async update(id: string, payload: any) {
     return unwrap<any>(await apiClient.put(`/leads/${id}`, payload));
   },
+  async activity(id: string) {
+    return unwrap<any[]>(await apiClient.get(`/leads/${id}/activity`));
+  },
+  async addComment(id: string, comment: string) {
+    return unwrap<any>(await apiClient.post(`/leads/${id}/comments`, { comment }));
+  },
   async remove(id: string) {
     return unwrap<any>(await apiClient.delete(`/leads/${id}`));
   },

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ActivityLog;
 use App\Models\Customer;
 use App\Models\Lead;
 use App\Models\User;
@@ -9,7 +10,10 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class LeadService extends CrudService
 {
@@ -18,6 +22,28 @@ class LeadService extends CrudService
     protected array $searchColumns = ['name', 'phone', 'email', 'city', 'state', 'country', 'requirement'];
 
     protected array $relations = ['creator', 'assignedUser'];
+
+    private ?array $activityLogColumns = null;
+
+    private const ACTIVITY_FIELD_LABELS = [
+        'lead_source' => 'Lead Source',
+        'name' => 'Name',
+        'phone' => 'Phone No.',
+        'email' => 'Email',
+        'address_line_1' => 'Address Line 1',
+        'address_line_2' => 'Address Line 2',
+        'city' => 'City',
+        'state' => 'State',
+        'pincode' => 'Pincode',
+        'country' => 'Country',
+        'requirement' => 'Requirement',
+        'expected_order_value' => 'Lead Expected Order Value',
+        'expected_closure' => 'Expected Closure',
+        'status' => 'Status',
+        'tags' => 'Tags',
+        'follow_up_date' => 'Follow Up Date',
+        'assigned_to' => 'Assigned To',
+    ];
 
     public function paginate(Request $request): LengthAwarePaginator
     {
@@ -33,28 +59,134 @@ class LeadService extends CrudService
             ->findOrFail($id);
     }
 
-    public function create(array $data): Model
+    public function create(array $data, ?User $actor = null, ?string $ipAddress = null): Model
     {
-        return DB::transaction(function () use ($data): Model {
+        return DB::transaction(function () use ($data, $actor, $ipAddress): Model {
             /** @var Lead $lead */
             $lead = parent::create($data);
 
             $this->syncCustomerForClosedSuccess($lead);
+            $this->logActivity(
+                $lead,
+                'created',
+                'Lead created.',
+                [],
+                $this->serializeLeadValues($lead),
+                $actor,
+                $ipAddress,
+            );
 
             return $lead->refresh()->load($this->relations);
         });
     }
 
-    public function update(Model $model, array $data): Model
+    public function update(Model $model, array $data, ?User $actor = null, ?string $ipAddress = null): Model
     {
-        return DB::transaction(function () use ($model, $data): Model {
+        return DB::transaction(function () use ($model, $data, $actor, $ipAddress): Model {
             /** @var Lead $lead */
+            $before = $this->serializeLeadValues($lead = $model);
             $lead = parent::update($model, $data);
 
             $this->syncCustomerForClosedSuccess($lead);
+            $after = $this->serializeLeadValues($lead);
+            [$oldValues, $newValues] = $this->diffLeadValues($before, $after);
+
+            if ($oldValues !== [] || $newValues !== []) {
+                $changedLabels = array_map(
+                    fn (string $field): string => self::ACTIVITY_FIELD_LABELS[$field] ?? $field,
+                    array_keys($newValues),
+                );
+
+                $this->logActivity(
+                    $lead,
+                    'updated',
+                    'Updated ' . implode(', ', $changedLabels) . '.',
+                    $oldValues,
+                    $newValues,
+                    $actor,
+                    $ipAddress,
+                );
+            }
 
             return $lead->refresh()->load($this->relations);
         });
+    }
+
+    public function activity(int|string $id): Collection
+    {
+        /** @var Lead $lead */
+        $lead = $this->find($id);
+
+        $logs = ActivityLog::query()
+            ->with('user:id,name,email')
+            ->where('module', 'leads')
+            ->where('entity_type', 'lead')
+            ->where('entity_id', $lead->id)
+            ->latest('created_at')
+            ->latest('id')
+            ->get()
+            ->map(fn (ActivityLog $log): array => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'description' => $log->description,
+                'old_values' => $log->old_values ?? [],
+                'new_values' => $log->new_values ?? [],
+                'actor' => $log->user ? [
+                    'id' => $log->user->id,
+                    'name' => $log->user->name,
+                    'email' => $log->user->email,
+                ] : null,
+                'occurred_at' => optional($log->created_at)->toISOString(),
+            ]);
+
+        if (! $logs->contains(fn (array $entry): bool => $entry['action'] === 'created')) {
+            $logs->push([
+                'id' => 'lead-created-' . $lead->id,
+                'action' => 'created',
+                'description' => 'Lead created.',
+                'old_values' => [],
+                'new_values' => [],
+                'actor' => $lead->creator ? [
+                    'id' => $lead->creator->id,
+                    'name' => $lead->creator->name,
+                    'email' => $lead->creator->email,
+                ] : null,
+                'occurred_at' => optional($lead->created_at)->toISOString(),
+            ]);
+        }
+
+        return $logs
+            ->sortByDesc('occurred_at')
+            ->values();
+    }
+
+    public function addComment(Lead $lead, string $comment, ?User $actor = null, ?string $ipAddress = null): array
+    {
+        $activity = $this->logActivity(
+            $lead,
+            'commented',
+            trim($comment),
+            [],
+            ['comment' => trim($comment)],
+            $actor,
+            $ipAddress,
+        );
+
+        $activity->loadMissing('user:id,name,email');
+
+        return [
+            'id' => $activity->id,
+            'action' => $activity->action,
+            'description' => $activity->description,
+            'old_values' => $activity->old_values ?? [],
+            'new_values' => $activity->new_values ?? [],
+            'actor' => $activity->user ? [
+                'id' => $activity->user->id,
+                'name' => $activity->user->name,
+                'email' => $activity->user->email,
+            ] : null,
+            'occurred_at' => optional($activity->created_at)->toISOString(),
+        ];
     }
 
     protected function applyFilters(Builder $query, Request $request): Builder
@@ -166,5 +298,129 @@ class LeadService extends CrudService
         }
 
         Customer::create($payload);
+    }
+
+    private function serializeLeadValues(Lead $lead): array
+    {
+        return collect(array_keys(self::ACTIVITY_FIELD_LABELS))
+            ->mapWithKeys(function (string $field) use ($lead): array {
+                return [$field => $this->formatLeadFieldValue($field, $lead->{$field})];
+            })
+            ->all();
+    }
+
+    private function formatLeadFieldValue(string $field, mixed $value): string
+    {
+        if ($field === 'lead_source') {
+            return match ((string) $value) {
+                'walk_in' => 'Walk In',
+                'reference' => 'Reference',
+                'india_mart' => 'India Mart',
+                'website' => 'Website',
+                default => (string) ($value ?? '-'),
+            };
+        }
+
+        if ($field === 'status') {
+            return match ((string) $value) {
+                'new' => 'New',
+                'in_progress' => 'In Progress',
+                'on_hold' => 'On Hold',
+                'closed_success' => 'Closed - Success',
+                'closed_fail' => 'Closed - Fail',
+                default => (string) ($value ?? '-'),
+            };
+        }
+
+        if ($field === 'assigned_to') {
+            if (! $value) {
+                return '-';
+            }
+
+            $user = User::query()->find($value);
+
+            return $user?->name ?: (string) $value;
+        }
+
+        if ($field === 'follow_up_date') {
+            if (! $value) {
+                return '-';
+            }
+
+            return (string) optional($value)->format('Y-m-d');
+        }
+
+        if ($field === 'tags') {
+            if (! is_array($value) || $value === []) {
+                return '-';
+            }
+
+            $labels = array_map(
+                fn (string $tag): string => match ($tag) {
+                    'hot' => 'Hot',
+                    'premium' => 'Premium',
+                    default => $tag,
+                },
+                $value,
+            );
+
+            return implode(', ', $labels);
+        }
+
+        return filled($value) ? trim((string) $value) : '-';
+    }
+
+    private function diffLeadValues(array $before, array $after): array
+    {
+        $oldValues = [];
+        $newValues = [];
+
+        foreach (self::ACTIVITY_FIELD_LABELS as $field => $label) {
+            if (($before[$field] ?? '-') === ($after[$field] ?? '-')) {
+                continue;
+            }
+
+            $oldValues[$field] = $before[$field] ?? '-';
+            $newValues[$field] = $after[$field] ?? '-';
+        }
+
+        return [$oldValues, $newValues];
+    }
+
+    private function logActivity(
+        Lead $lead,
+        string $action,
+        string $description,
+        array $oldValues,
+        array $newValues,
+        ?User $actor,
+        ?string $ipAddress,
+    ): ActivityLog {
+        $activity = new ActivityLog(Arr::only([
+            'module' => 'leads',
+            'entity_type' => 'lead',
+            'entity_id' => $lead->id,
+            'action' => $action,
+            'description' => $description,
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+            'created_by' => $actor?->id,
+            'ip_address' => $ipAddress,
+        ], $this->getActivityLogColumns()));
+
+        $activity->timestamps = $this->usesTimestamps($this->getActivityLogColumns());
+        $activity->save();
+
+        return $activity;
+    }
+
+    private function getActivityLogColumns(): array
+    {
+        return $this->activityLogColumns ??= Schema::getColumnListing('activity_logs');
+    }
+
+    private function usesTimestamps(array $columns): bool
+    {
+        return in_array('created_at', $columns, true) && in_array('updated_at', $columns, true);
     }
 }

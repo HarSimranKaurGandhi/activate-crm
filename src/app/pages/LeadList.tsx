@@ -71,7 +71,8 @@ const formatDisplayDateTime = (date?: string) => {
     minute: '2-digit',
   });
 };
-const TODAY = new Date('2026-07-16T00:00:00');
+const TODAY = new Date();
+TODAY.setHours(0, 0, 0, 0);
 const isPastDate = (date?: string) => {
   if (!date) return false;
 
@@ -130,11 +131,27 @@ export const LeadList = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const [leadResult, userResult] = await Promise.all([
-          leadService.list(),
+        const [initialLeadResult, userResult] = await Promise.all([
+          leadService.list({ page: 1, per_page: 100 }),
           userService.dropdown(),
         ]);
-        setLeads((leadResult.data || []).map(mapLead));
+
+        const allLeads = [...(initialLeadResult.data || [])];
+        const lastPage = initialLeadResult.meta?.pagination?.last_page || 1;
+
+        if (lastPage > 1) {
+          const remainingPages = await Promise.all(
+            Array.from({ length: lastPage - 1 }, (_, index) =>
+              leadService.list({ page: index + 2, per_page: 100 }),
+            ),
+          );
+
+          remainingPages.forEach((result) => {
+            allLeads.push(...(result.data || []));
+          });
+        }
+
+        setLeads(allLeads.map(mapLead));
         setUsers(Array.isArray(userResult) ? userResult : []);
       } catch (error) {
         toast.error('Unable to load leads');

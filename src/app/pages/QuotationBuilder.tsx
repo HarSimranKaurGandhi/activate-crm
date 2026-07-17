@@ -50,6 +50,9 @@ const calculateItemAmounts = (item: QuotationItem, gstInclusive: boolean) => {
   };
 };
 
+const getItemUnitLabel = (item: { product?: any }) =>
+  String(item?.product?.unitName || item?.product?.unit || '').trim();
+
 interface QuotationItem {
   id: string;
   product: any;
@@ -101,13 +104,20 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
         </div>
       </td>
       <td className="px-2 py-3 align-middle">
-        <input
-          type="number"
-          value={item.quantity}
-          onChange={(e) => onUpdate(item.id, { quantity: parseInt(e.target.value) || 1 })}
-          className="w-16 px-2 py-1.5 border border-gray-200 rounded-md text-center text-sm"
-          min="1"
-        />
+        <div className="flex flex-col items-center gap-1">
+          <input
+            type="number"
+            value={item.quantity}
+            onChange={(e) => onUpdate(item.id, { quantity: parseInt(e.target.value) || 1 })}
+            className="w-16 px-2 py-1.5 border border-gray-200 rounded-md text-center text-sm"
+            min="1"
+          />
+          {getItemUnitLabel(item) && (
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+              {getItemUnitLabel(item)}
+            </div>
+          )}
+        </div>
       </td>
       <td className="px-2 py-3 align-middle text-right">
         <div className="font-medium text-sm text-gray-900 whitespace-nowrap">

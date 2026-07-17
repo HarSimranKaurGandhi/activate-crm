@@ -145,10 +145,6 @@ export const QuotationPreview = () => {
   );
 
   const quantityLabel = (item: any) => {
-    if (!quotation.showUom) {
-      return String(item.quantity);
-    }
-
     return [item.quantity, item.product.unitName || item.product.unit].filter(Boolean).join(' ');
   };
 
@@ -164,6 +160,19 @@ export const QuotationPreview = () => {
       minimumFractionDigits: options?.whole ? 0 : 0,
       maximumFractionDigits: options?.whole ? 0 : 2,
     })}`;
+
+  const downloadFilename = () => {
+    const clientName = String(quotation.customer.company || quotation.customer.name || 'Client').trim();
+    const quoteNumber = String(quotation.number || 'quotation').trim();
+    const baseName = `Quote ${clientName} ${quoteNumber}`
+      .replace(/[\/\\]+/g, '-')
+      .replace(/[^A-Za-z0-9 _.-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^[ ._-]+|[ ._-]+$/g, '');
+
+    return `${baseName || 'Quote Client quotation'}.pdf`;
+  };
 
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-IN', {
@@ -194,7 +203,7 @@ export const QuotationPreview = () => {
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `${quotation.number || 'quotation'}.pdf`;
+      anchor.download = downloadFilename();
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();

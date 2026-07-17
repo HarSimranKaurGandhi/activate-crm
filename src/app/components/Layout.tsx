@@ -60,7 +60,20 @@ export const Layout = () => {
 
   const isActive = (href: string) => {
     if (href === '/') return location.pathname === '/';
-    return location.pathname.startsWith(href);
+    if (href === '/quotations') {
+      return location.pathname === '/quotations'
+        || (
+          location.pathname.startsWith('/quotations/')
+          && !location.pathname.startsWith('/quotations/approvals')
+        );
+    }
+    if (href === '/quotations/approvals') {
+      return location.pathname === '/quotations/approvals';
+    }
+    if (location.pathname === href) {
+      return true;
+    }
+    return location.pathname.startsWith(`${href}/`);
   };
 
   const renderNavigation = () => (

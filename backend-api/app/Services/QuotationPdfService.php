@@ -7,6 +7,7 @@ use App\Models\CompanyBankDetail;
 use App\Models\CompanySetting;
 use App\Models\Quotation;
 use App\Support\PublicAsset;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\ExecutableFinder;
@@ -56,7 +57,7 @@ class QuotationPdfService
 
                 return [
                     'path' => $pdfPath,
-                    'filename' => ($quotation->quotation_number ?: 'quotation').'.pdf',
+                    'filename' => $this->downloadFilename($quotation),
                 ];
             }
 
@@ -71,7 +72,7 @@ class QuotationPdfService
 
         return [
             'path' => $pdfPath,
-            'filename' => ($quotation->quotation_number ?: 'quotation').'.pdf',
+            'filename' => $this->downloadFilename($quotation),
         ];
     }
 
@@ -414,5 +415,19 @@ class QuotationPdfService
         $mime = mime_content_type($fullPath) ?: 'application/octet-stream';
 
         return 'data:'.$mime.';base64,'.base64_encode((string) file_get_contents($fullPath));
+    }
+
+    private function downloadFilename(Quotation $quotation): string
+    {
+        $clientName = trim((string) ($quotation->customer?->company_name ?: $quotation->customer?->primary_name ?: 'Client'));
+        $quoteNumber = trim((string) ($quotation->quotation_number ?: 'quotation'));
+
+        $filename = trim(sprintf('Quote %s %s', $clientName, $quoteNumber));
+        $filename = preg_replace('/[\/\\\\]+/', '-', $filename) ?? $filename;
+        $filename = preg_replace('/[^A-Za-z0-9 _.-]+/', ' ', $filename) ?? $filename;
+        $filename = preg_replace('/\s+/', ' ', $filename) ?? $filename;
+        $filename = trim($filename, " .-_");
+
+        return Str::limit($filename !== '' ? $filename : 'Quote Client quotation', 180, '').'.pdf';
     }
 }
