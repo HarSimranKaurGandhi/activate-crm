@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router';
-import { AlertTriangle, Clock, ListChecks, PhoneCall } from 'lucide-react';
+import { AlertTriangle, Clock, FileText, ListChecks, PhoneCall } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { dashboardService } from '../../services/dashboardService';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
