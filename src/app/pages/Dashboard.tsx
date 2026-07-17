@@ -1,6 +1,4 @@
 import { useNavigate } from 'react-router';
-import { AlertTriangle, Clock, FileText, ListChecks, PhoneCall } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { AlertTriangle, Clock, FileText, ListChecks, PhoneCall, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { dashboardService } from '../../services/dashboardService';
