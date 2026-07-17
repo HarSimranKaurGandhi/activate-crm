@@ -6,7 +6,6 @@
   <title>{{ $quotation['number'] }}</title>
   <style>
     @page { size: A4; margin: 24mm 6mm 8mm; }
-    @page :first { margin-top: 18mm; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #fff; }
     body { font-family: DejaVu Sans, Arial, Helvetica, sans-serif; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 11px; line-height: 1.4; }
@@ -64,27 +63,31 @@
     .status-draft { background: #e2e8f0; color: #0f172a; } .status-pending { background: #fef3c7; color: #92400e; } .status-approved { background: #dcfce7; color: #166534; } .status-rejected { background: #fee2e2; color: #991b1b; } .status-revised { background: #dbeafe; color: #1d4ed8; }
     table { width: 100%; border-collapse: collapse; }
     .items-wrap { border: 1px solid #d1d5db; overflow: hidden; margin-bottom: 14px; }
-    .items-table { table-layout: fixed; }
+    .items-table { table-layout: fixed; margin-top: -8mm; }
+    .items-table thead { display: table-header-group; }
+    .items-table thead .items-page-gap { background: #fff !important; border: 0 !important; }
+    .items-table thead .items-page-gap th {
+      padding: 0 !important;
+      height: 8mm;
+      border: 0 !important;
+      background: #fff !important;
+      color: transparent !important;
+      font-size: 0;
+      line-height: 0;
+      box-shadow: none !important;
+    }
     .items-table thead tr { background: #000; color: #fff; border-top: 2px solid #dc2626; }
     .items-table th { padding: 7px 3px; font-size: 8px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; text-align: center; }
     .items-table td { padding: 7px 3px; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; vertical-align: top; font-size: 9.5px; color: #334155; }
     .items-table tr:last-child td { border-bottom: 0; }
     .items-table td:last-child, .items-table th:last-child { border-right: 0; }
     .items-table tbody tr { page-break-inside: avoid; }
-    .col-no { width: 3%; }
-    .col-product { width: 21%; }
-    .col-specs { width: 38%; }
-    .col-price { width: 10%; }
-    .col-qty { width: 4%; }
-    .col-discount { width: 6%; }
-    .col-gst { width: 8%; }
-    .col-total { width: 10%; }
     .items-table td.col-no, .items-table th.col-no,
     .items-table td.col-qty, .items-table th.col-qty,
     .items-table td.col-discount, .items-table th.col-discount { padding-left: 1px; padding-right: 1px; }
     .center { text-align: center; } .right { text-align: right; }
     .item-no { width: 20px; font-weight: 900; color: #020617; text-align: center; }
-    .product-image { display: block; width: 100%; max-width: 138px; height: 88px; margin: 0 auto 6px; object-fit: contain; }
+    .product-image { display: block; width: auto; max-width: 138px; height: auto; max-height: 88px; margin: 0 auto 6px; object-fit: contain; }
     .product-image-placeholder { width: 138px; height: 88px; margin: 0 auto 6px; border-radius: 8px; background: #f1f5f9; color: #94a3b8; font-size: 8px; font-weight: 700; text-align: center; line-height: 88px; }
     .product-name { font-size: 10px; font-weight: 900; color: #020617; text-align: center; line-height: 1.2; }
     .product-model { margin-top: 2px; text-align: center; font-size: 8px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #475569; }
@@ -245,33 +248,83 @@
         </div>
         <div class="items-wrap">
           <table class="items-table">
+            @php
+              $columnWidths = match (true) {
+                  $quotation['show_discount'] && $quotation['show_item_wise_gst'] => [
+                      'no' => '4%',
+                      'product' => '19%',
+                      'specs' => '40%',
+                      'price' => '12%',
+                      'qty' => '4%',
+                      'discount' => '5%',
+                      'gst' => '6%',
+                      'total' => '12%',
+                  ],
+                  $quotation['show_discount'] => [
+                      'no' => '4%',
+                      'product' => '20%',
+                      'specs' => '43%',
+                      'price' => '12%',
+                      'qty' => '4%',
+                      'discount' => '5%',
+                      'total' => '12%',
+                  ],
+                  $quotation['show_item_wise_gst'] => [
+                      'no' => '4%',
+                      'product' => '20%',
+                      'specs' => '41%',
+                      'price' => '11%',
+                      'qty' => '4%',
+                      'gst' => '6%',
+                      'total' => '11%',
+                  ],
+                  default => [
+                      'no' => '4%',
+                      'product' => '20%',
+                      'specs' => '48%',
+                      'price' => '12%',
+                      'qty' => '4%',
+                      'total' => '12%',
+                  ],
+              };
+            @endphp
             <thead>
+              <tr class="items-page-gap">
+                <th style="width: {{ $columnWidths['no'] }};"></th>
+                <th style="width: {{ $columnWidths['product'] }};"></th>
+                <th style="width: {{ $columnWidths['specs'] }};"></th>
+                <th style="width: {{ $columnWidths['price'] }};"></th>
+                <th style="width: {{ $columnWidths['qty'] }};"></th>
+                @if($quotation['show_discount']) <th style="width: {{ $columnWidths['discount'] }};"></th> @endif
+                @if($quotation['show_item_wise_gst']) <th style="width: {{ $columnWidths['gst'] }};"></th> @endif
+                <th style="width: {{ $columnWidths['total'] }};"></th>
+              </tr>
               <tr>
-                <th class="center col-no">SNo</th>
-                <th class="center col-product">Product / Picture</th>
-                <th class="col-specs">Specifications</th>
-                <th class="right col-price">Price</th>
-                <th class="center col-qty">Qty</th>
-                @if($quotation['show_discount']) <th class="center col-discount">Disc%</th> @endif
-                @if($quotation['show_item_wise_gst']) <th class="right col-gst">GST</th> @endif
-                <th class="right col-total">{{ $quotation['gst_inclusive'] ? 'Amount' : 'Net Amount' }}</th>
+                <th class="center col-no" style="width: {{ $columnWidths['no'] }};">SNo</th>
+                <th class="center col-product" style="width: {{ $columnWidths['product'] }};">Product / Picture</th>
+                <th class="col-specs" style="width: {{ $columnWidths['specs'] }};">Specifications</th>
+                <th class="right col-price" style="width: {{ $columnWidths['price'] }};">Price</th>
+                <th class="center col-qty" style="width: {{ $columnWidths['qty'] }};">Qty</th>
+                @if($quotation['show_discount']) <th class="center col-discount" style="width: {{ $columnWidths['discount'] }};">Disc%</th> @endif
+                @if($quotation['show_item_wise_gst']) <th class="right col-gst" style="width: {{ $columnWidths['gst'] }};">GST</th> @endif
+                <th class="right col-total" style="width: {{ $columnWidths['total'] }};">{{ $quotation['gst_inclusive'] ? 'Amount' : 'Net Amount' }}</th>
               </tr>
             </thead>
             <tbody>
               @foreach($quotation['items'] as $index => $item)
                 <tr>
-                  <td class="item-no col-no">{{ $index + 1 }}</td>
-                  <td class="center col-product">
+                  <td class="item-no col-no" style="width: {{ $columnWidths['no'] }};">{{ $index + 1 }}</td>
+                  <td class="center col-product" style="width: {{ $columnWidths['product'] }};">
                     @if($item['product_image_src'])<img class="product-image" src="{{ $item['product_image_src'] }}" alt="{{ $item['product_name'] }}">@else<div class="product-image-placeholder">Product Image</div>@endif
                     <div class="product-name">{{ $item['product_name'] }}</div>
                     @if($item['model_number'])<div class="product-model">{{ $item['model_number'] }}</div>@endif
                   </td>
-                  <td class="specs col-specs">{!! $item['specifications_html'] !!}</td>
-                  <td class="right amount-strong col-price">{{ $quotation['show_mrp'] ? $item['edited_price_label'] : $item['discounted_price_label'] }}</td>
-                  <td class="center amount-strong col-qty" style="white-space: nowrap;">{{ $quotation['show_uom'] ? $item['quantity_with_unit_label'] : $item['quantity_label'] }}</td>
-                  @if($quotation['show_discount']) <td class="center col-discount" style="white-space: nowrap;">{{ $item['discount_percent_label'] }}</td> @endif
-                  @if($quotation['show_item_wise_gst']) <td class="right col-gst"><div>{{ $item['gst_percent_label'] }}</div><div class="gst-sub">{{ $item['tax_amount_label'] }}</div></td> @endif
-                  <td class="right amount-strong col-total">{{ $quotation['gst_inclusive'] ? $item['line_total_label'] : $item['net_amount_label'] }}</td>
+                  <td class="specs col-specs" style="width: {{ $columnWidths['specs'] }};">{!! $item['specifications_html'] !!}</td>
+                  <td class="right amount-strong col-price" style="width: {{ $columnWidths['price'] }};">{{ $quotation['show_mrp'] ? $item['edited_price_label'] : $item['discounted_price_label'] }}</td>
+                  <td class="center amount-strong col-qty" style="width: {{ $columnWidths['qty'] }}; white-space: nowrap;">{{ $quotation['show_uom'] ? $item['quantity_with_unit_label'] : $item['quantity_label'] }}</td>
+                  @if($quotation['show_discount']) <td class="center col-discount" style="width: {{ $columnWidths['discount'] }}; white-space: nowrap;">{{ $item['discount_percent_label'] }}</td> @endif
+                  @if($quotation['show_item_wise_gst']) <td class="right col-gst" style="width: {{ $columnWidths['gst'] }};"><div>{{ $item['gst_percent_label'] }}</div><div class="gst-sub">{{ $item['tax_amount_label'] }}</div></td> @endif
+                  <td class="right amount-strong col-total" style="width: {{ $columnWidths['total'] }};">{{ $quotation['gst_inclusive'] ? $item['line_total_label'] : $item['net_amount_label'] }}</td>
                 </tr>
               @endforeach
             </tbody>
