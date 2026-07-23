@@ -11,6 +11,9 @@ import { CustomerList } from "./pages/CustomerList";
 import { CustomerForm } from "./pages/CustomerForm";
 import { ProductList } from "./pages/ProductList";
 import { ProductForm } from "./pages/ProductForm";
+import { Inventory } from "./pages/Inventory";
+import { InventoryMovement } from "./pages/InventoryMovement";
+import { InventoryLog } from "./pages/InventoryLog";
 import { TaskList } from "./pages/TaskList";
 import { TaskForm } from "./pages/TaskForm";
 import { TaskView } from "./pages/TaskView";
@@ -23,6 +26,7 @@ import { AdjustmentMaster } from "./pages/masters/AdjustmentMaster";
 import { TermsMaster } from "./pages/masters/TermsMaster";
 import { CustomFieldBuilder } from "./pages/masters/CustomFieldBuilder";
 import { UserMaster } from "./pages/masters/UserMaster";
+import { GodownMaster } from "./pages/masters/GodownMaster";
 import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
@@ -60,9 +64,13 @@ export const router = createBrowserRouter([
               { path: "products", Component: ProductList },
               { path: "products/new", Component: ProductForm },
               { path: "products/:id/edit", Component: ProductForm },
+              { path: "inventory", Component: Inventory },
+              { path: "inventory/log", Component: InventoryLog },
+              { path: "inventory/movement/:type", Component: InventoryMovement },
               { path: "masters/categories", Component: CategoryMaster },
               { path: "masters/brands", Component: BrandMaster },
               { path: "masters/terms", Component: TermsMaster },
+              { path: "masters/godowns", Component: GodownMaster },
             ],
           },
         ],

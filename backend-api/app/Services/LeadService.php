@@ -137,7 +137,7 @@ class LeadService extends CrudService
                     'id' => $log->user->id,
                     'name' => $log->user->name,
                     'email' => $log->user->email,
-                ] : null,
+                ] : ($log->new_values['actor'] ?? null),
                 'occurred_at' => optional($log->created_at)->toISOString(),
             ]);
 
@@ -187,6 +187,73 @@ class LeadService extends CrudService
                 'name' => $activity->user->name,
                 'email' => $activity->user->email,
             ] : null,
+            'occurred_at' => optional($activity->created_at)->toISOString(),
+        ];
+    }
+
+    public function startCall(Lead $lead, ?User $actor = null, ?string $ipAddress = null): array
+    {
+        $activity = $this->logActivity(
+            $lead,
+            'called',
+            'Called the lead.',
+            [],
+            [
+                'connected' => null,
+                'notes' => null,
+                'actor' => $actor ? ['id' => $actor->id, 'name' => $actor->name, 'email' => $actor->email] : null,
+            ],
+            $actor,
+            $ipAddress,
+        );
+
+        return $this->serializeActivity($activity);
+    }
+
+    public function resolveCall(Lead $lead, int|string $activityId, bool $connected, ?string $notes, ?User $actor = null): array
+    {
+        $activity = ActivityLog::query()
+            ->whereKey($activityId)
+            ->where('module', 'leads')
+            ->where('entity_type', 'lead')
+            ->where('entity_id', $lead->id)
+            ->where('action', 'called')
+            ->firstOrFail();
+
+        $values = [
+            'description' => $connected
+                ? 'Called the lead — connected. Discussion: '.trim((string) $notes)
+                : 'Called the lead — not connected.',
+            'new_values' => [
+                'connected' => $connected,
+                'notes' => $connected ? trim((string) $notes) : null,
+                'actor' => $activity->new_values['actor'] ?? ($actor ? ['id' => $actor->id, 'name' => $actor->name, 'email' => $actor->email] : null),
+            ],
+            'created_by' => $activity->created_by ?: $actor?->id,
+        ];
+
+        $activityLogColumns = $this->getActivityLogColumns();
+        $activity->forceFill(Arr::only($values, $activityLogColumns));
+        $activity->timestamps = $this->usesTimestamps($activityLogColumns);
+        $activity->save();
+        $activity->refresh();
+
+        return $this->serializeActivity($activity);
+    }
+
+    private function serializeActivity(ActivityLog $activity): array
+    {
+        $activity->loadMissing('user:id,name,email');
+
+        return [
+            'id' => $activity->id,
+            'action' => $activity->action,
+            'description' => $activity->description,
+            'old_values' => $activity->old_values ?? [],
+            'new_values' => $activity->new_values ?? [],
+            'actor' => $activity->user
+                ? ['id' => $activity->user->id, 'name' => $activity->user->name, 'email' => $activity->user->email]
+                : ($activity->new_values['actor'] ?? null),
             'occurred_at' => optional($activity->created_at)->toISOString(),
         ];
     }

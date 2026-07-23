@@ -1,0 +1,23 @@
+import { useCallback, useEffect, useState } from 'react';
+import { ArrowDownToLine, ArrowUpFromLine, History, Search } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { inventoryService } from '../../services/inventoryService';
+import { PaginationControls } from '../components/common/Pagination';
+import { LoadingState } from '../components/common/AsyncState';
+
+export const Inventory = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [data, setData] = useState<{godowns:any[];products:any[]}>({godowns:[],products:[]});
+  const [page, setPage] = useState(1); const [pageSize,setPageSize]=useState(10); const [meta,setMeta]=useState<any>({total:0,last_page:1});
+  const load = useCallback(async (nextPage=page,nextSize=pageSize) => { setLoading(true); try { const result=await inventoryService.overview({page:nextPage,per_page:nextSize,search}); setData(result.data); setMeta(result.meta?.pagination||{}); setPage(nextPage);setPageSize(nextSize); } finally { setLoading(false); } },[page,pageSize,search]);
+  useEffect(()=>{const timer=setTimeout(()=>void load(1,pageSize),250);return()=>clearTimeout(timer);},[search]);
+  useEffect(()=>{void load(1,pageSize);},[]);
+  return <div className="p-4 sm:p-6 lg:p-8"><div className="mx-auto max-w-7xl space-y-6">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-semibold">Inventory</h2><p className="text-sm text-gray-500">Stock across all godowns</p></div><div className="flex flex-wrap gap-3"><button onClick={()=>navigate('/inventory/log')} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-gray-700"><History className="h-4 w-4"/>Inventory Log</button><button onClick={()=>navigate('/inventory/movement/in')} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-white"><ArrowDownToLine className="h-4 w-4"/>IN ITEMS</button><button onClick={()=>navigate('/inventory/movement/out')} className="flex items-center gap-2 rounded-xl bg-rose-600 px-5 py-2.5 text-white"><ArrowUpFromLine className="h-4 w-4"/>OUT ITEMS</button></div></div>
+    <div className="relative"><Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products" className="w-full rounded-xl border bg-white py-3 pl-10 pr-4"/></div>
+    <div className="overflow-hidden rounded-2xl border bg-white">{loading?<LoadingState label="Loading inventory..."/>:<div className="overflow-x-auto"><table className="min-w-full"><thead className="bg-gray-50"><tr><th className="px-5 py-4 text-left text-xs uppercase">Product</th><th className="px-5 py-4 text-left text-xs uppercase">Brand</th><th className="px-5 py-4 text-left text-xs uppercase">Measurement Unit</th><th className="px-5 py-4 text-left text-xs uppercase">Details</th><th className="px-5 py-4 text-right text-xs uppercase">Total Qty</th></tr></thead><tbody className="divide-y">{data.products.map(p=><tr key={p.id}><td className="px-5 py-4"><div className="font-medium">{p.product_name}</div><div className="text-xs text-gray-500">{p.model_number||'-'}</div></td><td className="px-5 py-4">{p.brand||'-'}</td><td className="whitespace-nowrap px-5 py-4">{p.measurement_unit||'-'}</td><td className="px-5 py-4"><div className="flex flex-wrap gap-2">{data.godowns.filter(g=>Number(p.quantities[String(g.id)]||0)>0).map(g=><span key={g.id} className="whitespace-nowrap rounded-lg bg-gray-100 px-2.5 py-1 text-sm text-gray-700">{g.name} - {Number(p.quantities[String(g.id)]||0).toLocaleString('en-IN')}</span>)}</div></td><td className="px-5 py-4 text-right font-semibold">{Number(p.total_quantity||0).toLocaleString('en-IN')}</td></tr>)}</tbody></table></div>}
+      <PaginationControls page={page} pageSize={pageSize} totalItems={meta.total||0} totalPages={meta.last_page||1} onPageChange={p=>void load(p,pageSize)} onPageSizeChange={s=>void load(1,s)}/></div>
+  </div></div>;
+};

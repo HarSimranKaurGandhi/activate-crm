@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api\Leads;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Leads\LeadCommentRequest;
+use App\Http\Requests\Leads\LeadCallOutcomeRequest;
 use App\Http\Requests\Leads\LeadIndexRequest;
 use App\Http\Requests\Leads\LeadRequest;
 use App\Http\Resources\LeadActivityResource;
 use App\Http\Resources\LeadResource;
 use App\Services\LeadService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class LeadController extends ApiController
@@ -80,6 +82,23 @@ class LeadController extends ApiController
             ),
             [],
             201
+        );
+    }
+
+    public function startCall(Request $request, int|string $id): JsonResponse
+    {
+        $lead = $this->leads->find($id);
+
+        return $this->ok('Lead call logged successfully', $this->leads->startCall($lead, $request->user(), $request->ip()), [], 201);
+    }
+
+    public function resolveCall(LeadCallOutcomeRequest $request, int|string $id, int|string $activityId): JsonResponse
+    {
+        $lead = $this->leads->find($id);
+
+        return $this->ok(
+            'Lead call outcome saved successfully',
+            $this->leads->resolveCall($lead, $activityId, $request->boolean('connected'), $request->input('notes'), $request->user()),
         );
     }
 

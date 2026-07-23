@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowUpDown, ChevronDown, Filter, Phone, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, Filter, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls } from '../components/common/Pagination';
@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
+import { LeadPhoneAction } from '../components/leads/LeadPhoneAction';
 import { leadService } from '../../services/leadService';
 import { mapLead } from '../../services/mappers';
 import { userService } from '../../services/userService';
@@ -558,16 +559,7 @@ export const LeadList = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="break-words text-base font-semibold text-gray-900">{lead.name}</div>
-                      {lead.phone && (
-                        <a
-                          href={phoneHref(lead.phone)}
-                          onClick={(event) => event.stopPropagation()}
-                          className="mt-1 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
-                        >
-                          <Phone className="h-3.5 w-3.5" />
-                          {lead.phone}
-                        </a>
-                      )}
+                      <div className="mt-1"><LeadPhoneAction leadId={String(lead.id)} phone={lead.phone} /></div>
                       {lead.email && <div className="break-words text-sm text-gray-500">{lead.email}</div>}
                     </div>
                     <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[lead.status] || statusBadgeClass.new}`}>
@@ -642,16 +634,7 @@ export const LeadList = () => {
                     >
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{lead.name}</div>
-                        {lead.phone && (
-                          <a
-                            href={phoneHref(lead.phone)}
-                            onClick={(event) => event.stopPropagation()}
-                            className="mt-1 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
-                          >
-                            <Phone className="h-3.5 w-3.5" />
-                            {lead.phone}
-                          </a>
-                        )}
+                        <div className="mt-1"><LeadPhoneAction leadId={String(lead.id)} phone={lead.phone} /></div>
                         {lead.email && <div className="text-sm text-gray-500">{lead.email}</div>}
                       </td>
                       <td className="px-6 py-4 text-gray-700">{sourceLabel(lead.leadSource)}</td>

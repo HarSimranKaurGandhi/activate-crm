@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { LayoutDashboard, FileText, Users, Package, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X, Phone } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Package, Warehouse, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X, Phone } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from './BrandLogo';
@@ -11,6 +11,7 @@ const baseNavigation = [
   { name: 'Leads', href: '/leads', icon: Phone },
   { name: 'Customers', href: '/customers', icon: Users },
   { name: 'Products', href: '/products', icon: Package },
+  { name: 'Inventory', href: '/inventory', icon: Warehouse },
   {
     name: 'Masters',
     icon: Database,
@@ -18,6 +19,7 @@ const baseNavigation = [
       { name: 'Categories', href: '/masters/categories' },
       { name: 'Users', href: '/masters/users' },
       { name: 'Brands', href: '/masters/brands' },
+      { name: 'Godowns', href: '/masters/godowns' },
       { name: 'Adjustments', href: '/masters/adjustments' },
       { name: 'Terms & Conditions', href: '/masters/terms' },
       { name: 'Custom Fields', href: '/masters/custom-fields' },

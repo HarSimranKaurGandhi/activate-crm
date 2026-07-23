@@ -19,6 +19,12 @@ export const leadService = {
   async addComment(id: string, comment: string) {
     return unwrap<any>(await apiClient.post(`/leads/${id}/comments`, { comment }));
   },
+  async startCall(id: string) {
+    return unwrap<any>(await apiClient.post(`/leads/${id}/calls`));
+  },
+  async resolveCall(id: string, activityId: string, connected: boolean, notes?: string) {
+    return unwrap<any>(await apiClient.patch(`/leads/${id}/calls/${activityId}`, { connected, notes }));
+  },
   async remove(id: string) {
     return unwrap<any>(await apiClient.delete(`/leads/${id}`));
   },

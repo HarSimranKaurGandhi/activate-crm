@@ -4,11 +4,13 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Customers\CustomerController;
 use App\Http\Controllers\Api\Dashboard\DashboardController;
 use App\Http\Controllers\Api\Leads\LeadController;
+use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\Logs\ActivityLogController;
 use App\Http\Controllers\Api\Masters\AdjustmentController;
 use App\Http\Controllers\Api\Masters\BrandController;
 use App\Http\Controllers\Api\Masters\CategoryController;
 use App\Http\Controllers\Api\Masters\CustomerFieldController;
+use App\Http\Controllers\Api\Masters\GodownController;
 use App\Http\Controllers\Api\Masters\MeasurementUnitController;
 use App\Http\Controllers\Api\Masters\ProductController;
 use App\Http\Controllers\Api\Masters\TermController;
@@ -61,6 +63,15 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::put('brands/{id}', [BrandController::class, 'update']);
 
     Route::get('measurement-units', [MeasurementUnitController::class, 'index']);
+    Route::get('godowns', [GodownController::class, 'index']);
+    Route::post('godowns', [GodownController::class, 'store']);
+    Route::put('godowns/{id}', [GodownController::class, 'update']);
+    Route::delete('godowns/{id}', [GodownController::class, 'destroy']);
+
+    Route::get('inventory', [InventoryController::class, 'index']);
+    Route::get('inventory/selectable-products', [InventoryController::class, 'selectableProducts']);
+    Route::get('inventory/movements', [InventoryController::class, 'movements']);
+    Route::post('inventory/movements', [InventoryController::class, 'store']);
 
     Route::get('products/selectable', [ProductController::class, 'selectable']);
     Route::get('products/bulk-sample', [ProductController::class, 'bulkSample']);
@@ -117,6 +128,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::delete('leads/{id}', [LeadController::class, 'destroy']);
     Route::get('leads/{id}/activity', [LeadController::class, 'activity']);
     Route::post('leads/{id}/comments', [LeadController::class, 'comment']);
+    Route::post('leads/{id}/calls', [LeadController::class, 'startCall']);
+    Route::patch('leads/{id}/calls/{activityId}', [LeadController::class, 'resolveCall']);
     Route::get('leads/{id}', [LeadController::class, 'show']);
     Route::put('leads/{id}', [LeadController::class, 'update']);
 

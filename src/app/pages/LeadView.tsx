@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { LoadingState } from '../components/common/AsyncState';
 import { leadService } from '../../services/leadService';
 import { mapLead } from '../../services/mappers';
+import { LeadPhoneAction } from '../components/leads/LeadPhoneAction';
 
 const statusBadgeClass: Record<string, string> = {
   new: 'bg-sky-50 text-sky-700',
@@ -167,7 +168,7 @@ export const LeadView = () => {
 
               <div>
                 <div className="mb-1 text-sm font-medium text-gray-500">Phone No.</div>
-                <div className="text-gray-900">{lead.phone}</div>
+                <LeadPhoneAction leadId={String(lead.id)} phone={lead.phone} />
               </div>
 
               <div>
