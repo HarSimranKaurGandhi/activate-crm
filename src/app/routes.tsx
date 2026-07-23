@@ -14,6 +14,9 @@ import { ProductForm } from "./pages/ProductForm";
 import { Inventory } from "./pages/Inventory";
 import { InventoryMovement } from "./pages/InventoryMovement";
 import { InventoryLog } from "./pages/InventoryLog";
+import { DispatchList } from "./pages/DispatchList";
+import { DispatchForm } from "./pages/DispatchForm";
+import { DispatchView } from "./pages/DispatchView";
 import { TaskList } from "./pages/TaskList";
 import { TaskForm } from "./pages/TaskForm";
 import { TaskView } from "./pages/TaskView";
@@ -67,6 +70,10 @@ export const router = createBrowserRouter([
               { path: "inventory", Component: Inventory },
               { path: "inventory/log", Component: InventoryLog },
               { path: "inventory/movement/:type", Component: InventoryMovement },
+              { path: "dispatches", Component: DispatchList },
+              { path: "dispatches/new", Component: DispatchForm },
+              { path: "dispatches/:id", Component: DispatchView },
+              { path: "dispatches/:id/edit", Component: DispatchForm },
               { path: "masters/categories", Component: CategoryMaster },
               { path: "masters/brands", Component: BrandMaster },
               { path: "masters/terms", Component: TermsMaster },

@@ -10,6 +10,7 @@ export const godownService = {
 export const inventoryService = {
   async overview(params: Record<string, unknown>) { return unwrapEnvelope<any>(await apiClient.get('/inventory', { params })); },
   async selectableProducts(params: Record<string, unknown>) { return unwrapEnvelope<any[]>(await apiClient.get('/inventory/selectable-products', { params })); },
+  async productStock(id: string) { return unwrap<any>(await apiClient.get(`/inventory/products/${id}/stock`)); },
   async movements(params: Record<string, unknown>) { return unwrapEnvelope<any[]>(await apiClient.get('/inventory/movements', { params })); },
   async createMovement(payload: FormData) { return unwrap<any>(await apiClient.post('/inventory/movements', payload)); },
 };

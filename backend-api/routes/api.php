@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Customers\CustomerController;
 use App\Http\Controllers\Api\Dashboard\DashboardController;
+use App\Http\Controllers\Api\DispatchController;
 use App\Http\Controllers\Api\Leads\LeadController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\Logs\ActivityLogController;
@@ -70,8 +71,16 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::get('inventory', [InventoryController::class, 'index']);
     Route::get('inventory/selectable-products', [InventoryController::class, 'selectableProducts']);
+    Route::get('inventory/products/{id}/stock', [InventoryController::class, 'productStock']);
     Route::get('inventory/movements', [InventoryController::class, 'movements']);
     Route::post('inventory/movements', [InventoryController::class, 'store']);
+
+    Route::get('dispatches', [DispatchController::class, 'index']);
+    Route::post('dispatches', [DispatchController::class, 'store']);
+    Route::get('dispatches/{id}', [DispatchController::class, 'show']);
+    Route::put('dispatches/{id}', [DispatchController::class, 'update']);
+    Route::post('dispatches/{id}/invoice', [DispatchController::class, 'uploadInvoice']);
+    Route::patch('dispatches/{id}/reopen', [DispatchController::class, 'reopen']);
 
     Route::get('products/selectable', [ProductController::class, 'selectable']);
     Route::get('products/bulk-sample', [ProductController::class, 'bulkSample']);

@@ -31,6 +31,11 @@ class InventoryController extends ApiController
         ]);
     }
 
+    public function productStock(int|string $id): JsonResponse
+    {
+        return $this->ok('Product stock fetched successfully', $this->inventory->productStock($id));
+    }
+
     public function movements(Request $request): JsonResponse
     {
         $paginator = $this->inventory->movements($request);

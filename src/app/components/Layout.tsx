@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { LayoutDashboard, FileText, Users, Package, Warehouse, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X, Phone } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Package, Warehouse, Truck, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X, Phone } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from './BrandLogo';
@@ -12,6 +12,7 @@ const baseNavigation = [
   { name: 'Customers', href: '/customers', icon: Users },
   { name: 'Products', href: '/products', icon: Package },
   { name: 'Inventory', href: '/inventory', icon: Warehouse },
+  { name: 'Dispatches', href: '/dispatches', icon: Truck },
   {
     name: 'Masters',
     icon: Database,

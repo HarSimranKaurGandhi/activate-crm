@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Godown;
 use App\Models\InventoryMovement;
 use App\Models\InventoryStock;
+use App\Models\Dispatch;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\PublicAsset;
@@ -80,6 +81,20 @@ class InventoryService
         return $products;
     }
 
+    public function productStock(int|string $productId): array
+    {
+        $product = Product::query()->with(['brand:id,name', 'measurementUnit'])->findOrFail($productId);
+        $godowns = Godown::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $stocks = InventoryStock::query()->where('product_id', $product->id)->get()->keyBy('godown_id');
+        $quantities = $godowns->map(fn ($godown) => [
+            'godown_id' => $godown->id, 'godown' => $godown->name,
+            'quantity' => (float) ($stocks->get($godown->id)?->quantity ?? 0),
+        ])->values();
+        return ['id' => $product->id, 'product_name' => $product->product_name, 'model_number' => $product->model_number,
+            'brand' => $product->brand?->name, 'measurement_unit' => $product->measurementUnit?->name ?: $product->unit,
+            'quantities' => $quantities, 'total_quantity' => $quantities->sum('quantity')];
+    }
+
     public function movements(Request $request): LengthAwarePaginator
     {
         return InventoryMovement::query()
@@ -91,10 +106,21 @@ class InventoryService
     public function createMovement(array $data, Request $request, ?User $user): InventoryMovement
     {
         return DB::transaction(function () use ($data, $request, $user): InventoryMovement {
+            if (! empty($data['dispatch_id'])) {
+                if ($data['movement_type'] !== 'out') {
+                    throw ValidationException::withMessages(['dispatch_id' => ['A dispatch slip can only be linked to an OUT movement.']]);
+                }
+                $dispatch = Dispatch::query()->lockForUpdate()->findOrFail($data['dispatch_id']);
+                if ($dispatch->status !== 'invoiced') {
+                    throw ValidationException::withMessages(['dispatch_id' => ['Only an invoiced dispatch can be stocked out.']]);
+                }
+                $data['customer_id'] = $dispatch->customer_id;
+            }
             $slipPath = $request->hasFile('slip') ? PublicAsset::store($request->file('slip'), 'uploads/inventory/slips') : null;
             $movement = InventoryMovement::create([
                 'movement_date' => $data['movement_date'], 'movement_type' => $data['movement_type'],
-                'transport_type' => $data['transport_type'], 'slip_path' => $slipPath, 'created_by' => $user?->id,
+                'transport_type' => $data['transport_type'], 'customer_id' => $data['customer_id'] ?? null,
+                'dispatch_id' => $data['dispatch_id'] ?? null, 'slip_path' => $slipPath, 'created_by' => $user?->id,
             ]);
             foreach ($data['items'] as $index => $item) {
                 $stock = InventoryStock::query()->lockForUpdate()->firstOrCreate(
@@ -105,6 +131,9 @@ class InventoryService
                 if ($next < 0) throw ValidationException::withMessages(["items.{$index}.quantity" => ['Insufficient stock in the selected godown.']]);
                 $stock->update(['quantity' => $next]);
                 $movement->items()->create($item);
+            }
+            if (! empty($data['dispatch_id']) && $data['movement_type'] === 'out') {
+                Dispatch::query()->whereKey($data['dispatch_id'])->update(['status' => 'dispatched']);
             }
             return $movement->load('items');
         });
