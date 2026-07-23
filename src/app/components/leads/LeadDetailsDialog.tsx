@@ -15,7 +15,8 @@ const LEAD_SOURCE_OPTIONS = [
 ];
 
 const LEAD_STATUS_OPTIONS = [
-  { value: 'new', label: 'New' },
+  { value: 'enquiry', label: 'Enquiry' },
+  { value: 'new', label: 'New (Requirement Confirmed)' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'on_hold', label: 'On Hold' },
   { value: 'closed_success', label: 'Closed - Success' },
@@ -42,6 +43,7 @@ const LEAD_EXPECTED_CLOSURE_OPTIONS = [
 
 const statusBadgeClass: Record<string, string> = {
   new: 'bg-sky-50 text-sky-700',
+  enquiry: 'bg-indigo-50 text-indigo-700',
   in_progress: 'bg-amber-50 text-amber-700',
   on_hold: 'bg-slate-100 text-slate-700',
   closed_success: 'bg-emerald-50 text-emerald-700',
@@ -57,7 +59,7 @@ const sourceLabel = (source: string) =>
   LEAD_SOURCE_OPTIONS.find((option) => option.value === source)?.label || 'Walk In';
 
 const statusLabel = (status: string) =>
-  LEAD_STATUS_OPTIONS.find((option) => option.value === status)?.label || 'New';
+  LEAD_STATUS_OPTIONS.find((option) => option.value === status)?.label || 'New (Requirement Confirmed)';
 
 const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
 const today = formatDateInput(new Date());

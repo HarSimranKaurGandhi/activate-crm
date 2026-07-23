@@ -238,6 +238,11 @@ export const QuotationBuilder = () => {
   const [inProgressLeads, setInProgressLeads] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const brandBannerOptions = brands.filter(
+    (brand) => brand.status === 'active' && String(brand.logoPath || '').trim() !== '',
+  );
+  const selectedBrandBanner = brandBannerOptions.find((brand) => brand.id === brandBannerId) || null;
+
   useEffect(() => {
     userService
       .dropdown()
@@ -798,40 +803,6 @@ export const QuotationBuilder = () => {
                            after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-5"
                 />
               </label>
-
-              <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm font-medium text-gray-700">Show Brand Logo Banner</span>
-                <input
-                  type="checkbox"
-                  checked={showBrandBanner}
-                  onChange={(e) => {
-                    setShowBrandBanner(e.target.checked);
-                    if (!e.target.checked) {
-                      setBrandBannerId('');
-                    }
-                  }}
-                  className="w-11 h-6 bg-gray-200 rounded-full appearance-none cursor-pointer relative checked:bg-blue-600 transition-colors
-                           after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform checked:after:translate-x-5"
-                />
-              </label>
-
-              {showBrandBanner && (
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Banner Brand</label>
-                  <select
-                    value={brandBannerId}
-                    onChange={(e) => setBrandBannerId(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2"
-                  >
-                    <option value="">Select brand</option>
-                    {brands
-                      .filter((brand) => brand.status === 'active')
-                      .map((brand) => (
-                        <option key={brand.id} value={brand.id}>{brand.name}</option>
-                      ))}
-                  </select>
-                </div>
-              )}
 
               <label className="flex items-center justify-between cursor-pointer">
                 <span className="text-sm font-medium text-gray-700">Round Off Net Amount in Quotation</span>

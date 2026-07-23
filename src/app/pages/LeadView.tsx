@@ -8,6 +8,7 @@ import { mapLead } from '../../services/mappers';
 
 const statusBadgeClass: Record<string, string> = {
   new: 'bg-sky-50 text-sky-700',
+  enquiry: 'bg-indigo-50 text-indigo-700',
   in_progress: 'bg-amber-50 text-amber-700',
   on_hold: 'bg-slate-100 text-slate-700',
   closed_success: 'bg-emerald-50 text-emerald-700',
@@ -34,6 +35,8 @@ const sourceLabel = (source: string) => {
 
 const statusLabel = (status: string) => {
   switch (status) {
+    case 'enquiry':
+      return 'Enquiry';
     case 'in_progress':
       return 'In Progress';
     case 'on_hold':
@@ -43,7 +46,7 @@ const statusLabel = (status: string) => {
     case 'closed_fail':
       return 'Closed - Fail';
     default:
-      return 'New';
+      return 'New (Requirement Confirmed)';
   }
 };
 
@@ -82,7 +85,7 @@ const formatDisplayDateTime = (date?: string) => {
     minute: '2-digit',
   });
 };
-const TODAY = new Date('2026-07-16T00:00:00');
+const TODAY = new Date('2026-07-18T00:00:00');
 const isPastDate = (date?: string) => {
   if (!date) return false;
 

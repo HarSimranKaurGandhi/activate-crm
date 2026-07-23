@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Schema;
 
 class LeadService extends CrudService
 {
+    private const CLOSED_STATUSES = ['closed_success', 'closed_fail'];
+
     protected string $modelClass = Lead::class;
 
     protected array $searchColumns = ['name', 'phone', 'email', 'city', 'state', 'country', 'requirement'];
@@ -191,14 +193,33 @@ class LeadService extends CrudService
 
     protected function applyFilters(Builder $query, Request $request): Builder
     {
+        $includeClosed = $request->boolean('include_closed');
+        $leadSources = collect(Arr::wrap($request->input('lead_source')))
+            ->filter(fn (mixed $value): bool => filled($value))
+            ->values()
+            ->all();
+        $statuses = collect(Arr::wrap($request->input('status')))
+            ->filter(fn (mixed $value): bool => filled($value))
+            ->values()
+            ->all();
+        $assigneeIds = collect(Arr::wrap($request->input('assigned_to')))
+            ->filter(fn (mixed $value): bool => filled($value))
+            ->map(fn (mixed $value): int => (int) $value)
+            ->values()
+            ->all();
+
         return $query
             ->when(
-                $request->filled('lead_source'),
-                fn (Builder $builder) => $builder->where('lead_source', $request->string('lead_source')->toString())
+                ! $includeClosed,
+                fn (Builder $builder) => $builder->whereNotIn('status', self::CLOSED_STATUSES)
             )
             ->when(
-                $request->filled('status'),
-                fn (Builder $builder) => $builder->where('status', $request->string('status')->toString())
+                $leadSources !== [],
+                fn (Builder $builder) => $builder->whereIn('lead_source', $leadSources)
+            )
+            ->when(
+                $statuses !== [],
+                fn (Builder $builder) => $builder->whereIn('status', $statuses)
             )
             ->when(
                 $request->filled('tag'),
@@ -209,8 +230,8 @@ class LeadService extends CrudService
                 fn (Builder $builder) => $builder->where('created_by', $request->integer('created_by'))
             )
             ->when(
-                $request->filled('assigned_to'),
-                fn (Builder $builder) => $builder->where('assigned_to', $request->integer('assigned_to'))
+                $assigneeIds !== [],
+                fn (Builder $builder) => $builder->whereIn('assigned_to', $assigneeIds)
             )
             ->when(
                 $request->filled('follow_up_from'),
@@ -323,7 +344,8 @@ class LeadService extends CrudService
 
         if ($field === 'status') {
             return match ((string) $value) {
-                'new' => 'New',
+                'new' => 'New (Requirement Confirmed)',
+                'enquiry' => 'Enquiry',
                 'in_progress' => 'In Progress',
                 'on_hold' => 'On Hold',
                 'closed_success' => 'Closed - Success',

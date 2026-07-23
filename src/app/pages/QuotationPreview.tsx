@@ -4,7 +4,7 @@ import { ArrowLeft, Download, Edit, Check, X, Send, Mail, Phone, FileText, Build
 import { toast } from 'sonner';
 import { useEffect, useRef, useState } from 'react';
 import { quotationService } from '../../services/quotationService';
-import { mapQuotation } from '../../services/mappers';
+import { mapQuotation, quotationPayload } from '../../services/mappers';
 import { useAuth } from '../auth/AuthContext';
 import { LoadingState } from '../components/common/AsyncState';
 
@@ -19,10 +19,12 @@ export const QuotationPreview = () => {
     settings,
     adjustments: masterAdjustments,
     terms: masterTerms,
+    brands,
   } = useData();
   const { user } = useAuth();
   const [previewQuotation, setPreviewQuotation] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(Boolean(id));
+  const [bannerSaving, setBannerSaving] = useState(false);
   const quotationDocumentRef = useRef<HTMLDivElement | null>(null);
 
   
@@ -67,10 +69,52 @@ export const QuotationPreview = () => {
 
   const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
   const canApprove = ['admin', 'sales_manager'].includes(role);
+  const bannerBrandOptions = brands.filter(
+    (brand) => brand.status === 'active' && String(brand.logoPath || '').trim() !== '',
+  );
+
+  const applyBannerSettingChange = (nextValues: Partial<any>) => {
+    const nextQuotation = {
+      ...quotation,
+      ...nextValues,
+      brandBannerId: nextValues.showBrandBanner === false
+        ? ''
+        : (nextValues.brandBannerId ?? quotation.brandBannerId ?? ''),
+      brandBanner: nextValues.showBrandBanner === false
+        ? null
+        : (
+          bannerBrandOptions.find((brand) => brand.id === (nextValues.brandBannerId ?? quotation.brandBannerId))
+          || quotation.brandBanner
+          || null
+        ),
+    };
+
+    setPreviewQuotation(nextQuotation);
+
+    return nextQuotation;
+  };
+
+  const persistQuotationPreviewSettings = async (quotationToPersist = quotation) => {
+    if (!quotationToPersist?.id) {
+      return quotationToPersist;
+    }
+
+    setBannerSaving(true);
+
+    try {
+      const updated = await quotationService.update(quotationToPersist.id, quotationPayload(quotationToPersist));
+      const mapped = mapQuotation(updated);
+      setPreviewQuotation(mapped);
+      return mapped;
+    } finally {
+      setBannerSaving(false);
+    }
+  };
 
   const handleSubmitForApproval = async () => {
-    await submitQuotationForApproval(quotation.id);
-    setPreviewQuotation({ ...quotation, status: 'pending' });
+    const persistedQuotation = await persistQuotationPreviewSettings();
+    await submitQuotationForApproval(persistedQuotation.id);
+    setPreviewQuotation({ ...persistedQuotation, status: 'pending' });
     toast.success('Quotation submitted for approval');
   };
 
@@ -199,7 +243,8 @@ export const QuotationPreview = () => {
     });
 
     try {
-      const blob = await quotationService.downloadPdf(quotation.id);
+      const persistedQuotation = await persistQuotationPreviewSettings();
+      const blob = await quotationService.downloadPdf(persistedQuotation.id);
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -231,7 +276,8 @@ export const QuotationPreview = () => {
             Back to Quotations
           </button>
 
-          <div className="flex flex-wrap items-stretch justify-start gap-2 sm:justify-end sm:gap-3">
+          <div className="flex flex-col gap-3 sm:items-end">
+            <div className="flex flex-wrap items-stretch justify-start gap-2 sm:justify-end sm:gap-3">
             {quotation.status === 'draft' && (
               <button
                 onClick={handleSubmitForApproval}
@@ -275,6 +321,50 @@ export const QuotationPreview = () => {
               <Download className="h-5 w-5" />
               Download PDF
             </button>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(quotation.showBrandBanner)}
+                    disabled={bannerSaving}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      applyBannerSettingChange({
+                        showBrandBanner: checked,
+                        brandBannerId: checked ? (quotation.brandBannerId || bannerBrandOptions[0]?.id || '') : '',
+                      });
+                    }}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                  />
+                  <span>Show brand logo below letterhead</span>
+                </label>
+
+                <select
+                  value={quotation.brandBannerId || ''}
+                  disabled={!quotation.showBrandBanner || bannerSaving}
+                  onChange={(event) => applyBannerSettingChange({
+                    showBrandBanner: true,
+                    brandBannerId: event.target.value,
+                  })}
+                  className="min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  <option value="">Select brand logo</option>
+                  {bannerBrandOptions.map((brand) => (
+                    <option key={brand.id} value={brand.id}>{brand.name}</option>
+                  ))}
+                </select>
+
+                {bannerSaving && (
+                  <span className="text-xs font-medium text-slate-500">Saving...</span>
+                )}
+                {!bannerSaving && (
+                  <span className="text-xs font-medium text-slate-500">Saved on submit for approval or PDF download.</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

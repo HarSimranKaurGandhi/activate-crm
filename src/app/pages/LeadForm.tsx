@@ -16,7 +16,8 @@ const LEAD_SOURCE_OPTIONS = [
 ];
 
 const LEAD_STATUS_OPTIONS = [
-  { value: 'new', label: 'New' },
+  { value: 'enquiry', label: 'Enquiry' },
+  { value: 'new', label: 'New (Requirement Confirmed)' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'on_hold', label: 'On Hold' },
   { value: 'closed_success', label: 'Closed - Success' },

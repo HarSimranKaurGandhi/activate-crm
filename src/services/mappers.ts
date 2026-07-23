@@ -3,7 +3,7 @@ import { apiOrigin } from './apiClient';
 export type Status = 'active' | 'inactive';
 export type QuotationStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'revised';
 export type TaskStatus = 'new' | 'in_progress' | 'completed' | 'on_hold';
-export type LeadStatus = 'new' | 'in_progress' | 'on_hold' | 'closed_success' | 'closed_fail';
+export type LeadStatus = 'new' | 'enquiry' | 'in_progress' | 'on_hold' | 'closed_success' | 'closed_fail';
 
 const normalizeExpectedClosure = (value: unknown) => {
   const normalized = String(value || '').trim().toLowerCase();

@@ -233,7 +233,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (/^\/quotations\/[^/]+\/preview$/.test(pathname)) {
-        loaders.push(loadAdjustments(), loadTerms(), loadSettings());
+        loaders.push(loadAdjustments(), loadTerms(), loadSettings(), loadBrands());
       }
     }
 

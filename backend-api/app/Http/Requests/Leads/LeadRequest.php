@@ -28,7 +28,7 @@ class LeadRequest extends FormRequest
             'requirement' => ['required', 'string'],
             'expected_order_value' => ['nullable', 'string', Rule::in(['5L-10L', '10L-30L', '30L+']), 'required_if:status,in_progress'],
             'expected_closure' => ['nullable', 'string', Rule::in(['10 days', '20 days', '30 days', '90 days']), 'required_if:status,in_progress'],
-            'status' => ['required', Rule::in(['new', 'in_progress', 'on_hold', 'closed_success', 'closed_fail'])],
+            'status' => ['required', Rule::in(['new', 'enquiry', 'in_progress', 'on_hold', 'closed_success', 'closed_fail'])],
             'tags' => ['sometimes', 'nullable', 'array'],
             'tags.*' => ['string', Rule::in(['hot', 'premium'])],
             'follow_up_date' => ['required', 'date', 'after_or_equal:today'],

@@ -3,14 +3,21 @@ import { useNavigate } from 'react-router';
 import { ArrowUpDown, ChevronDown, Filter, Phone, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
-import { PaginationControls, usePagination } from '../components/common/Pagination';
+import { PaginationControls } from '../components/common/Pagination';
 import { LeadDetailsDialog } from '../components/leads/LeadDetailsDialog';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import { leadService } from '../../services/leadService';
 import { mapLead } from '../../services/mappers';
 import { userService } from '../../services/userService';
 
 const LEAD_SOURCE_OPTIONS = [
-  { value: 'all', label: 'All Sources' },
   { value: 'walk_in', label: 'Walk In' },
   { value: 'reference', label: 'Reference' },
   { value: 'india_mart', label: 'India Mart' },
@@ -18,16 +25,18 @@ const LEAD_SOURCE_OPTIONS = [
 ];
 
 const LEAD_STATUS_OPTIONS = [
-  { value: 'all', label: 'All Status' },
-  { value: 'new', label: 'New' },
+  { value: 'enquiry', label: 'Enquiry' },
+  { value: 'new', label: 'New (Requirement Confirmed)' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'on_hold', label: 'On Hold' },
   { value: 'closed_success', label: 'Closed - Success' },
   { value: 'closed_fail', label: 'Closed - Fail' },
 ];
+const CLOSED_LEAD_STATUS_OPTIONS = ['closed_success', 'closed_fail'];
 
 const statusBadgeClass: Record<string, string> = {
   new: 'bg-sky-50 text-sky-700',
+  enquiry: 'bg-indigo-50 text-indigo-700',
   in_progress: 'bg-amber-50 text-amber-700',
   on_hold: 'bg-slate-100 text-slate-700',
   closed_success: 'bg-emerald-50 text-emerald-700',
@@ -38,7 +47,7 @@ const sourceLabel = (source: string) =>
   LEAD_SOURCE_OPTIONS.find((option) => option.value === source)?.label || 'Walk In';
 
 const statusLabel = (status: string) =>
-  LEAD_STATUS_OPTIONS.find((option) => option.value === status)?.label || 'New';
+  LEAD_STATUS_OPTIONS.find((option) => option.value === status)?.label || 'New (Requirement Confirmed)';
 
 const formatAddress = (lead: any) =>
   [lead.addressLine1, lead.addressLine2, lead.city, lead.state, lead.pincode, lead.country]
@@ -84,20 +93,35 @@ const isPastDate = (date?: string) => {
 };
 
 const phoneHref = (phone?: string) => `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
+const toggleFilterValue = (values: string[], value: string) =>
+  values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+const filterTriggerLabel = (label: string, selected: string[], options: Array<{ value: string; label: string }>) => {
+  if (selected.length === 0) return label;
+  if (selected.length === 1) {
+    return options.find((option) => option.value === selected[0])?.label || label;
+  }
+
+  return `${label} (${selected.length})`;
+};
 
 export const LeadList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
-    leadSource: 'all',
-    status: 'all',
-    assignedTo: 'all',
+    leadSources: [] as string[],
+    statuses: [] as string[],
+    assignedTo: [] as string[],
+    showClosed: false,
   });
   const [sort, setSort] = useState<{ key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'status'; direction: 'asc' | 'desc' }>({
     key: 'followUpDate',
@@ -121,6 +145,7 @@ export const LeadList = () => {
     try {
       await leadService.remove(leadId);
       setLeads((current) => current.filter((lead) => lead.id !== leadId));
+      setTotalItems((current) => Math.max(0, current - 1));
       toast.success('Lead deleted');
     } catch {
       toast.error('Unable to delete lead');
@@ -128,59 +153,67 @@ export const LeadList = () => {
   };
 
   useEffect(() => {
-    const load = async () => {
+    const loadUsers = async () => {
+      try {
+        const userResult = await userService.dropdown();
+        setUsers(Array.isArray(userResult) ? userResult : []);
+      } catch {
+        toast.error('Unable to load lead users');
+      }
+    };
+
+    void loadUsers();
+  }, []);
+
+  useEffect(() => {
+    const loadLeads = async () => {
       setLoading(true);
       try {
-        const [initialLeadResult, userResult] = await Promise.all([
-          leadService.list({ page: 1, per_page: 100 }),
-          userService.dropdown(),
-        ]);
+        const result = await leadService.list({
+          page,
+          per_page: pageSize,
+          include_closed: filters.showClosed ? 1 : 0,
+          ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
+          ...(filters.leadSources.length > 0 ? { lead_source: filters.leadSources } : {}),
+          ...(filters.statuses.length > 0 ? { status: filters.statuses } : {}),
+          ...(filters.assignedTo.length > 0 ? { assigned_to: filters.assignedTo } : {}),
+        });
 
-        const allLeads = [...(initialLeadResult.data || [])];
-        const lastPage = initialLeadResult.meta?.pagination?.last_page || 1;
-
-        if (lastPage > 1) {
-          const remainingPages = await Promise.all(
-            Array.from({ length: lastPage - 1 }, (_, index) =>
-              leadService.list({ page: index + 2, per_page: 100 }),
-            ),
-          );
-
-          remainingPages.forEach((result) => {
-            allLeads.push(...(result.data || []));
-          });
-        }
-
-        setLeads(allLeads.map(mapLead));
-        setUsers(Array.isArray(userResult) ? userResult : []);
-      } catch (error) {
+        const pagination = result.meta?.pagination;
+        setLeads((result.data || []).map(mapLead));
+        setTotalItems(pagination?.total || 0);
+        setTotalPages(pagination?.last_page || 1);
+      } catch {
         toast.error('Unable to load leads');
       } finally {
         setLoading(false);
       }
     };
 
-    load();
-  }, []);
+    void loadLeads();
+  }, [filters, page, pageSize]);
 
-  const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
-      const search = filters.search.trim().toLowerCase();
-      const searchMatch =
-        !search ||
-        lead.name.toLowerCase().includes(search) ||
-        lead.phone.toLowerCase().includes(search) ||
-        lead.email.toLowerCase().includes(search) ||
-        lead.requirement.toLowerCase().includes(search) ||
-        formatAddress(lead).toLowerCase().includes(search);
+  useEffect(() => {
+    setPage(1);
+  }, [filters.search, filters.leadSources, filters.statuses, filters.assignedTo, filters.showClosed]);
 
-      const sourceMatch = filters.leadSource === 'all' || lead.leadSource === filters.leadSource;
-      const statusMatch = filters.status === 'all' || lead.status === filters.status;
-      const assignedMatch = filters.assignedTo === 'all' || lead.assignedTo === filters.assignedTo;
+  useEffect(() => {
+    if (filters.showClosed) {
+      return;
+    }
 
-      return searchMatch && sourceMatch && statusMatch && assignedMatch;
+    setFilters((current) => {
+      const nextStatuses = current.statuses.filter((status) => !CLOSED_LEAD_STATUS_OPTIONS.includes(status));
+      if (nextStatuses.length === current.statuses.length) {
+        return current;
+      }
+
+      return {
+        ...current,
+        statuses: nextStatuses,
+      };
     });
-  }, [filters, leads]);
+  }, [filters.showClosed]);
 
   const sortedLeads = useMemo(() => {
     const valueForSort = (lead: any) => {
@@ -200,7 +233,7 @@ export const LeadList = () => {
       }
     };
 
-    return [...filteredLeads].sort((a, b) => {
+    return [...leads].sort((a, b) => {
       const aValue = valueForSort(a);
       const bValue = valueForSort(b);
 
@@ -208,7 +241,7 @@ export const LeadList = () => {
       if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [filteredLeads, sort]);
+  }, [leads, sort]);
 
   const toggleSort = (key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'status') => {
     setSort((current) => ({
@@ -236,26 +269,45 @@ export const LeadList = () => {
     </button>
   );
 
-  const pagination = usePagination(sortedLeads, 10);
   const activeFilterCount = [
     filters.search.trim() ? 1 : 0,
-    filters.leadSource !== 'all' ? 1 : 0,
-    filters.status !== 'all' ? 1 : 0,
-    filters.assignedTo !== 'all' ? 1 : 0,
+    filters.leadSources.length > 0 ? 1 : 0,
+    filters.statuses.length > 0 ? 1 : 0,
+    filters.assignedTo.length > 0 ? 1 : 0,
   ].reduce((sum, count) => sum + count, 0);
+  const assigneeOptions = users.map((user) => ({ value: String(user.id), label: user.name }));
+  const visibleStatusOptions = filters.showClosed
+    ? LEAD_STATUS_OPTIONS
+    : LEAD_STATUS_OPTIONS.filter((option) => !CLOSED_LEAD_STATUS_OPTIONS.includes(option.value));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Leads</h2>
-          <button
-            onClick={() => navigate('/leads/new')}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto"
-          >
-            <Plus className="h-5 w-5" />
-            Create Lead
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={filters.showClosed}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    showClosed: event.target.checked,
+                  }))
+                }
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Show Closed leads
+            </label>
+            <button
+              onClick={() => navigate('/leads/new')}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto"
+            >
+              <Plus className="h-5 w-5" />
+              Create Lead
+            </button>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
@@ -280,9 +332,10 @@ export const LeadList = () => {
                 onClick={() =>
                   setFilters({
                     search: '',
-                    leadSource: 'all',
-                    status: 'all',
-                    assignedTo: 'all',
+                    leadSources: [],
+                    statuses: [],
+                    assignedTo: [],
+                    showClosed: filters.showClosed,
                   })
                 }
                 className="text-sm font-medium text-blue-600 hover:underline"
@@ -303,34 +356,90 @@ export const LeadList = () => {
                 className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <select
-              value={filters.leadSource}
-              onChange={(event) => setFilters((current) => ({ ...current, leadSource: event.target.value }))}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {LEAD_SOURCE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
-              value={filters.status}
-              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {LEAD_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
-              value={filters.assignedTo}
-              onChange={(event) => setFilters((current) => ({ ...current, assignedTo: event.target.value }))}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Assignees</option>
-              {users.map((user) => (
-                <option key={user.id} value={String(user.id)}>{user.name}</option>
-              ))}
-            </select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700"
+                >
+                  <span>{filterTriggerLabel('Source', filters.leadSources, LEAD_SOURCE_OPTIONS)}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64">
+                <DropdownMenuLabel>Lead Sources</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {LEAD_SOURCE_OPTIONS.map((option) => (
+                  <DropdownMenuCheckboxItem
+                    key={option.value}
+                    checked={filters.leadSources.includes(option.value)}
+                    onCheckedChange={() => setFilters((current) => ({
+                      ...current,
+                      leadSources: toggleFilterValue(current.leadSources, option.value),
+                    }))}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    {option.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700"
+                >
+                  <span>{filterTriggerLabel('Status', filters.statuses, LEAD_STATUS_OPTIONS)}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64">
+                <DropdownMenuLabel>Lead Status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {visibleStatusOptions.map((option) => (
+                  <DropdownMenuCheckboxItem
+                    key={option.value}
+                    checked={filters.statuses.includes(option.value)}
+                    onCheckedChange={() => setFilters((current) => ({
+                      ...current,
+                      statuses: toggleFilterValue(current.statuses, option.value),
+                    }))}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    {option.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700"
+                >
+                  <span>{filterTriggerLabel('Assignee', filters.assignedTo, assigneeOptions)}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64">
+                <DropdownMenuLabel>Assigned To</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {assigneeOptions.map((option) => (
+                  <DropdownMenuCheckboxItem
+                    key={option.value}
+                    checked={filters.assignedTo.includes(option.value)}
+                    onCheckedChange={() => setFilters((current) => ({
+                      ...current,
+                      assignedTo: toggleFilterValue(current.assignedTo, option.value),
+                    }))}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    {option.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="mb-4 hidden grid-cols-1 gap-3 lg:grid lg:grid-cols-4">
@@ -344,39 +453,95 @@ export const LeadList = () => {
                 className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <select
-              value={filters.leadSource}
-              onChange={(event) => setFilters((current) => ({ ...current, leadSource: event.target.value }))}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {LEAD_SOURCE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
-              value={filters.status}
-              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {LEAD_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
-              value={filters.assignedTo}
-              onChange={(event) => setFilters((current) => ({ ...current, assignedTo: event.target.value }))}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Assignees</option>
-              {users.map((user) => (
-                <option key={user.id} value={String(user.id)}>{user.name}</option>
-              ))}
-            </select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700"
+                >
+                  <span>{filterTriggerLabel('Source', filters.leadSources, LEAD_SOURCE_OPTIONS)}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64">
+                <DropdownMenuLabel>Lead Sources</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {LEAD_SOURCE_OPTIONS.map((option) => (
+                  <DropdownMenuCheckboxItem
+                    key={option.value}
+                    checked={filters.leadSources.includes(option.value)}
+                    onCheckedChange={() => setFilters((current) => ({
+                      ...current,
+                      leadSources: toggleFilterValue(current.leadSources, option.value),
+                    }))}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    {option.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700"
+                >
+                  <span>{filterTriggerLabel('Status', filters.statuses, LEAD_STATUS_OPTIONS)}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64">
+                <DropdownMenuLabel>Lead Status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {visibleStatusOptions.map((option) => (
+                  <DropdownMenuCheckboxItem
+                    key={option.value}
+                    checked={filters.statuses.includes(option.value)}
+                    onCheckedChange={() => setFilters((current) => ({
+                      ...current,
+                      statuses: toggleFilterValue(current.statuses, option.value),
+                    }))}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    {option.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700"
+                >
+                  <span>{filterTriggerLabel('Assignee', filters.assignedTo, assigneeOptions)}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64">
+                <DropdownMenuLabel>Assigned To</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {assigneeOptions.map((option) => (
+                  <DropdownMenuCheckboxItem
+                    key={option.value}
+                    checked={filters.assignedTo.includes(option.value)}
+                    onCheckedChange={() => setFilters((current) => ({
+                      ...current,
+                      assignedTo: toggleFilterValue(current.assignedTo, option.value),
+                    }))}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    {option.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200">
             <div className="divide-y divide-gray-200 md:hidden">
-              {pagination.pageItems.map((lead) => (
+              {sortedLeads.map((lead) => (
                 <div
                   key={lead.id}
                   role="button"
@@ -469,7 +634,7 @@ export const LeadList = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {pagination.pageItems.map((lead) => (
+                  {sortedLeads.map((lead) => (
                     <tr
                       key={lead.id}
                       onClick={() => openLeadDialog(lead.id)}
@@ -523,17 +688,20 @@ export const LeadList = () => {
             </div>
 
             <PaginationControls
-              page={pagination.page}
-              pageSize={pagination.pageSize}
-              totalItems={pagination.totalItems}
-              totalPages={pagination.totalPages}
-              onPageChange={pagination.setPage}
-              onPageSizeChange={pagination.setPageSize}
+              page={page}
+              pageSize={pageSize}
+              totalItems={totalItems}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={(nextPageSize) => {
+                setPageSize(nextPageSize);
+                setPage(1);
+              }}
             />
           </div>
 
           {loading && <LoadingState label="Loading leads..." />}
-          {!loading && filteredLeads.length === 0 && (
+          {!loading && leads.length === 0 && (
             <EmptyState label="No leads found. Create your first lead to get started." />
           )}
         </div>
