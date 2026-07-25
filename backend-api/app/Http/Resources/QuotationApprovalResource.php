@@ -17,7 +17,7 @@ class QuotationApprovalResource extends JsonResource
             'acted_by' => $this->acted_by,
             'actor' => $this->whenLoaded('actor', fn () => [
                 'id' => $this->actor?->id,
-                'name' => $this->actor?->name,
+                'name' => $this->actor?->name ?: $this->action_by_name,
                 'email' => $this->actor?->email,
             ]),
             'acted_at' => $this->acted_at,

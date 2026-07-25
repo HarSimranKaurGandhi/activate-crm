@@ -9,7 +9,7 @@ class QuotationApproval extends Model
 {
     protected $table = 'quotation_approvals';
 
-    protected $fillable = ['quotation_id', 'action', 'remarks', 'acted_by', 'acted_at', 'action_by', 'action_at'];
+    protected $fillable = ['quotation_id', 'action', 'remarks', 'acted_by', 'acted_at', 'action_by', 'action_by_name', 'action_at'];
 
     protected function casts(): array
     {

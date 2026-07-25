@@ -16,6 +16,7 @@ class LeadCallOutcomeRequest extends FormRequest
         return [
             'connected' => ['required', 'boolean'],
             'notes' => ['nullable', 'string', 'max:5000', 'required_if:connected,true'],
+            'follow_up_date' => ['nullable', 'date_format:Y-m-d'],
         ];
     }
 }

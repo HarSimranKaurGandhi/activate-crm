@@ -82,7 +82,11 @@ class QuotationApprovalService
                     'id' => $approval->actor->id,
                     'name' => $approval->actor->name,
                     'email' => $approval->actor->email,
-                ] : null,
+                ] : ($approval->action_by_name ? [
+                    'id' => null,
+                    'name' => $approval->action_by_name,
+                    'email' => null,
+                ] : null),
                 'occurred_at' => data_get($approval, $approvalTimestampColumn),
             ]);
 
@@ -153,6 +157,7 @@ class QuotationApprovalService
                 'action' => $this->storedApprovalAction($action),
                 'remarks' => $remarks,
                 'acted_by' => $user->id,
+                'action_by_name' => $user->name,
                 'acted_at' => now(),
             ], $this->getQuotationApprovalColumns());
 

@@ -4,7 +4,14 @@ namespace App\Services;
 
 use App\Models\Customer;
 use App\Models\CustomerFieldDefinition;
+use App\Models\CustomerOwnedProduct;
+use App\Models\InventoryMovement;
+use App\Models\Lead;
+use App\Models\ActivityLog;
+use App\Models\Quotation;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -83,6 +90,156 @@ class CustomerService extends CrudService
         return $customer->quotations()
             ->latest('id')
             ->paginate((int) $request->integer('per_page', 15));
+    }
+
+    public function overview(Customer $customer, ?User $viewer = null): array
+    {
+        $ownedProducts = $customer->ownedProducts()
+            ->with(['product.brand:id,name', 'product.measurementUnit', 'sourceDispatch:id,dispatch_number'])
+            ->latest('last_purchased_at')
+            ->get()
+            ->map(fn (CustomerOwnedProduct $owned): array => [
+                'id' => $owned->id,
+                'product_id' => $owned->product_id,
+                'product_name' => $owned->product?->product_name ?: $owned->product_description,
+                'product_description' => $owned->product_description,
+                'model_number' => $owned->product?->model_number,
+                'brand' => $owned->product?->brand?->name,
+                'measurement_unit' => $owned->product?->measurementUnit?->name ?: $owned->product?->unit,
+                'quantity' => (float) $owned->quantity,
+                'first_purchased_at' => optional($owned->first_purchased_at)->toDateString(),
+                'last_purchased_at' => optional($owned->last_purchased_at)->toDateString(),
+                'dispatch_number' => $owned->sourceDispatch?->dispatch_number,
+            ]);
+
+        $timeline = collect();
+
+        Quotation::query()
+            ->where('customer_id', $customer->id)
+            ->latest('quote_date')
+            ->limit(100)
+            ->get()
+            ->each(function (Quotation $quotation) use ($timeline): void {
+                $timeline->push([
+                    'id' => "quotation-{$quotation->id}",
+                    'type' => 'quotation',
+                    'title' => "Quotation {$quotation->quotation_number}",
+                    'description' => 'Quotation status: '.str_replace('_', ' ', $quotation->status).'.',
+                    'amount' => (float) $quotation->grand_total,
+                    'occurred_at' => optional($quotation->quote_date ?? $quotation->created_at)->toISOString(),
+                ]);
+            });
+
+        InventoryMovement::query()
+            ->with(['items.product:id,product_name'])
+            ->where('customer_id', $customer->id)
+            ->where('movement_type', 'out')
+            ->whereNotNull('dispatch_id')
+            ->latest('movement_date')
+            ->limit(100)
+            ->get()
+            ->each(function (InventoryMovement $movement) use ($timeline): void {
+                $products = $movement->items
+                    ->map(fn ($item): string => ($item->product?->product_name ?? 'Product').' × '.(float) $item->quantity)
+                    ->implode(', ');
+                $timeline->push([
+                    'id' => "purchase-{$movement->id}",
+                    'type' => 'purchase',
+                    'title' => 'Purchase dispatched',
+                    'description' => $products,
+                    'occurred_at' => optional($movement->movement_date)->toISOString(),
+                ]);
+            });
+
+        $leadQuery = Lead::query()
+            ->when(
+                filled($customer->phone) || filled($customer->email),
+                function (Builder $query) use ($customer): void {
+                    $query->where(function (Builder $match) use ($customer): void {
+                        if (filled($customer->phone)) {
+                            $match->where('phone', $customer->phone);
+                        }
+                        if (filled($customer->email)) {
+                            filled($customer->phone)
+                                ? $match->orWhere('email', $customer->email)
+                                : $match->where('email', $customer->email);
+                        }
+                    });
+                },
+                fn (Builder $query) => $query->whereRaw('1 = 0')
+            );
+
+        if ($viewer && ! $viewer->hasAnyRole(['admin'])) {
+            $leadQuery->where('assigned_to', $viewer->id);
+        }
+
+        $leads = $leadQuery->latest('id')->limit(100)->get();
+        $leads->each(function (Lead $lead) use ($timeline): void {
+            $timeline->push([
+                'id' => "enquiry-{$lead->id}",
+                'type' => 'enquiry',
+                'title' => 'Enquiry: '.($lead->name ?: 'Lead'),
+                'description' => $lead->requirement ?: 'No requirement recorded.',
+                'occurred_at' => optional($lead->created_at)->toISOString(),
+            ]);
+        });
+
+        if ($leads->isNotEmpty()) {
+            ActivityLog::query()
+                ->where('module', 'leads')
+                ->where('entity_type', 'lead')
+                ->whereIn('entity_id', $leads->pluck('id'))
+                ->latest('created_at')
+                ->limit(150)
+                ->get()
+                ->each(function (ActivityLog $activity) use ($timeline): void {
+                    $actor = $activity->new_values['actor']['name'] ?? null;
+                    $timeline->push([
+                        'id' => "activity-{$activity->id}",
+                        'type' => 'activity',
+                        'title' => ucfirst(str_replace('_', ' ', $activity->action)),
+                        'description' => $activity->description ?: 'Lead activity recorded.',
+                        'actor' => $actor,
+                        'occurred_at' => optional($activity->created_at)->toISOString(),
+                    ]);
+                });
+        }
+
+        return [
+            'owned_products' => $ownedProducts->values(),
+            'timeline' => $timeline
+                ->filter(fn (array $item): bool => filled($item['occurred_at'] ?? null))
+                ->sortByDesc('occurred_at')
+                ->take(200)
+                ->values(),
+        ];
+    }
+
+    public function addOwnedProduct(Customer $customer, array $data, ?User $actor): CustomerOwnedProduct
+    {
+        return DB::transaction(function () use ($customer, $data, $actor): CustomerOwnedProduct {
+            $identity = ['customer_id' => $customer->id];
+            if (! empty($data['product_id'])) {
+                $identity['product_id'] = $data['product_id'];
+            }
+
+            $owned = ! empty($data['product_id'])
+                ? CustomerOwnedProduct::query()->firstOrNew($identity)
+                : new CustomerOwnedProduct(['customer_id' => $customer->id]);
+            $owned->product_description = filled($data['product_description'] ?? null)
+                ? trim($data['product_description'])
+                : $owned->product_description;
+            $owned->quantity = (float) ($owned->quantity ?? 0) + (float) $data['quantity'];
+            $owned->created_by ??= $actor?->id;
+            $owned->save();
+
+            return $owned;
+        });
+    }
+
+    public function removeOwnedProduct(Customer $customer, int|string $ownedProductId): void
+    {
+        $customer->ownedProducts()->whereKey($ownedProductId)->firstOrFail()->delete();
     }
 
     private function syncCustomFields(Customer $customer, array $customFields): void

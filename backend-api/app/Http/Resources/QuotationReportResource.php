@@ -31,7 +31,7 @@ class QuotationReportResource extends JsonResource
             'created_by' => $this->created_by,
             'creator' => $this->whenLoaded('creator', fn () => [
                 'id' => $this->creator?->id,
-                'name' => $this->creator?->name,
+                'name' => $this->creator?->name ?: $this->created_by_name,
                 'email' => $this->creator?->email,
             ]),
             'subtotal_before_discount' => $this->subtotal_before_discount,

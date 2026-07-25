@@ -29,6 +29,8 @@ class LeadIndexRequest extends FormRequest
             'assigned_to.*' => ['required', 'integer', 'exists:users,id'],
             'follow_up_from' => ['sometimes', 'nullable', 'date'],
             'follow_up_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:follow_up_from'],
+            'sort_by' => ['sometimes', Rule::in(['name', 'lead_source', 'assigned_to', 'follow_up_date', 'created_at', 'status'])],
+            'sort_direction' => ['sometimes', Rule::in(['asc', 'desc'])],
         ];
     }
 }

@@ -3,12 +3,43 @@
 namespace App\Services;
 
 use App\Models\Quotation;
+use App\Models\Leaderboard;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class ReportService
 {
+    public function leaderboardReport(string $date, string $period): array
+    {
+        $rows = Leaderboard::query()
+            ->with('user:id,name,designation')
+            ->whereDate('snapshot_date', $date)
+            ->where('period_type', $period)
+            ->orderByDesc('score')
+            ->orderBy('user_id')
+            ->get();
+
+        return [
+            'snapshot_date' => $date,
+            'period' => $period,
+            'period_start' => optional($rows->first()?->period_start)->toDateString(),
+            'period_end' => optional($rows->first()?->period_end)->toDateString(),
+            'calculated_at' => optional($rows->first()?->calculated_at)->toISOString(),
+            'rows' => $rows->map(fn (Leaderboard $row): array => [
+                'user_id' => $row->user_id,
+                'user_name' => $row->user_name ?: ($row->user?->name ?? 'Deleted User'),
+                'designation' => $row->user_designation ?: $row->user?->designation,
+                'total_due_follow_ups' => $row->total_due_follow_ups,
+                'follow_ups_done' => $row->follow_ups_done,
+                'success' => $row->success_count,
+                'failed' => $row->failed_count,
+                'pending_follow_ups' => $row->pending_follow_ups,
+                'score' => $row->score,
+            ])->values(),
+        ];
+    }
+
     public function quotationReport(Request $request): LengthAwarePaginator
     {
         return $this->quotationQuery($request)
@@ -83,7 +114,7 @@ class ReportService
             'customer_name' => $quotation->customer?->primary_name,
             'company_name' => $quotation->customer?->company_name,
             'salesperson_name' => $quotation->salesperson_name,
-            'created_by' => $quotation->creator?->name,
+            'created_by' => $quotation->creator?->name ?: $quotation->created_by_name,
             'subtotal_before_discount' => $quotation->subtotal_before_discount,
             'total_line_discount' => $quotation->total_line_discount,
             'subtotal_after_discount' => $quotation->subtotal_after_discount,

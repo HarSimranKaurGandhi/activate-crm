@@ -22,8 +22,12 @@ export const QuotationList = () => {
   });
 
   const filteredQuotations = useMemo(() => quotations.filter(q => {
-    const matchesSearch = q.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         q.customer.company.toLowerCase().includes(searchTerm.toLowerCase());
+    const search = searchTerm.trim().toLowerCase();
+    const matchesSearch = !search || [
+      q.number,
+      q.customer?.name,
+      q.customer?.company,
+    ].some((value) => String(value || '').toLowerCase().includes(search));
     const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
 
     let matchesDate = true;
@@ -150,7 +154,7 @@ export const QuotationList = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search quotations..."
+                  placeholder="Search quotation, client, or company..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -202,7 +206,7 @@ export const QuotationList = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search quotations..."
+                  placeholder="Search quotation, client, or company..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

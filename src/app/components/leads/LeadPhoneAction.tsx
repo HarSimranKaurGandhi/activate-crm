@@ -7,15 +7,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 interface LeadPhoneActionProps {
   leadId: string;
   phone?: string;
+  followUpDate?: string;
   onActivitySaved?: (activity: any) => void;
+  onFollowUpDateChanged?: (date: string) => void;
 }
 
-export const LeadPhoneAction = ({ leadId, phone, onActivitySaved }: LeadPhoneActionProps) => {
+export const LeadPhoneAction = ({ leadId, phone, followUpDate, onActivitySaved, onFollowUpDateChanged }: LeadPhoneActionProps) => {
   const [revealed, setRevealed] = useState(false);
   const [open, setOpen] = useState(false);
   const [activityId, setActivityId] = useState('');
   const [connected, setConnected] = useState<boolean | null>(null);
   const [notes, setNotes] = useState('');
+  const [nextFollowUpDate, setNextFollowUpDate] = useState(followUpDate || '');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -29,6 +32,9 @@ export const LeadPhoneAction = ({ leadId, phone, onActivitySaved }: LeadPhoneAct
       const activity = await leadService.startCall(leadId);
       setActivityId(String(activity.id));
       setRevealed(true);
+      setConnected(null);
+      setNotes('');
+      setNextFollowUpDate(followUpDate || '');
       setOpen(true);
       onActivitySaved?.(activity);
     } catch {
@@ -49,8 +55,11 @@ export const LeadPhoneAction = ({ leadId, phone, onActivitySaved }: LeadPhoneAct
     }
     setSaving(true);
     try {
-      const activity = await leadService.resolveCall(leadId, activityId, connected, notes.trim());
+      const activity = await leadService.resolveCall(leadId, activityId, connected, notes.trim(), nextFollowUpDate);
       onActivitySaved?.(activity);
+      if (activity.follow_up_date) {
+        onFollowUpDateChanged?.(activity.follow_up_date);
+      }
       setOpen(false);
       toast.success('Call outcome saved');
     } catch {
@@ -77,7 +86,14 @@ export const LeadPhoneAction = ({ leadId, phone, onActivitySaved }: LeadPhoneAct
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent onClick={(event) => event.stopPropagation()} className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Was the call connected?</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="space-y-2">
+              <span className="flex items-center gap-2 text-lg font-semibold text-blue-600">
+                <Phone className="h-5 w-5" /> {phone}
+              </span>
+              <span className="block text-lg font-semibold text-gray-900">Was the call connected?</span>
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <button type="button" onClick={() => setConnected(true)}
@@ -96,6 +112,15 @@ export const LeadPhoneAction = ({ leadId, phone, onActivitySaved }: LeadPhoneAct
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             )}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Follow Up Date</label>
+              <input
+                type="date"
+                value={nextFollowUpDate}
+                onChange={(event) => setNextFollowUpDate(event.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
             <div className="flex justify-end">
               <button type="button" onClick={saveOutcome} disabled={saving}
                 className="rounded-xl bg-blue-600 px-5 py-2.5 text-white hover:bg-blue-700 disabled:opacity-60">

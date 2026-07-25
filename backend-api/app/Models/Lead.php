@@ -22,6 +22,8 @@ class Lead extends Model
         'expected_order_value',
         'expected_closure',
         'status',
+        'failure_reason',
+        'failure_reason_details',
         'tags',
         'follow_up_date',
         'assigned_to',

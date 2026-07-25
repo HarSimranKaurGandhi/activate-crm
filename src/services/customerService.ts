@@ -22,4 +22,17 @@ export const customerService = {
   async quotations(id: string, params: Record<string, unknown> = {}) {
     return unwrapEnvelope<any[]>(await apiClient.get(`/customers/${id}/quotations`, { params }));
   },
+  async overview(id: string) {
+    return unwrap<any>(await apiClient.get(`/customers/${id}/overview`));
+  },
+  async addOwnedProduct(id: string, productId: string, description: string, quantity: number) {
+    return unwrap<any>(await apiClient.post(`/customers/${id}/owned-products`, {
+      product_id: productId ? Number(productId) : null,
+      product_description: description.trim() || null,
+      quantity,
+    }));
+  },
+  async removeOwnedProduct(id: string, ownedProductId: string) {
+    return unwrap<any>(await apiClient.delete(`/customers/${id}/owned-products/${ownedProductId}`));
+  },
 };

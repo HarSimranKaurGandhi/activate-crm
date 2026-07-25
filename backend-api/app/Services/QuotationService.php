@@ -65,6 +65,9 @@ class QuotationService extends CrudService
             $data['show_uom_to_customer'] = $data['show_uom_to_customer'] ?? false;
             $data['show_brand_banner_to_customer'] = $data['show_brand_banner_to_customer'] ?? false;
             $data['brand_banner_id'] = ($data['show_brand_banner_to_customer'] ?? false) ? ($data['brand_banner_id'] ?? null) : null;
+            if (! empty($data['created_by'])) {
+                $data['created_by_name'] = User::query()->whereKey($data['created_by'])->value('name');
+            }
             $data = $this->sanitizeForCurrentSchema($data);
 
             $quotation = Quotation::create($data);
@@ -126,6 +129,7 @@ class QuotationService extends CrudService
             $copy->quotation_number = $this->nextQuotationNumber();
             $copy->status = 'draft';
             $copy->created_by = $userId;
+            $copy->created_by_name = User::query()->whereKey($userId)->value('name');
             $copy->save();
 
             foreach ($quotation->items as $item) {

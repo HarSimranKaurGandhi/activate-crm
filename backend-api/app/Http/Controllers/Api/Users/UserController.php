@@ -7,6 +7,7 @@ use App\Http\Requests\Common\StatusRequest;
 use App\Http\Requests\Users\StoreUserRequest;
 use App\Http\Requests\Users\UserIndexRequest;
 use App\Http\Requests\Users\UpdateUserRequest;
+use App\Http\Requests\Users\DeleteUserRequest;
 use App\Http\Resources\UserDropdownResource;
 use App\Http\Resources\UserResource;
 use App\Services\UserService;
@@ -64,11 +65,14 @@ class UserController extends ApiController
         );
     }
 
-    public function destroy(int|string $id): JsonResponse
+    public function destroy(DeleteUserRequest $request, int|string $id): JsonResponse
     {
-        $this->users->delete($this->users->find($id));
+        $user = $this->users->find($id);
+        $replacement = $this->users->find($request->integer('replacement_user_id'));
 
-        return $this->ok('User deleted successfully');
+        $this->users->deleteAndReassign($user, $replacement, $request->user());
+
+        return $this->ok('User deleted and assigned work transferred successfully');
     }
 
     public function status(StatusRequest $request, int|string $id): JsonResponse

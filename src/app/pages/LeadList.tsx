@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowUpDown, ChevronDown, Filter, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, Filter, Plus, Search, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls } from '../components/common/Pagination';
@@ -14,9 +14,11 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import { LeadPhoneAction } from '../components/leads/LeadPhoneAction';
+import { LeadBulkUploadDialog } from '../components/leads/LeadBulkUploadDialog';
 import { leadService } from '../../services/leadService';
 import { mapLead } from '../../services/mappers';
 import { userService } from '../../services/userService';
+import { useAuth } from '../auth/AuthContext';
 
 const LEAD_SOURCE_OPTIONS = [
   { value: 'walk_in', label: 'Walk In' },
@@ -106,6 +108,8 @@ const filterTriggerLabel = (label: string, selected: string[], options: Array<{ 
 };
 
 export const LeadList = () => {
+  const { user } = useAuth();
+  const isAdmin = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase() === 'admin';
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<any[]>([]);
@@ -117,14 +121,16 @@ export const LeadList = () => {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
-  const [filters, setFilters] = useState({
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [filters, setFilters] = useState(() => ({
     search: '',
     leadSources: [] as string[],
     statuses: [] as string[],
-    assignedTo: [] as string[],
+    assignedTo: isAdmin && user?.id ? [String(user.id)] : [] as string[],
     showClosed: false,
-  });
-  const [sort, setSort] = useState<{ key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'status'; direction: 'asc' | 'desc' }>({
+  }));
+  const [sort, setSort] = useState<{ key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'createdAt' | 'status'; direction: 'asc' | 'desc' }>({
     key: 'followUpDate',
     direction: 'asc',
   });
@@ -135,7 +141,16 @@ export const LeadList = () => {
   };
 
   const updateLeadInList = (updatedLead: any) => {
-    setLeads((current) => current.map((lead) => (lead.id === updatedLead.id ? updatedLead : lead)));
+    const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
+    const remainsVisible = role === 'admin' || String(updatedLead.assignedTo || '') === String(user?.id || '');
+
+    setLeads((current) => remainsVisible
+      ? current.map((lead) => (lead.id === updatedLead.id ? updatedLead : lead))
+      : current.filter((lead) => lead.id !== updatedLead.id));
+
+    if (!remainsVisible) {
+      setTotalItems((current) => Math.max(0, current - 1));
+    }
   };
 
   const handleDelete = async (leadId: string) => {
@@ -178,6 +193,13 @@ export const LeadList = () => {
           ...(filters.leadSources.length > 0 ? { lead_source: filters.leadSources } : {}),
           ...(filters.statuses.length > 0 ? { status: filters.statuses } : {}),
           ...(filters.assignedTo.length > 0 ? { assigned_to: filters.assignedTo } : {}),
+          sort_by: {
+            leadSource: 'lead_source',
+            assignedTo: 'assigned_to',
+            followUpDate: 'follow_up_date',
+            createdAt: 'created_at',
+          }[sort.key] || sort.key,
+          sort_direction: sort.direction,
         });
 
         const pagination = result.meta?.pagination;
@@ -192,11 +214,11 @@ export const LeadList = () => {
     };
 
     void loadLeads();
-  }, [filters, page, pageSize]);
+  }, [filters, page, pageSize, sort, reloadKey]);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.search, filters.leadSources, filters.statuses, filters.assignedTo, filters.showClosed]);
+  }, [filters.search, filters.leadSources, filters.statuses, filters.assignedTo, filters.showClosed, sort.key, sort.direction]);
 
   useEffect(() => {
     if (filters.showClosed) {
@@ -216,35 +238,9 @@ export const LeadList = () => {
     });
   }, [filters.showClosed]);
 
-  const sortedLeads = useMemo(() => {
-    const valueForSort = (lead: any) => {
-      switch (sort.key) {
-        case 'name':
-          return (lead.name || '').toLowerCase();
-        case 'leadSource':
-          return sourceLabel(lead.leadSource).toLowerCase();
-        case 'assignedTo':
-          return (lead.assignedUser?.name || '').toLowerCase();
-        case 'followUpDate':
-          return lead.followUpDate ? new Date(lead.followUpDate).getTime() : Number.MAX_SAFE_INTEGER;
-        case 'status':
-          return statusLabel(lead.status).toLowerCase();
-        default:
-          return '';
-      }
-    };
+  const sortedLeads = leads;
 
-    return [...leads].sort((a, b) => {
-      const aValue = valueForSort(a);
-      const bValue = valueForSort(b);
-
-      if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [leads, sort]);
-
-  const toggleSort = (key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'status') => {
+  const toggleSort = (key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'createdAt' | 'status') => {
     setSort((current) => ({
       key,
       direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
@@ -257,7 +253,7 @@ export const LeadList = () => {
     align = 'left',
   }: {
     label: string;
-    sortKey: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'status';
+    sortKey: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'createdAt' | 'status';
     align?: 'left' | 'right';
   }) => (
     <button
@@ -301,6 +297,14 @@ export const LeadList = () => {
               />
               Show Closed leads
             </label>
+            <button
+              type="button"
+              onClick={() => setIsBulkUploadOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-5 py-3 font-medium text-blue-700 transition-colors hover:bg-blue-50 sm:w-auto"
+            >
+              <Upload className="h-5 w-5" />
+              Bulk Upload
+            </button>
             <button
               onClick={() => navigate('/leads/new')}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto"
@@ -559,7 +563,16 @@ export const LeadList = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="break-words text-base font-semibold text-gray-900">{lead.name}</div>
-                      <div className="mt-1"><LeadPhoneAction leadId={String(lead.id)} phone={lead.phone} /></div>
+                      <div className="mt-1">
+                        <LeadPhoneAction
+                          leadId={String(lead.id)}
+                          phone={lead.phone}
+                          followUpDate={lead.followUpDate}
+                          onFollowUpDateChanged={(date) => setLeads((current) => current.map((item) =>
+                            item.id === lead.id ? { ...item, followUpDate: date } : item
+                          ))}
+                        />
+                      </div>
                       {lead.email && <div className="break-words text-sm text-gray-500">{lead.email}</div>}
                     </div>
                     <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[lead.status] || statusBadgeClass.new}`}>
@@ -619,7 +632,7 @@ export const LeadList = () => {
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Assigned To" sortKey="assignedTo" /></th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Requirement</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Follow Up" sortKey="followUpDate" /></th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Created On</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Created On" sortKey="createdAt" /></th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600">Last Updated On</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Status" sortKey="status" /></th>
                     <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-gray-600">Actions</th>
@@ -634,7 +647,16 @@ export const LeadList = () => {
                     >
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{lead.name}</div>
-                        <div className="mt-1"><LeadPhoneAction leadId={String(lead.id)} phone={lead.phone} /></div>
+                        <div className="mt-1">
+                          <LeadPhoneAction
+                            leadId={String(lead.id)}
+                            phone={lead.phone}
+                            followUpDate={lead.followUpDate}
+                            onFollowUpDateChanged={(date) => setLeads((current) => current.map((item) =>
+                              item.id === lead.id ? { ...item, followUpDate: date } : item
+                            ))}
+                          />
+                        </div>
                         {lead.email && <div className="text-sm text-gray-500">{lead.email}</div>}
                       </td>
                       <td className="px-6 py-4 text-gray-700">{sourceLabel(lead.leadSource)}</td>
@@ -701,6 +723,15 @@ export const LeadList = () => {
           }
         }}
         onSaved={updateLeadInList}
+      />
+      <LeadBulkUploadDialog
+        open={isBulkUploadOpen}
+        users={users}
+        onClose={() => setIsBulkUploadOpen(false)}
+        onUploaded={() => {
+          setPage(1);
+          setReloadKey((current) => current + 1);
+        }}
       />
     </div>
   );

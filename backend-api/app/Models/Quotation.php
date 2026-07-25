@@ -16,7 +16,7 @@ class Quotation extends Model
         'show_discount_to_customer', 'show_mrp_to_customer', 'show_item_wise_gst_to_customer', 'round_off_net_amount_to_customer', 'show_uom_to_customer', 'show_brand_banner_to_customer', 'brand_banner_id', 'default_discount_percent', 'default_discount_amount',
         'intro_text', 'remarks', 'internal_notes', 'subtotal_before_discount',
         'total_line_discount', 'subtotal_after_discount', 'total_adjustments',
-        'total_tax', 'grand_total', 'status', 'internal_remarks', 'created_by', 'approved_by',
+        'total_tax', 'grand_total', 'status', 'internal_remarks', 'created_by', 'created_by_name', 'approved_by',
         'approved_at', 'rejected_reason',
     ];
 

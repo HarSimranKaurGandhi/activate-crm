@@ -2,12 +2,17 @@
 
 namespace App\Services;
 
+use App\Models\Lead;
+use App\Models\Task;
 use App\Models\User;
+use App\Models\Quotation;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class UserService extends CrudService
 {
@@ -66,6 +71,37 @@ class UserService extends CrudService
         $model->update(['is_active' => $isActive]);
 
         return $model->refresh()->load($this->relations);
+    }
+
+    public function deleteAndReassign(User $user, User $replacement, ?User $actor = null): void
+    {
+        if ($actor?->is($user)) {
+            throw ValidationException::withMessages([
+                'user' => ['You cannot delete your own logged-in account.'],
+            ]);
+        }
+
+        if ($user->is($replacement)) {
+            throw ValidationException::withMessages([
+                'replacement_user_id' => ['The replacement must be a different user.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($user, $replacement): void {
+            Lead::query()
+                ->where('assigned_to', $user->id)
+                ->update(['assigned_to' => $replacement->id]);
+
+            Task::query()
+                ->where('assigned_to', $user->id)
+                ->update(['assigned_to' => $replacement->id]);
+
+            Quotation::query()
+                ->where('created_by', $user->id)
+                ->update(['created_by' => $replacement->id]);
+
+            $user->delete();
+        });
     }
 
     protected function applyFilters(Builder $query, Request $request): Builder

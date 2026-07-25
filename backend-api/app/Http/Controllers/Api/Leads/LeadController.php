@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Leads;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Leads\LeadCommentRequest;
 use App\Http\Requests\Leads\LeadCallOutcomeRequest;
+use App\Http\Requests\Leads\LeadBulkUploadRequest;
 use App\Http\Requests\Leads\LeadIndexRequest;
 use App\Http\Requests\Leads\LeadRequest;
 use App\Http\Resources\LeadActivityResource;
@@ -13,6 +14,7 @@ use App\Services\LeadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LeadController extends ApiController
 {
@@ -41,6 +43,29 @@ class LeadController extends ApiController
             [],
             201
         );
+    }
+
+    public function bulkUpload(LeadBulkUploadRequest $request): JsonResponse
+    {
+        return $this->ok(
+            'Lead bulk upload processed',
+            $this->leads->bulkImportCsv(
+                $request->file('file')->getRealPath(),
+                $request->user(),
+                $request->ip(),
+            ),
+        );
+    }
+
+    public function bulkSample(): StreamedResponse
+    {
+        $content = $this->leads->bulkSampleCsv();
+
+        return response()->streamDownload(function () use ($content): void {
+            echo $content;
+        }, 'lead_bulk_upload_template.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
     }
 
     public function show(int|string $id): JsonResponse
@@ -98,7 +123,14 @@ class LeadController extends ApiController
 
         return $this->ok(
             'Lead call outcome saved successfully',
-            $this->leads->resolveCall($lead, $activityId, $request->boolean('connected'), $request->input('notes'), $request->user()),
+            $this->leads->resolveCall(
+                $lead,
+                $activityId,
+                $request->boolean('connected'),
+                $request->input('notes'),
+                $request->input('follow_up_date'),
+                $request->user()
+            ),
         );
     }
 

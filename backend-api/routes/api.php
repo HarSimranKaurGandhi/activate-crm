@@ -35,6 +35,7 @@ Route::prefix('auth')->group(function (): void {
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('dashboard/quotation-summary', [DashboardController::class, 'quotationSummary']);
+    Route::get('dashboard/leaderboard', [DashboardController::class, 'leaderboard']);
     Route::get('users/dropdown', [UserController::class, 'dropdown']);
 
     Route::middleware('role:admin')->group(function (): void {
@@ -121,6 +122,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('customers', [CustomerController::class, 'index']);
     Route::post('customers', [CustomerController::class, 'store']);
     Route::get('customers/{id}/quotations', [CustomerController::class, 'quotations']);
+    Route::get('customers/{id}/overview', [CustomerController::class, 'overview']);
+    Route::post('customers/{id}/owned-products', [CustomerController::class, 'addOwnedProduct']);
+    Route::delete('customers/{id}/owned-products/{ownedProductId}', [CustomerController::class, 'removeOwnedProduct']);
     Route::delete('customers/{id}', [CustomerController::class, 'destroy']);
     Route::patch('customers/{id}/status', [CustomerController::class, 'status']);
     Route::get('customers/{id}', [CustomerController::class, 'show']);
@@ -133,6 +137,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::delete('tasks/{id}', [TaskController::class, 'destroy'])->middleware('role:admin');
 
     Route::get('leads', [LeadController::class, 'index']);
+    Route::get('leads/bulk-sample', [LeadController::class, 'bulkSample']);
+    Route::post('leads/bulk-upload', [LeadController::class, 'bulkUpload']);
     Route::post('leads', [LeadController::class, 'store']);
     Route::delete('leads/{id}', [LeadController::class, 'destroy']);
     Route::get('leads/{id}/activity', [LeadController::class, 'activity']);
@@ -172,6 +178,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::get('reports/quotations', [ReportController::class, 'quotations']);
     Route::get('reports/quotations/export', [ReportController::class, 'export']);
+    Route::get('reports/leaderboard', [ReportController::class, 'leaderboard']);
 
     Route::get('activity-logs', [ActivityLogController::class, 'index']);
 });

@@ -8,6 +8,7 @@ use App\Models\InventoryStock;
 use App\Models\Dispatch;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\CustomerOwnedProduct;
 use App\Support\PublicAsset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -134,6 +135,18 @@ class InventoryService
             }
             if (! empty($data['dispatch_id']) && $data['movement_type'] === 'out') {
                 Dispatch::query()->whereKey($data['dispatch_id'])->update(['status' => 'dispatched']);
+                foreach ($movement->items as $item) {
+                    $owned = CustomerOwnedProduct::query()->firstOrNew([
+                        'customer_id' => $movement->customer_id,
+                        'product_id' => $item->product_id,
+                    ]);
+                    $owned->quantity = (float) ($owned->quantity ?? 0) + (float) $item->quantity;
+                    $owned->first_purchased_at ??= $movement->movement_date;
+                    $owned->last_purchased_at = $movement->movement_date;
+                    $owned->source_dispatch_id = $movement->dispatch_id;
+                    $owned->created_by ??= $user?->id;
+                    $owned->save();
+                }
             }
             return $movement->load('items');
         });

@@ -7,6 +7,7 @@ import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
 import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
 import { sortItems } from '../utils/sort';
+import { CustomerDetailsDialog } from '../components/customers/CustomerDetailsDialog';
 
 export const CustomerList = () => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export const CustomerList = () => {
     rating: 'all',
   });
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: 'company' | 'name' | 'phone' | 'location' | 'rating'; direction: SortDirection }>({
     key: 'company',
     direction: 'asc',
@@ -259,7 +261,7 @@ export const CustomerList = () => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {pagination.pageItems.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-gray-50">
+                  <tr key={customer.id} onClick={() => setSelectedCustomerId(customer.id)} className="cursor-pointer hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{customer.company || '-'}</div>
                       <div className="text-sm text-gray-500">{customer.email || '-'}</div>
@@ -271,14 +273,15 @@ export const CustomerList = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => navigate(`/customers/${customer.id}/edit`)}
+                          onClick={(event) => { event.stopPropagation(); navigate(`/customers/${customer.id}/edit`); }}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={async () => {
+                          onClick={async (event) => {
+                            event.stopPropagation();
                             if (confirm('Delete this customer permanently?')) {
                               await deleteCustomer(customer.id);
                               toast.success('Customer deleted');
@@ -311,6 +314,11 @@ export const CustomerList = () => {
           )}
         </div>
       </div>
+      <CustomerDetailsDialog
+        customerId={selectedCustomerId}
+        open={Boolean(selectedCustomerId)}
+        onOpenChange={(open) => { if (!open) setSelectedCustomerId(null); }}
+      />
     </div>
   );
 };

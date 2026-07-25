@@ -39,4 +39,9 @@ class Customer extends Model
     {
         return $this->hasMany(Quotation::class);
     }
+
+    public function ownedProducts(): HasMany
+    {
+        return $this->hasMany(CustomerOwnedProduct::class);
+    }
 }

@@ -305,6 +305,8 @@ export const mapLead = (lead: any) => ({
   expectedOrderValue: lead.expected_order_value || '',
   expectedClosure: normalizeExpectedClosure(lead.expected_closure),
   status: (lead.status || 'new') as LeadStatus,
+  failureReason: lead.failure_reason || '',
+  failureReasonDetails: lead.failure_reason_details || '',
   tags: Array.isArray(lead.tags) ? lead.tags : [],
   followUpDate: lead.follow_up_date || '',
   assignedTo: lead.assigned_to ? String(lead.assigned_to) : '',
@@ -344,6 +346,10 @@ export const leadPayload = (lead: any) => ({
   expected_order_value: lead.expectedOrderValue || null,
   expected_closure: normalizeExpectedClosure(lead.expectedClosure) || null,
   status: lead.status || 'new',
+  failure_reason: lead.status === 'closed_fail' ? lead.failureReason || null : null,
+  failure_reason_details: lead.status === 'closed_fail' && lead.failureReason === 'other'
+    ? lead.failureReasonDetails || null
+    : null,
   tags: Array.isArray(lead.tags) ? lead.tags.filter(Boolean) : [],
   follow_up_date: lead.followUpDate || null,
   assigned_to: lead.assignedTo ? Number(lead.assignedTo) : null,

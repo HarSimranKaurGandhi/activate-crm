@@ -17,7 +17,7 @@ class CustomerRequest extends FormRequest
             'primary_name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['required', 'string', 'max:20'],
+            'phone' => ['required', 'digits:10'],
             'address_line_1' => ['required', 'string', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:100'],
@@ -31,6 +31,13 @@ class CustomerRequest extends FormRequest
             'custom_fields.*.field_definition_id' => ['nullable', 'required_without:custom_fields.*.field_key', 'exists:customer_field_definitions,id'],
             'custom_fields.*.field_key' => ['nullable', 'required_without:custom_fields.*.field_definition_id', 'exists:customer_field_definitions,field_key'],
             'custom_fields.*.value' => ['nullable'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'phone.digits' => 'Phone number must contain exactly 10 digits.',
         ];
     }
 }

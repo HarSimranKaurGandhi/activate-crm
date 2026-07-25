@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router';
-import { AlertTriangle, Clock, FileText, ListChecks, PhoneCall, Search } from 'lucide-react';
+import { AlertTriangle, Clock, FileText, ListChecks, PhoneCall, Search, Trophy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { dashboardService } from '../../services/dashboardService';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
@@ -24,6 +24,9 @@ export const Dashboard = () => {
   const { user } = useAuth();
   const [summary, setSummary] = useState(emptySummary);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState<'today' | 'week' | 'month'>('today');
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [filters, setFilters] = useState({
     overdueTasks: '',
     todayFollowUps: '',
@@ -42,6 +45,15 @@ export const Dashboard = () => {
       .catch(() => setSummary(emptySummary))
       .finally(() => setSummaryLoading(false));
   }, [isAdmin, viewScope]);
+
+  useEffect(() => {
+    setLeaderboardLoading(true);
+    dashboardService
+      .leaderboard(leaderboardPeriod)
+      .then((result) => setLeaderboard(result.rows || []))
+      .catch(() => setLeaderboard([]))
+      .finally(() => setLeaderboardLoading(false));
+  }, [leaderboardPeriod]);
 
   const isLoading = summaryLoading;
   const formatDate = (value?: string | null) => {
@@ -115,6 +127,7 @@ export const Dashboard = () => {
   const overdueFollowUpsPagination = usePagination(filteredOverdueFollowUps, 10);
   const todayTasksPagination = usePagination(filteredTodayTasks, 10);
   const overdueTasksResolved = !isLoading && summary.overdue_tasks_count === 0;
+  const todayTasksResolved = !isLoading && summary.tasks_due_today_count === 0;
   const overdueFollowUpsResolved = !isLoading && summary.overdue_follow_ups_count === 0;
 
   return (
@@ -155,12 +168,12 @@ export const Dashboard = () => {
           )}
         </div>
 
-        <div className={`grid grid-cols-1 gap-4 sm:gap-6 ${isAdmin ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-9">
           {isAdminView ? (
             <button
               type="button"
               onClick={() => navigate('/quotations/approvals')}
-              className="w-full rounded-2xl border border-gray-200 bg-white p-6 text-left transition-all hover:shadow-lg"
+              className="w-full rounded-2xl border border-gray-200 bg-white p-6 text-left transition-all hover:shadow-lg xl:col-span-2"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -174,7 +187,7 @@ export const Dashboard = () => {
               </div>
             </button>
           ) : (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg">
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg xl:col-span-2">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">My Quotations Awaiting Approval</p>
@@ -187,31 +200,60 @@ export const Dashboard = () => {
               </div>
             </div>
           )}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}</p>
-                <p className="mt-2 text-4xl font-bold text-gray-900">{isLoading ? '...' : summary.tasks_due_today_count}</p>
-                <p className="mt-2 text-sm text-gray-500">{isAdminView ? 'Assigned tasks across all users' : 'Assigned tasks for today'}</p>
-              </div>
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
-                <ListChecks className="h-7 w-7 text-violet-600" />
-              </div>
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all hover:shadow-lg md:col-span-2 xl:col-span-3">
+            <div className="grid h-full grid-cols-2">
+              <button
+                type="button"
+                onClick={() => navigate('/tasks')}
+                className={`flex min-w-0 items-start justify-between gap-2 border-r p-4 text-left transition-colors ${
+                  todayTasksResolved
+                    ? 'border-emerald-200 bg-emerald-50/70 hover:bg-emerald-50'
+                    : 'border-rose-200 bg-rose-50/70 hover:bg-rose-50'
+                }`}
+              >
+                <div>
+                  <p className={`whitespace-nowrap text-sm font-medium ${todayTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}
+                  </p>
+                  <p className={`mt-2 text-3xl font-bold ${todayTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {isLoading ? '...' : summary.tasks_due_today_count}
+                  </p>
+                  <p className={`mt-2 whitespace-nowrap text-xs ${todayTasksResolved ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {todayTasksResolved ? 'No tasks due today' : 'Tasks pending today'}
+                  </p>
+                </div>
+                <div className={`hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl 2xl:flex ${todayTasksResolved ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+                  <ListChecks className={`h-5 w-5 ${todayTasksResolved ? 'text-emerald-600' : 'text-rose-600'}`} />
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/tasks')}
+                className={`flex min-w-0 items-start justify-between gap-2 p-4 text-left transition-colors ${
+                  overdueTasksResolved
+                    ? 'border-emerald-200 bg-emerald-50/70 hover:bg-emerald-50'
+                    : 'border-rose-200 bg-rose-50/70 hover:bg-rose-50'
+                }`}
+              >
+                <div>
+                  <p className={`whitespace-nowrap text-sm font-medium ${overdueTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}
+                  </p>
+                  <p className={`mt-2 text-3xl font-bold ${overdueTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {isLoading ? '...' : summary.overdue_tasks_count}
+                  </p>
+                  <p className={`mt-2 whitespace-nowrap text-xs ${overdueTasksResolved ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {overdueTasksResolved ? 'No past due tasks' : 'Past due tasks pending'}
+                  </p>
+                </div>
+                <div className={`hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl 2xl:flex ${overdueTasksResolved ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+                  <AlertTriangle className={`h-5 w-5 ${overdueTasksResolved ? 'text-emerald-600' : 'text-rose-600'}`} />
+                </div>
+              </button>
             </div>
           </div>
-          <div className={`rounded-2xl bg-white p-6 transition-all hover:shadow-lg ${overdueTasksResolved ? 'border border-emerald-200' : 'border border-rose-200'}`}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className={`text-sm font-medium ${overdueTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</p>
-                <p className={`mt-2 text-4xl font-bold ${overdueTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isLoading ? '...' : summary.overdue_tasks_count}</p>
-                <p className={`mt-2 text-sm ${overdueTasksResolved ? 'text-emerald-600' : 'text-rose-500'}`}>{isAdminView ? 'Incomplete overdue tasks across all users' : 'My incomplete overdue tasks'}</p>
-              </div>
-              <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${overdueTasksResolved ? 'bg-emerald-50' : 'bg-rose-50'}`}>
-                <AlertTriangle className={`h-7 w-7 ${overdueTasksResolved ? 'text-emerald-600' : 'text-rose-600'}`} />
-              </div>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg xl:col-span-2">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">{isAdminView ? `Everyone's Follow Ups Today` : 'My Follow Ups Today'}</p>
@@ -223,7 +265,7 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
-          <div className={`rounded-2xl bg-white p-6 transition-all hover:shadow-lg ${overdueFollowUpsResolved ? 'border border-emerald-200' : 'border border-rose-200'}`}>
+          <div className={`rounded-2xl bg-white p-6 transition-all hover:shadow-lg xl:col-span-2 ${overdueFollowUpsResolved ? 'border border-emerald-200' : 'border border-rose-200'}`}>
             <div className="flex items-start justify-between">
               <div>
                 <p className={`text-sm font-medium ${overdueFollowUpsResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</p>
@@ -237,7 +279,99 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        {!isLoading && (
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <div className="flex flex-col gap-4 border-b border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div>
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                <Trophy className="h-6 w-6 fill-amber-400 text-amber-500" aria-hidden="true" />
+                Leaderboard
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">Performance based on lead follow-up activity.</p>
+            </div>
+            <div className="flex w-fit rounded-xl bg-gray-100 p-1">
+              {[
+                { value: 'today' as const, label: 'TODAY' },
+                { value: 'week' as const, label: 'THIS WEEK' },
+                { value: 'month' as const, label: 'THIS MONTH' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setLeaderboardPeriod(option.value)}
+                  className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
+                    leaderboardPeriod === option.value
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {leaderboardLoading ? (
+            <div className="p-6"><LoadingState label="Loading leaderboard..." /></div>
+          ) : leaderboard.length === 0 ? (
+            <div className="p-6"><EmptyState label="No leaderboard data available." /></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50">
+                  <tr className="border-b border-gray-200">
+                    <th className={tableHeaderClassName}>User</th>
+                    <th className={tableHeaderClassName}>
+                      {leaderboardPeriod === 'today'
+                        ? 'Follow Ups Due Today'
+                        : leaderboardPeriod === 'week'
+                          ? 'Follow Ups Due This Week'
+                          : 'Follow Ups Due This Month'}
+                    </th>
+                    <th className={tableHeaderClassName}>Past Due Follow Ups</th>
+                    <th className={tableHeaderClassName}>
+                      {leaderboardPeriod === 'today'
+                        ? 'Follow Ups Done Today'
+                        : leaderboardPeriod === 'week'
+                          ? 'Follow Ups Done This Week'
+                          : 'Follow Ups Done This Month'}
+                    </th>
+                    <th className={tableHeaderClassName}>Success</th>
+                    <th className={tableHeaderClassName}>Failed</th>
+                    <th className={tableHeaderClassName}>Score</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {leaderboard.map((row, index) => (
+                    <tr key={row.user_id} className={index === 0 ? 'bg-amber-50/50' : 'hover:bg-gray-50'}>
+                      <td className={`${tableCellClassName} font-medium text-gray-900`}>
+                        <span className="mr-2 text-xs font-semibold text-gray-400">#{index + 1}</span>
+                        {row.user_name}
+                        {(row.designation || row.role) && (
+                          <span className="ml-2 text-xs font-normal text-gray-500">
+                            {row.designation || row.role}
+                          </span>
+                        )}
+                      </td>
+                      <td className={tableCellClassName}>{row.total_due_follow_ups}</td>
+                      <td className={tableCellClassName}>{row.pending_follow_ups}</td>
+                      <td className={tableCellClassName}>{row.follow_ups_done}</td>
+                      <td className={`${tableCellClassName} text-emerald-700`}>{row.success}</td>
+                      <td className={`${tableCellClassName} text-rose-700`}>{row.failed}</td>
+                      <td className={`${tableCellClassName} font-semibold text-blue-700`}>
+                        {Number(row.score).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-500 sm:px-6">
+            Score = 10 × Success − 5 × Failed + Follow Ups Done − (Past Due Follow Ups ÷ 2)
+          </div>
+        </div>
+
+        {!isLoading && summary.overdue_tasks.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-rose-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="px-4 pt-4 text-lg font-semibold text-rose-700 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</h3>
@@ -306,7 +440,7 @@ export const Dashboard = () => {
           </div>
         )}
 
-        {!isLoading && (
+        {!isLoading && summary.follow_ups_due_today.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="px-4 pt-4 text-lg font-semibold text-gray-900 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Follow Ups Due Today` : 'My Follow Ups Due Today'}</h3>
@@ -375,7 +509,7 @@ export const Dashboard = () => {
           </div>
         )}
 
-        {!isLoading && (
+        {!isLoading && summary.overdue_follow_ups.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-rose-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="px-4 pt-4 text-lg font-semibold text-rose-700 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</h3>
@@ -444,7 +578,7 @@ export const Dashboard = () => {
           </div>
         )}
 
-        {!isLoading && (
+        {!isLoading && summary.tasks_due_today.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="px-4 pt-4 text-lg font-semibold text-gray-900 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}</h3>

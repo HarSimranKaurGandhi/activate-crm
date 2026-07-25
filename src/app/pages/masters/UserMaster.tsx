@@ -60,6 +60,10 @@ export const UserMaster = () => {
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<any | null>(null);
+  const [replacementUserId, setReplacementUserId] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [formData, setFormData] = useState(emptyForm);
@@ -148,6 +152,38 @@ export const UserMaster = () => {
     await loadData();
   };
 
+  const openDeleteDialog = (user: any) => {
+    setDeletingUser(user);
+    setReplacementUserId('');
+    setDeleteError('');
+  };
+
+  const handleDelete = async () => {
+    if (!deletingUser || !replacementUserId) {
+      setDeleteError('Select a user to receive the leads and tasks.');
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await userService.remove(deletingUser.id, replacementUserId);
+      toast.success('User deleted and assigned work transferred successfully');
+      setDeletingUser(null);
+      setReplacementUserId('');
+      await loadData();
+    } catch (error: any) {
+      setDeleteError(
+        error?.errors?.replacement_user_id?.[0]
+          || error?.errors?.user?.[0]
+          || error?.message
+          || 'Unable to delete user.',
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const toggleSort = (key: typeof sort.key) => {
     setSort((current) => ({
       key,
@@ -221,9 +257,9 @@ export const UserMaster = () => {
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => toggleStatus(user)}
+                    onClick={() => openDeleteDialog(user)}
                     className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
-                    title="Toggle status"
+                    title="Delete user"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -283,8 +319,9 @@ export const UserMaster = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => toggleStatus(user)}
+                        onClick={() => openDeleteDialog(user)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete user"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -411,6 +448,64 @@ export const UserMaster = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deletingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl sm:p-6">
+            <h3 className="text-xl font-semibold text-gray-900">Delete {deletingUser.name}?</h3>
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              This permanently deletes the user. Select who should receive all leads and tasks currently assigned to them.
+            </p>
+
+            <div className="mt-5">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Assign leads and tasks to <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={replacementUserId}
+                onChange={(event) => {
+                  setReplacementUserId(event.target.value);
+                  setDeleteError('');
+                }}
+                className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 ${
+                  deleteError
+                    ? 'border-red-500 focus:ring-red-100'
+                    : 'border-gray-200 focus:ring-blue-500'
+                }`}
+              >
+                <option value="">Select replacement user</option>
+                {users
+                  .filter((user) => user.id !== deletingUser.id && user.status === 'active')
+                  .map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}{user.designation ? ` — ${user.designation}` : ''}
+                    </option>
+                  ))}
+              </select>
+              {deleteError && <p className="mt-2 text-sm text-red-600">{deleteError}</p>}
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setDeletingUser(null)}
+                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting || !replacementUserId}
+                onClick={handleDelete}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Reassign & Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -7,6 +7,7 @@ import { leadService } from '../../services/leadService';
 import { leadPayload, mapLead } from '../../services/mappers';
 import { userService } from '../../services/userService';
 import { useAuth } from '../auth/AuthContext';
+import { LeadFailureReasonDialog, leadFailureReasonLabel } from '../components/leads/LeadFailureReasonDialog';
 
 const LEAD_SOURCE_OPTIONS = [
   { value: 'walk_in', label: 'Walk In' },
@@ -58,6 +59,7 @@ export const LeadForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const [failureDialogOpen, setFailureDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     leadSource: 'walk_in',
     name: '',
@@ -73,6 +75,8 @@ export const LeadForm = () => {
     expectedOrderValue: '',
     expectedClosure: '',
     status: 'new',
+    failureReason: '',
+    failureReasonDetails: '',
     tags: [] as string[],
     followUpDate: defaultFollowUpDate,
     assignedTo: user?.id ? String(user.id) : '',
@@ -104,6 +108,8 @@ export const LeadForm = () => {
           expectedOrderValue: mapped.expectedOrderValue,
           expectedClosure: mapped.expectedClosure,
           status: mapped.status,
+          failureReason: mapped.failureReason,
+          failureReasonDetails: mapped.failureReasonDetails,
           tags: mapped.tags,
           followUpDate: mapped.followUpDate,
           assignedTo: mapped.assignedTo,
@@ -182,6 +188,14 @@ export const LeadForm = () => {
       validationErrors.expected_closure = ['Expected closure is required for in-progress leads.'];
     }
 
+    if (formData.status === 'closed_fail' && !formData.failureReason) {
+      validationErrors.failure_reason = ['Select a failure reason.'];
+    }
+
+    if (formData.status === 'closed_fail' && formData.failureReason === 'other' && !formData.failureReasonDetails.trim()) {
+      validationErrors.failure_reason_details = ['Enter the custom failure reason.'];
+    }
+
     if (!formData.followUpDate) {
       validationErrors.follow_up_date = ['Follow up date is required.'];
     }
@@ -207,6 +221,10 @@ export const LeadForm = () => {
       navigate('/leads');
     } catch (error: any) {
       setErrors(error.errors || {});
+      const duplicatePhoneMessage = error?.errors?.phone?.[0];
+      if (duplicatePhoneMessage) {
+        toast.error(duplicatePhoneMessage);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -260,7 +278,19 @@ export const LeadForm = () => {
                 <label className="mb-2 block text-sm font-medium text-gray-700">Status *</label>
                 <select
                   value={formData.status}
-                  onChange={(event) => setFormData((current) => ({ ...current, status: event.target.value }))}
+                  onChange={(event) => {
+                    const status = event.target.value;
+                    if (status === 'closed_fail') {
+                      setFailureDialogOpen(true);
+                      return;
+                    }
+                    setFormData((current) => ({
+                      ...current,
+                      status,
+                      failureReason: '',
+                      failureReasonDetails: '',
+                    }));
+                  }}
                   className={fieldClassName(Boolean(errors.status?.[0]))}
                 >
                   {LEAD_STATUS_OPTIONS.map((option) => (
@@ -268,6 +298,14 @@ export const LeadForm = () => {
                   ))}
                 </select>
                 {errors.status?.[0] && <p className="mt-1 text-sm text-red-600">{errors.status[0]}</p>}
+                {formData.status === 'closed_fail' && formData.failureReason && (
+                  <button type="button" onClick={() => setFailureDialogOpen(true)}
+                    className="mt-2 block text-left text-sm font-medium text-rose-600 hover:underline">
+                    Failure reason: {leadFailureReasonLabel(formData.failureReason, formData.failureReasonDetails)} — Change
+                  </button>
+                )}
+                {errors.failure_reason?.[0] && <p className="mt-1 text-sm text-red-600">{errors.failure_reason[0]}</p>}
+                {errors.failure_reason_details?.[0] && <p className="mt-1 text-sm text-red-600">{errors.failure_reason_details[0]}</p>}
               </div>
 
             </div>
@@ -275,12 +313,25 @@ export const LeadForm = () => {
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">Phone No.</label>
-                <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={(event) => setFormData((current) => ({ ...current, phone: event.target.value }))}
-                  className={fieldClassName(Boolean(errors.phone?.[0]))}
-                />
+                <div className="flex">
+                  <span className={`inline-flex items-center rounded-l-xl border border-r-0 px-4 text-gray-700 ${
+                    errors.phone?.[0] ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-gray-50'
+                  }`}>
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]{10}"
+                    maxLength={10}
+                    value={formData.phone}
+                    onChange={(event) => setFormData((current) => ({
+                      ...current,
+                      phone: event.target.value.replace(/\D/g, '').slice(0, 10),
+                    }))}
+                    className={`${fieldClassName(Boolean(errors.phone?.[0]))} rounded-l-none`}
+                  />
+                </div>
                 {errors.phone?.[0] && <p className="mt-1 text-sm text-red-600">{errors.phone[0]}</p>}
               </div>
 
@@ -483,6 +534,27 @@ export const LeadForm = () => {
           </form>
         )}
       </div>
+      <LeadFailureReasonDialog
+        open={failureDialogOpen}
+        initialReason={formData.failureReason}
+        initialDetails={formData.failureReasonDetails}
+        onCancel={() => setFailureDialogOpen(false)}
+        onConfirm={(reason, details) => {
+          setFormData((current) => ({
+            ...current,
+            status: 'closed_fail',
+            failureReason: reason,
+            failureReasonDetails: details,
+          }));
+          setFailureDialogOpen(false);
+          setErrors((current) => {
+            const next = { ...current };
+            delete next.failure_reason;
+            delete next.failure_reason_details;
+            return next;
+          });
+        }}
+      />
     </div>
   );
 };

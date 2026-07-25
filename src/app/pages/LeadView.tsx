@@ -168,7 +168,14 @@ export const LeadView = () => {
 
               <div>
                 <div className="mb-1 text-sm font-medium text-gray-500">Phone No.</div>
-                <LeadPhoneAction leadId={String(lead.id)} phone={lead.phone} />
+                <LeadPhoneAction
+                  leadId={String(lead.id)}
+                  phone={lead.phone}
+                  followUpDate={lead.followUpDate}
+                  onFollowUpDateChanged={(date) => setLead((current: any) =>
+                    current ? { ...current, followUpDate: date } : current
+                  )}
+                />
               </div>
 
               <div>

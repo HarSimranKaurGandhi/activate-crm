@@ -22,10 +22,23 @@ export const leadService = {
   async startCall(id: string) {
     return unwrap<any>(await apiClient.post(`/leads/${id}/calls`));
   },
-  async resolveCall(id: string, activityId: string, connected: boolean, notes?: string) {
-    return unwrap<any>(await apiClient.patch(`/leads/${id}/calls/${activityId}`, { connected, notes }));
+  async resolveCall(id: string, activityId: string, connected: boolean, notes?: string, followUpDate?: string) {
+    return unwrap<any>(await apiClient.patch(`/leads/${id}/calls/${activityId}`, {
+      connected,
+      notes,
+      follow_up_date: followUpDate || null,
+    }));
   },
   async remove(id: string) {
     return unwrap<any>(await apiClient.delete(`/leads/${id}`));
+  },
+  async bulkUpload(file: File) {
+    const payload = new FormData();
+    payload.append('file', file);
+    return unwrap<any>(await apiClient.post('/leads/bulk-upload', payload));
+  },
+  async downloadBulkTemplate() {
+    const response = await apiClient.get('/leads/bulk-sample', { responseType: 'blob' });
+    return response.data as Blob;
   },
 };

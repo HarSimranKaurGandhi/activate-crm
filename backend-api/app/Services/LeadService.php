@@ -14,6 +14,10 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class LeadService extends CrudService
 {
@@ -42,6 +46,8 @@ class LeadService extends CrudService
         'expected_order_value' => 'Lead Expected Order Value',
         'expected_closure' => 'Expected Closure',
         'status' => 'Status',
+        'failure_reason' => 'Failure Reason',
+        'failure_reason_details' => 'Failure Details',
         'tags' => 'Tags',
         'follow_up_date' => 'Follow Up Date',
         'assigned_to' => 'Assigned To',
@@ -49,8 +55,25 @@ class LeadService extends CrudService
 
     public function paginate(Request $request): LengthAwarePaginator
     {
-        return $this->applyFilters($this->visibleQuery($request), $request)
-            ->latest('id')
+        $query = $this->applyFilters($this->visibleQuery($request), $request);
+        $sortBy = $request->string('sort_by')->toString() ?: 'follow_up_date';
+        $direction = $request->string('sort_direction')->toString() === 'desc' ? 'desc' : 'asc';
+
+        if ($sortBy === 'assigned_to') {
+            $query->orderBy(
+                User::query()->select('name')->whereColumn('users.id', 'leads.assigned_to'),
+                $direction
+            );
+        } elseif ($sortBy === 'follow_up_date') {
+            $query
+                ->orderByRaw('follow_up_date IS NULL')
+                ->orderBy('follow_up_date', $direction);
+        } else {
+            $query->orderBy($sortBy, $direction);
+        }
+
+        return $query
+            ->orderByDesc('id')
             ->paginate((int) $request->integer('per_page', 15));
     }
 
@@ -64,6 +87,25 @@ class LeadService extends CrudService
     public function create(array $data, ?User $actor = null, ?string $ipAddress = null): Model
     {
         return DB::transaction(function () use ($data, $actor, $ipAddress): Model {
+            $normalizedPhone = $this->normalizePhone($data['phone'] ?? null);
+
+            if ($normalizedPhone !== '') {
+                $duplicateLead = Lead::query()
+                    ->with('assignedUser:id,name')
+                    ->whereNotIn('status', self::CLOSED_STATUSES)
+                    ->whereNotNull('phone')
+                    ->lockForUpdate()
+                    ->get(['id', 'phone', 'assigned_to'])
+                    ->first(fn (Lead $existing): bool => $this->normalizePhone($existing->phone) === $normalizedPhone);
+
+                if ($duplicateLead) {
+                    $assignee = $duplicateLead->assignedUser?->name ?: 'Unassigned';
+                    throw ValidationException::withMessages([
+                        'phone' => ["A lead already exists with the same phone number and is assigned to {$assignee}."],
+                    ]);
+                }
+            }
+
             /** @var Lead $lead */
             $lead = parent::create($data);
 
@@ -80,6 +122,332 @@ class LeadService extends CrudService
 
             return $lead->refresh()->load($this->relations);
         });
+    }
+
+    private function normalizePhone(?string $phone): string
+    {
+        return preg_replace('/\D+/', '', trim((string) $phone)) ?? '';
+    }
+
+    public function bulkImportCsv(string $path, ?User $actor = null, ?string $ipAddress = null): array
+    {
+        @set_time_limit(300);
+
+        $handle = fopen($path, 'r');
+
+        if (! $handle) {
+            throw ValidationException::withMessages(['file' => ['Unable to read the uploaded CSV file.']]);
+        }
+
+        $header = fgetcsv($handle);
+
+        if (! is_array($header)) {
+            fclose($handle);
+            throw ValidationException::withMessages(['file' => ['The uploaded CSV file is empty.']]);
+        }
+
+        $header = array_map(fn ($value): string => $this->normalizeBulkHeader((string) $value), $header);
+        $requiredHeaders = ['name', 'phone', 'requirement', 'assigned_to', 'lead_source'];
+        $missingHeaders = array_values(array_diff($requiredHeaders, $header));
+
+        if ($missingHeaders !== []) {
+            fclose($handle);
+            throw ValidationException::withMessages([
+                'file' => ['Missing mandatory CSV columns: '.implode(', ', $missingHeaders).'.'],
+            ]);
+        }
+
+        $results = [];
+        $rowNumber = 1;
+        $existingPhones = Lead::query()
+            ->with('assignedUser:id,name')
+            ->whereNotIn('status', self::CLOSED_STATUSES)
+            ->whereNotNull('phone')
+            ->get(['id', 'phone', 'assigned_to'])
+            ->mapWithKeys(fn (Lead $lead): array => [
+                $this->normalizePhone($lead->phone) => [
+                    'id' => $lead->id,
+                    'assignee' => $lead->assignedUser?->name ?: 'Unassigned',
+                ],
+            ])
+            ->all();
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNumber++;
+
+            if (count(array_filter($row, fn ($value): bool => trim((string) $value) !== '')) === 0) {
+                continue;
+            }
+
+            if (count($row) > count($header)) {
+                $results[] = $this->bulkFailureResult($rowNumber, '', '', 'CSV row has more values than the header.');
+                continue;
+            }
+
+            $payload = array_combine($header, array_pad($row, count($header), null));
+
+            if (! is_array($payload)) {
+                $results[] = $this->bulkFailureResult($rowNumber, '', '', 'Invalid CSV row structure.');
+                continue;
+            }
+
+            $data = $this->prepareBulkLeadData($payload, $actor);
+            $validator = Validator::make($data, $this->bulkLeadRules(), [
+                'phone.digits' => 'Phone number must contain exactly 10 digits.',
+                'assigned_to.exists' => 'The assignee user ID does not exist.',
+            ]);
+
+            if ($validator->fails()) {
+                $results[] = $this->bulkFailureResult(
+                    $rowNumber,
+                    (string) ($data['name'] ?? ''),
+                    (string) ($data['phone'] ?? ''),
+                    implode(' ', $validator->errors()->all()),
+                );
+                continue;
+            }
+
+            try {
+                $validated = $validator->validated();
+                unset($validated['_raw_phone']);
+
+                if (isset($existingPhones[$validated['phone']])) {
+                    $results[] = $this->bulkFailureResult(
+                        $rowNumber,
+                        (string) $validated['name'],
+                        (string) $validated['phone'],
+                        "A lead already exists with the same phone number and is assigned to {$existingPhones[$validated['phone']]['assignee']}.",
+                    );
+                    continue;
+                }
+
+                $lead = $this->createBulkLead($validated, $actor, $ipAddress);
+                $existingPhones[$validated['phone']] = [
+                    'id' => $lead->id,
+                    'assignee' => $lead->assignedUser?->name ?: 'Unassigned',
+                ];
+                $results[] = [
+                    'row' => $rowNumber,
+                    'name' => $lead->name,
+                    'phone' => $lead->phone,
+                    'status' => 'success',
+                    'message' => 'Lead uploaded successfully.',
+                    'lead_id' => $lead->id,
+                ];
+            } catch (ValidationException $exception) {
+                $results[] = $this->bulkFailureResult(
+                    $rowNumber,
+                    (string) ($data['name'] ?? ''),
+                    (string) ($data['phone'] ?? ''),
+                    implode(' ', Arr::flatten($exception->errors())),
+                );
+            } catch (Throwable) {
+                $results[] = $this->bulkFailureResult(
+                    $rowNumber,
+                    (string) ($data['name'] ?? ''),
+                    (string) ($data['phone'] ?? ''),
+                    'Unable to upload this lead.',
+                );
+            }
+        }
+
+        fclose($handle);
+        $successful = count(array_filter($results, fn (array $result): bool => $result['status'] === 'success'));
+
+        return [
+            'total' => count($results),
+            'successful' => $successful,
+            'failed' => count($results) - $successful,
+            'results' => $results,
+        ];
+    }
+
+    private function createBulkLead(array $data, ?User $actor, ?string $ipAddress): Lead
+    {
+        return DB::transaction(function () use ($data, $actor, $ipAddress): Lead {
+            /** @var Lead $lead */
+            $lead = parent::create($data);
+
+            $this->syncCustomerForClosedSuccess($lead);
+            $this->logActivity(
+                $lead,
+                'created',
+                'Lead created through bulk upload.',
+                [],
+                $this->serializeLeadValues($lead),
+                $actor,
+                $ipAddress,
+            );
+
+            return $lead->refresh()->load($this->relations);
+        });
+    }
+
+    public function bulkSampleCsv(): string
+    {
+        return implode("\n", [
+            'name,phone_no,requirement,assignee_user_id,source,email,address_line_1,address_line_2,city,state,pincode,country,expected_order_value,expected_closure,status,failure_reason,failure_reason_details,tags,follow_up_date',
+            '"Sample Lead","9876543210","Commercial treadmill","REPLACE_WITH_USER_ID","walk_in","lead@example.com","Address 1","","Mohali","Punjab","160055","India","","","new","","","hot",""',
+        ]);
+    }
+
+    private function normalizeBulkHeader(string $header): string
+    {
+        $normalized = strtolower(trim(ltrim($header, "\xEF\xBB\xBF")));
+        $normalized = preg_replace('/[^a-z0-9]+/', '_', $normalized) ?? '';
+        $normalized = trim($normalized, '_');
+
+        return match ($normalized) {
+            'phone_no', 'phone_number', 'mobile', 'mobile_no' => 'phone',
+            'assignee_user_id', 'assignee_id', 'assigned_user_id', 'assignee' => 'assigned_to',
+            'source' => 'lead_source',
+            default => $normalized,
+        };
+    }
+
+    private function prepareBulkLeadData(array $payload, ?User $actor): array
+    {
+        $rawPhone = trim((string) ($payload['phone'] ?? ''));
+        $phone = $this->normalizeBulkPhone($rawPhone);
+
+        $source = strtolower(trim((string) ($payload['lead_source'] ?? '')));
+        $source = str_replace([' ', '-'], '_', $source);
+        $source = match ($source) {
+            'walkin' => 'walk_in',
+            'indiamart' => 'india_mart',
+            default => $source,
+        };
+
+        $status = strtolower(trim((string) ($payload['status'] ?? 'new'))) ?: 'new';
+        $tags = array_values(array_filter(array_map(
+            fn (string $tag): string => strtolower(trim($tag)),
+            preg_split('/[|;,]+/', (string) ($payload['tags'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [],
+        )));
+
+        return [
+            'lead_source' => $source,
+            'name' => trim((string) ($payload['name'] ?? '')),
+            'phone' => $phone,
+            '_raw_phone' => $rawPhone,
+            'email' => $this->nullableBulkValue($payload['email'] ?? null),
+            'address_line_1' => $this->nullableBulkValue($payload['address_line_1'] ?? null),
+            'address_line_2' => $this->nullableBulkValue($payload['address_line_2'] ?? null),
+            'city' => $this->nullableBulkValue($payload['city'] ?? null),
+            'state' => $this->nullableBulkValue($payload['state'] ?? null),
+            'pincode' => $this->nullableBulkValue($payload['pincode'] ?? null),
+            'country' => $this->nullableBulkValue($payload['country'] ?? null),
+            'requirement' => trim((string) ($payload['requirement'] ?? '')),
+            'expected_order_value' => $this->nullableBulkValue($payload['expected_order_value'] ?? null),
+            'expected_closure' => $this->nullableBulkValue($payload['expected_closure'] ?? null),
+            'status' => $status,
+            'failure_reason' => $this->nullableBulkValue($payload['failure_reason'] ?? null),
+            'failure_reason_details' => $this->nullableBulkValue($payload['failure_reason_details'] ?? null),
+            'tags' => $tags,
+            'follow_up_date' => $this->nullableBulkValue($payload['follow_up_date'] ?? null)
+                ?: now()->addDays(2)->toDateString(),
+            'assigned_to' => trim((string) ($payload['assigned_to'] ?? '')),
+            'created_by' => $actor?->id,
+        ];
+    }
+
+    private function bulkLeadRules(): array
+    {
+        return [
+            'lead_source' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website'])],
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['required', 'digits:10'],
+            '_raw_phone' => [
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($this->isRoundedScientificPhone((string) $value)) {
+                        $fail('The phone number is rounded scientific notation and has lost digits. Format the Excel phone column as Text and export the CSV again.');
+                    }
+                },
+            ],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address_line_1' => ['nullable', 'string', 'max:255'],
+            'address_line_2' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'pincode' => ['nullable', 'string', 'max:20'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'requirement' => ['required', 'string'],
+            'expected_order_value' => ['nullable', Rule::in(['5L-10L', '10L-30L', '30L+']), 'required_if:status,in_progress'],
+            'expected_closure' => ['nullable', Rule::in(['10 days', '20 days', '30 days', '90 days']), 'required_if:status,in_progress'],
+            'status' => ['required', Rule::in(['new', 'enquiry', 'in_progress', 'on_hold', 'closed_success', 'closed_fail'])],
+            'failure_reason' => [
+                'nullable',
+                Rule::in(['lost_to_competitor', 'no_enquiry_made', 'lost_interest', 'no_response', 'didnt_like_product', 'product_not_available', 'other']),
+                'required_if:status,closed_fail',
+            ],
+            'failure_reason_details' => ['nullable', 'string', 'max:2000', 'required_if:failure_reason,other'],
+            'tags' => ['array'],
+            'tags.*' => [Rule::in(['hot', 'premium'])],
+            'follow_up_date' => ['required', 'date', 'after_or_equal:today'],
+            'assigned_to' => ['required', 'integer', 'exists:users,id'],
+            'created_by' => ['nullable', 'integer'],
+        ];
+    }
+
+    private function nullableBulkValue(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
+    }
+
+    private function normalizeBulkPhone(string $phone): string
+    {
+        $phone = trim($phone);
+
+        if (preg_match('/^[+]?\d+(?:\.\d+)?[eE][+-]?\d+$/', $phone) === 1) {
+            $numericPhone = (float) $phone;
+
+            if (is_finite($numericPhone) && $numericPhone >= 0) {
+                $phone = number_format($numericPhone, 0, '.', '');
+            }
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (strlen($digits) <= 10) {
+            return $digits;
+        }
+
+        $number = substr($digits, -10);
+        $possibleCountryCode = ltrim(substr($digits, 0, -10), '0');
+
+        // Country codes are not stored separately on leads. Recognized codes such
+        // as 91, as well as an unrecognized prefix, are therefore discarded while
+        // retaining the final 10-digit national number.
+        if ($possibleCountryCode !== '' && preg_match('/^\d{1,3}$/', $possibleCountryCode) === 1) {
+            return $number;
+        }
+
+        return $number;
+    }
+
+    private function isRoundedScientificPhone(string $phone): bool
+    {
+        if (preg_match('/^[+]?(\d+)(?:\.(\d+))?[eE][+]?(\d+)$/', trim($phone), $matches) !== 1) {
+            return false;
+        }
+
+        $integerDigits = (int) $matches[3] + 1;
+        $significantDigits = strlen(ltrim($matches[1].($matches[2] ?? ''), '0'));
+
+        return $significantDigits < $integerDigits;
+    }
+
+    private function bulkFailureResult(int $row, string $name, string $phone, string $message): array
+    {
+        return [
+            'row' => $row,
+            'name' => $name,
+            'phone' => $phone,
+            'status' => 'failed',
+            'message' => $message,
+            'lead_id' => null,
+        ];
     }
 
     public function update(Model $model, array $data, ?User $actor = null, ?string $ipAddress = null): Model
@@ -210,7 +578,14 @@ class LeadService extends CrudService
         return $this->serializeActivity($activity);
     }
 
-    public function resolveCall(Lead $lead, int|string $activityId, bool $connected, ?string $notes, ?User $actor = null): array
+    public function resolveCall(
+        Lead $lead,
+        int|string $activityId,
+        bool $connected,
+        ?string $notes,
+        ?string $followUpDate = null,
+        ?User $actor = null
+    ): array
     {
         $activity = ActivityLog::query()
             ->whereKey($activityId)
@@ -220,13 +595,18 @@ class LeadService extends CrudService
             ->where('action', 'called')
             ->firstOrFail();
 
+        $dateChanged = filled($followUpDate)
+            && optional($lead->follow_up_date)->format('Y-m-d') !== $followUpDate;
+
         $values = [
-            'description' => $connected
+            'description' => ($connected
                 ? 'Called the lead — connected. Discussion: '.trim((string) $notes)
-                : 'Called the lead — not connected.',
+                : 'Called the lead — not connected.')
+                .($dateChanged ? ' Next follow up: '.$followUpDate.'.' : ''),
             'new_values' => [
                 'connected' => $connected,
                 'notes' => $connected ? trim((string) $notes) : null,
+                'follow_up_date' => $dateChanged ? $followUpDate : null,
                 'actor' => $activity->new_values['actor'] ?? ($actor ? ['id' => $actor->id, 'name' => $actor->name, 'email' => $actor->email] : null),
             ],
             'created_by' => $activity->created_by ?: $actor?->id,
@@ -238,7 +618,14 @@ class LeadService extends CrudService
         $activity->save();
         $activity->refresh();
 
-        return $this->serializeActivity($activity);
+        if ($dateChanged) {
+            $lead->update(['follow_up_date' => $followUpDate]);
+        }
+
+        return [
+            ...$this->serializeActivity($activity),
+            'follow_up_date' => optional($lead->fresh()->follow_up_date)->format('Y-m-d'),
+        ];
     }
 
     private function serializeActivity(ActivityLog $activity): array
@@ -417,6 +804,19 @@ class LeadService extends CrudService
                 'on_hold' => 'On Hold',
                 'closed_success' => 'Closed - Success',
                 'closed_fail' => 'Closed - Fail',
+                default => (string) ($value ?? '-'),
+            };
+        }
+
+        if ($field === 'failure_reason') {
+            return match ((string) $value) {
+                'lost_to_competitor' => 'Lost to Competitor',
+                'no_enquiry_made' => 'No Enquiry Made',
+                'lost_interest' => 'Lost Interest',
+                'no_response' => 'No Response',
+                'didnt_like_product' => "Didn't Like the Product",
+                'product_not_available' => 'Product Not Available',
+                'other' => 'Other',
                 default => (string) ($value ?? '-'),
             };
         }

@@ -7,6 +7,8 @@ import { LoadingState } from '../common/AsyncState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { LeadPhoneAction } from './LeadPhoneAction';
+import { useAuth } from '../../auth/AuthContext';
+import { LeadFailureReasonDialog, leadFailureReasonLabel } from './LeadFailureReasonDialog';
 
 const LEAD_SOURCE_OPTIONS = [
   { value: 'walk_in', label: 'Walk In' },
@@ -161,10 +163,10 @@ const leadTimelineDescription = (item: any) => {
 
   if (item?.action === 'called') {
     if (item?.new_values?.connected === true) {
-      return `Called the lead — connected.${item?.new_values?.notes ? ` Discussion: ${item.new_values.notes}` : ''}`;
+      return `Called the lead — connected.${item?.new_values?.notes ? ` Discussion: ${item.new_values.notes}` : ''}${item?.new_values?.follow_up_date ? ` Next follow up: ${item.new_values.follow_up_date}.` : ''}`;
     }
     if (item?.new_values?.connected === false) {
-      return 'Called the lead — not connected.';
+      return `Called the lead — not connected.${item?.new_values?.follow_up_date ? ` Next follow up: ${item.new_values.follow_up_date}.` : ''}`;
     }
     return 'Called the lead. Outcome pending.';
   }
@@ -187,6 +189,8 @@ const createEmptyFormData = () => ({
   expectedOrderValue: '',
   expectedClosure: '',
   status: 'new',
+  failureReason: '',
+  failureReasonDetails: '',
   tags: [] as string[],
   followUpDate: '',
   assignedTo: '',
@@ -207,6 +211,7 @@ export const LeadDetailsDialog = ({
   onOpenChange,
   onSaved,
 }: LeadDetailsDialogProps) => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('preview');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -217,6 +222,7 @@ export const LeadDetailsDialog = ({
   const [commentSaving, setCommentSaving] = useState(false);
   const [formData, setFormData] = useState(createEmptyFormData);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const [failureDialogOpen, setFailureDialogOpen] = useState(false);
 
   const mergeActivity = (activity: any) => {
     setActivityItems((current) => [activity, ...current.filter((item) => String(item.id) !== String(activity.id))]);
@@ -259,6 +265,8 @@ export const LeadDetailsDialog = ({
           expectedOrderValue: mapped.expectedOrderValue,
           expectedClosure: mapped.expectedClosure,
           status: mapped.status,
+          failureReason: mapped.failureReason,
+          failureReasonDetails: mapped.failureReasonDetails,
           tags: mapped.tags,
           followUpDate: mapped.followUpDate,
           assignedTo: mapped.assignedTo,
@@ -315,6 +323,14 @@ export const LeadDetailsDialog = ({
       validationErrors.expected_closure = ['Expected closure is required for in-progress leads.'];
     }
 
+    if (formData.status === 'closed_fail' && !formData.failureReason) {
+      validationErrors.failure_reason = ['Select a failure reason.'];
+    }
+
+    if (formData.status === 'closed_fail' && formData.failureReason === 'other' && !formData.failureReasonDetails.trim()) {
+      validationErrors.failure_reason_details = ['Enter the custom failure reason.'];
+    }
+
     if (!formData.followUpDate) {
       validationErrors.follow_up_date = ['Follow up date is required.'];
     }
@@ -330,10 +346,8 @@ export const LeadDetailsDialog = ({
     setSaving(true);
     try {
       const result = await leadService.update(leadId, leadPayload(formData));
-      const activity = await leadService.activity(leadId);
       const mapped = mapLead(result);
       setLead(mapped);
-      setActivityItems(Array.isArray(activity) ? activity : []);
       setFormData({
         leadSource: mapped.leadSource,
         name: mapped.name,
@@ -349,13 +363,26 @@ export const LeadDetailsDialog = ({
         expectedOrderValue: mapped.expectedOrderValue,
         expectedClosure: mapped.expectedClosure,
         status: mapped.status,
+        failureReason: mapped.failureReason,
+        failureReasonDetails: mapped.failureReasonDetails,
         tags: mapped.tags,
         followUpDate: mapped.followUpDate,
         assignedTo: mapped.assignedTo,
       });
       onSaved(mapped);
-      setActiveTab('preview');
       toast.success('Lead updated successfully');
+
+      const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
+      const canStillViewLead = role === 'admin' || String(mapped.assignedTo || '') === String(user?.id || '');
+
+      if (!canStillViewLead) {
+        onOpenChange(false);
+        return;
+      }
+
+      const activity = await leadService.activity(leadId);
+      setActivityItems(Array.isArray(activity) ? activity : []);
+      setActiveTab('preview');
     } catch (error: any) {
       setErrors(error.errors || {});
     } finally {
@@ -429,7 +456,16 @@ export const LeadDetailsDialog = ({
 
                   <div>
                     <div className="mb-1 text-sm font-medium text-gray-500">Phone No.</div>
-                    <LeadPhoneAction leadId={String(lead.id)} phone={lead.phone} onActivitySaved={mergeActivity} />
+                    <LeadPhoneAction
+                      leadId={String(lead.id)}
+                      phone={lead.phone}
+                      followUpDate={lead.followUpDate}
+                      onActivitySaved={mergeActivity}
+                      onFollowUpDateChanged={(date) => {
+                        setLead((current: any) => current ? { ...current, followUpDate: date } : current);
+                        setFormData((current) => ({ ...current, followUpDate: date }));
+                      }}
+                    />
                   </div>
 
                   <div>
@@ -603,7 +639,19 @@ export const LeadDetailsDialog = ({
                       <label className="mb-2 block text-sm font-medium text-gray-700">Status *</label>
                       <select
                         value={formData.status}
-                        onChange={(event) => setFormData((current) => ({ ...current, status: event.target.value }))}
+                        onChange={(event) => {
+                          const status = event.target.value;
+                          if (status === 'closed_fail') {
+                            setFailureDialogOpen(true);
+                            return;
+                          }
+                          setFormData((current) => ({
+                            ...current,
+                            status,
+                            failureReason: '',
+                            failureReasonDetails: '',
+                          }));
+                        }}
                         className={fieldClassName(Boolean(errors.status?.[0]))}
                       >
                         {LEAD_STATUS_OPTIONS.map((option) => (
@@ -611,6 +659,14 @@ export const LeadDetailsDialog = ({
                         ))}
                       </select>
                       {errors.status?.[0] && <p className="mt-1 text-sm text-red-600">{errors.status[0]}</p>}
+                      {formData.status === 'closed_fail' && formData.failureReason && (
+                        <button type="button" onClick={() => setFailureDialogOpen(true)}
+                          className="mt-2 block text-left text-sm font-medium text-rose-600 hover:underline">
+                          Failure reason: {leadFailureReasonLabel(formData.failureReason, formData.failureReasonDetails)} — Change
+                        </button>
+                      )}
+                      {errors.failure_reason?.[0] && <p className="mt-1 text-sm text-red-600">{errors.failure_reason[0]}</p>}
+                      {errors.failure_reason_details?.[0] && <p className="mt-1 text-sm text-red-600">{errors.failure_reason_details[0]}</p>}
                     </div>
 
                   </div>
@@ -618,12 +674,25 @@ export const LeadDetailsDialog = ({
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">Phone No.</label>
-                      <input
-                        type="text"
-                        value={formData.phone}
-                        onChange={(event) => setFormData((current) => ({ ...current, phone: event.target.value }))}
-                        className={fieldClassName(Boolean(errors.phone?.[0]))}
-                      />
+                      <div className="flex">
+                        <span className={`inline-flex items-center rounded-l-xl border border-r-0 px-4 text-gray-700 ${
+                          errors.phone?.[0] ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-gray-50'
+                        }`}>
+                          +91
+                        </span>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]{10}"
+                          maxLength={10}
+                          value={formData.phone}
+                          onChange={(event) => setFormData((current) => ({
+                            ...current,
+                            phone: event.target.value.replace(/\D/g, '').slice(0, 10),
+                          }))}
+                          className={`${fieldClassName(Boolean(errors.phone?.[0]))} rounded-l-none`}
+                        />
+                      </div>
                       {errors.phone?.[0] && <p className="mt-1 text-sm text-red-600">{errors.phone[0]}</p>}
                     </div>
 
@@ -810,6 +879,27 @@ export const LeadDetailsDialog = ({
           <div className="p-6 text-sm text-gray-500">Lead not found.</div>
         )}
       </DialogContent>
+      <LeadFailureReasonDialog
+        open={failureDialogOpen}
+        initialReason={formData.failureReason}
+        initialDetails={formData.failureReasonDetails}
+        onCancel={() => setFailureDialogOpen(false)}
+        onConfirm={(reason, details) => {
+          setFormData((current) => ({
+            ...current,
+            status: 'closed_fail',
+            failureReason: reason,
+            failureReasonDetails: details,
+          }));
+          setFailureDialogOpen(false);
+          setErrors((current) => {
+            const next = { ...current };
+            delete next.failure_reason;
+            delete next.failure_reason_details;
+            return next;
+          });
+        }}
+      />
     </Dialog>
   );
 };

@@ -25,6 +25,8 @@ class LeadResource extends JsonResource
             'expected_order_value' => $this->expected_order_value,
             'expected_closure' => $this->expected_closure,
             'status' => $this->status,
+            'failure_reason' => $this->failure_reason,
+            'failure_reason_details' => $this->failure_reason_details,
             'tags' => $this->tags ?? [],
             'follow_up_date' => optional($this->follow_up_date)?->format('Y-m-d'),
             'assigned_to' => $this->assigned_to,
