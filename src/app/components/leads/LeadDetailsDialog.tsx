@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { LoaderCircle, MessageSquareText, Save } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronRight, LoaderCircle, MessageSquareText, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { leadPayload, mapLead } from '../../../services/mappers';
 import { leadService } from '../../../services/leadService';
@@ -202,6 +202,7 @@ interface LeadDetailsDialogProps {
   users: any[];
   onOpenChange: (open: boolean) => void;
   onSaved: (lead: any) => void;
+  onNext?: () => void;
 }
 
 export const LeadDetailsDialog = ({
@@ -210,6 +211,7 @@ export const LeadDetailsDialog = ({
   users,
   onOpenChange,
   onSaved,
+  onNext,
 }: LeadDetailsDialogProps) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('preview');
@@ -223,6 +225,12 @@ export const LeadDetailsDialog = ({
   const [formData, setFormData] = useState(createEmptyFormData);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [failureDialogOpen, setFailureDialogOpen] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const changeTab = (tab: string) => {
+    setActiveTab(tab);
+    requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: 0 }));
+  };
 
   const mergeActivity = (activity: any) => {
     setActivityItems((current) => [activity, ...current.filter((item) => String(item.id) !== String(activity.id))]);
@@ -382,7 +390,7 @@ export const LeadDetailsDialog = ({
 
       const activity = await leadService.activity(leadId);
       setActivityItems(Array.isArray(activity) ? activity : []);
-      setActiveTab('preview');
+      changeTab('preview');
     } catch (error: any) {
       setErrors(error.errors || {});
     } finally {
@@ -415,25 +423,44 @@ export const LeadDetailsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[95vh] max-w-[96vw] gap-0 overflow-hidden border-gray-200 p-0 xl:max-w-6xl 2xl:max-w-7xl">
-        <DialogHeader className="border-b border-gray-200 px-6 py-4">
+      <DialogContent className="left-0 top-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-gray-200 p-0 sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[95dvh] sm:w-[96vw] sm:max-w-[96vw] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg xl:max-w-6xl 2xl:max-w-7xl">
+        <DialogHeader className="shrink-0 border-b border-gray-200 px-4 py-4 pr-14 sm:px-6">
           <DialogTitle>{lead?.name ? `Lead: ${lead.name}` : 'Lead Details'}</DialogTitle>
         </DialogHeader>
+
+        {activeTab === 'preview' && (
+          <button
+            type="button"
+            onClick={() => {
+              changeTab('preview');
+              onNext?.();
+            }}
+            disabled={!onNext || loading}
+            className="absolute right-3 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-600 shadow-lg transition-all hover:scale-105 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 sm:right-4 sm:h-14 sm:w-14"
+            title={onNext ? 'View next lead' : 'No next lead on this page'}
+            aria-label="View next lead"
+          >
+            <ChevronRight className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={2.5} />
+          </button>
+        )}
 
         {loading ? (
           <div className="p-6">
             <LoadingState label="Loading lead..." />
           </div>
         ) : lead ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 flex-1 overflow-hidden">
-            <div className="border-b border-gray-200 px-6 py-2.5">
+          <Tabs value={activeTab} onValueChange={changeTab} className="min-h-0 flex-1 gap-0 overflow-hidden">
+            <div className="shrink-0 border-b border-gray-200 px-4 py-2.5 sm:px-6">
               <TabsList className="w-full max-w-sm">
                 <TabsTrigger value="preview">Preview</TabsTrigger>
                 <TabsTrigger value="edit">Edit</TabsTrigger>
               </TabsList>
             </div>
 
-            <div className="max-h-[calc(95vh-8rem)] overflow-y-auto px-6 py-4">
+            <div
+              ref={scrollContainerRef}
+              className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 py-4 pb-[calc(6rem+env(safe-area-inset-bottom))] [-webkit-overflow-scrolling:touch] sm:px-6 sm:pb-8"
+            >
               <TabsContent value="preview">
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

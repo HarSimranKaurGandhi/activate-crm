@@ -9,6 +9,12 @@ class LeadResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $isFavourite = array_key_exists('is_favourite', $this->resource->getAttributes())
+            ? (bool) $this->is_favourite
+            : ($request->user()
+                ? $this->favouritedBy()->where('users.id', $request->user()->id)->exists()
+                : false);
+
         return [
             'id' => $this->id,
             'lead_source' => $this->lead_source,
@@ -27,6 +33,7 @@ class LeadResource extends JsonResource
             'status' => $this->status,
             'failure_reason' => $this->failure_reason,
             'failure_reason_details' => $this->failure_reason_details,
+            'is_favourite' => $isFavourite,
             'tags' => $this->tags ?? [],
             'follow_up_date' => optional($this->follow_up_date)?->format('Y-m-d'),
             'assigned_to' => $this->assigned_to,

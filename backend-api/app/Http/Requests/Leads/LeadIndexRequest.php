@@ -18,6 +18,7 @@ class LeadIndexRequest extends FormRequest
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'include_closed' => ['sometimes', 'boolean'],
+            'favourites_only' => ['sometimes', 'boolean'],
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
             'lead_source' => ['sometimes', 'array'],
             'lead_source.*' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website'])],
@@ -32,5 +33,22 @@ class LeadIndexRequest extends FormRequest
             'sort_by' => ['sometimes', Rule::in(['name', 'lead_source', 'assigned_to', 'follow_up_date', 'created_at', 'status'])],
             'sort_direction' => ['sometimes', Rule::in(['asc', 'desc'])],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $filters = [];
+
+        foreach (['lead_source', 'status', 'assigned_to'] as $field) {
+            $value = $this->input($field);
+
+            if ($value !== null && ! is_array($value)) {
+                $filters[$field] = [$value];
+            }
+        }
+
+        if ($filters !== []) {
+            $this->merge($filters);
+        }
     }
 }

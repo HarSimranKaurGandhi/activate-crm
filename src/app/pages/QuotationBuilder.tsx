@@ -383,7 +383,7 @@ export const QuotationBuilder = () => {
     if (!showLeadModal) return;
 
     leadService
-      .list({ status: 'in_progress' })
+      .list({ status: ['in_progress'], page: 1, per_page: 100 })
       .then((result) => {
         setInProgressLeads(Array.isArray(result.data) ? result.data : []);
       })

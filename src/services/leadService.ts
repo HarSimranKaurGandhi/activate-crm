@@ -41,4 +41,7 @@ export const leadService = {
     const response = await apiClient.get('/leads/bulk-sample', { responseType: 'blob' });
     return response.data as Blob;
   },
+  async favourite(id: string, favourite: boolean) {
+    return unwrap<{ is_favourite: boolean }>(await apiClient.patch(`/leads/${id}/favourite`, { favourite }));
+  },
 };

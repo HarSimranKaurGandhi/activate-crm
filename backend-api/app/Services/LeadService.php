@@ -482,6 +482,17 @@ class LeadService extends CrudService
         });
     }
 
+    public function setFavourite(Lead $lead, User $user, bool $favourite): bool
+    {
+        if ($favourite) {
+            $lead->favouritedBy()->syncWithoutDetaching([$user->id]);
+        } else {
+            $lead->favouritedBy()->detach($user->id);
+        }
+
+        return $favourite;
+    }
+
     public function activity(int|string $id): Collection
     {
         /** @var Lead $lead */
@@ -694,6 +705,13 @@ class LeadService extends CrudService
             ->when(
                 $request->filled('follow_up_to'),
                 fn (Builder $builder) => $builder->whereDate('follow_up_date', '<=', $request->date('follow_up_to'))
+            )
+            ->when(
+                $request->boolean('favourites_only') && $request->user() instanceof User,
+                fn (Builder $builder) => $builder->whereHas(
+                    'favouritedBy',
+                    fn (Builder $favourites) => $favourites->where('users.id', $request->user()->id),
+                ),
             );
     }
 
@@ -714,6 +732,10 @@ class LeadService extends CrudService
         if (! $user instanceof User) {
             return $query;
         }
+
+        $query->withExists([
+            'favouritedBy as is_favourite' => fn (Builder $favourites) => $favourites->where('users.id', $user->id),
+        ]);
 
         $user->loadMissing('role');
 

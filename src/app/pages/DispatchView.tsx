@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Download, Edit, FileDown } from 'lucide-react';
+import { ArrowLeft, Ban, Download, Edit, FileDown, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { dispatchService } from '../../services/dispatchService';
 import { LoadingState } from '../components/common/AsyncState';
 import { toast } from 'sonner';
+import { useAuth } from '../auth/AuthContext';
 
 const money = (value: any) =>
   `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -13,6 +14,8 @@ const money = (value: any) =>
 export const DispatchView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase() === 'admin';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const slipRef = useRef<HTMLDivElement>(null);
@@ -46,6 +49,27 @@ export const DispatchView = () => {
       setData(await dispatchService.reopen(id));
       toast.success('Dispatch changed back to NEW');
     } catch {}
+  };
+
+  const cancelDispatch = async () => {
+    if (!id || !confirm('Cancel this dispatch? It will be removed from Planned Dispatches and cannot be stocked out.')) return;
+    try {
+      setData(await dispatchService.cancel(id));
+      toast.success('Dispatch cancelled successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Unable to cancel dispatch');
+    }
+  };
+
+  const deleteDispatch = async () => {
+    if (!id || !confirm('Permanently delete this cancelled dispatch? This action cannot be undone.')) return;
+    try {
+      await dispatchService.remove(id);
+      toast.success('Cancelled dispatch deleted');
+      navigate('/dispatches');
+    } catch (error: any) {
+      toast.error(error?.message || 'Unable to delete dispatch');
+    }
   };
 
   if (loading) return <LoadingState label="Loading dispatch..." />;
@@ -82,9 +106,25 @@ export const DispatchView = () => {
                 <option value="new">NEW</option>
               </select>
             ) : (
-              <span className={`inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${data.status === 'new' ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}`}>{data.status.toUpperCase()}</span>
+              <span className={`inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${
+                data.status === 'new'
+                  ? 'bg-sky-50 text-sky-700'
+                  : data.status === 'cancelled'
+                    ? 'bg-rose-50 text-rose-700'
+                    : 'bg-emerald-50 text-emerald-700'
+              }`}>{data.status.toUpperCase()}</span>
             )}
             {data.status === 'new' && <button onClick={() => navigate(`/dispatches/${id}/edit`)} className="flex items-center gap-2 rounded-xl border px-4 py-2.5"><Edit className="h-4 w-4" />Edit</button>}
+            {['new', 'invoiced'].includes(data.status) && (
+              <button onClick={() => void cancelDispatch()} className="flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-rose-700 hover:bg-rose-50">
+                <Ban className="h-4 w-4" />Cancel Dispatch
+              </button>
+            )}
+            {isAdmin && data.status === 'cancelled' && (
+              <button onClick={() => void deleteDispatch()} className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-white hover:bg-rose-700">
+                <Trash2 className="h-4 w-4" />Delete
+              </button>
+            )}
             {data.invoice_url && <a href={data.invoice_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border px-4 py-2.5"><FileDown className="h-4 w-4" />Download Invoice</a>}
             <button onClick={() => void download()} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-white"><Download className="h-4 w-4" />Download Slip</button>
           </div>

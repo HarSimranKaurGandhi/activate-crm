@@ -82,6 +82,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::put('dispatches/{id}', [DispatchController::class, 'update']);
     Route::post('dispatches/{id}/invoice', [DispatchController::class, 'uploadInvoice']);
     Route::patch('dispatches/{id}/reopen', [DispatchController::class, 'reopen']);
+    Route::patch('dispatches/{id}/cancel', [DispatchController::class, 'cancel']);
+    Route::delete('dispatches/{id}', [DispatchController::class, 'destroy'])->middleware('role:admin');
 
     Route::get('products/selectable', [ProductController::class, 'selectable']);
     Route::get('products/bulk-sample', [ProductController::class, 'bulkSample']);
@@ -145,6 +147,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('leads/{id}/comments', [LeadController::class, 'comment']);
     Route::post('leads/{id}/calls', [LeadController::class, 'startCall']);
     Route::patch('leads/{id}/calls/{activityId}', [LeadController::class, 'resolveCall']);
+    Route::patch('leads/{id}/favourite', [LeadController::class, 'favourite']);
     Route::get('leads/{id}', [LeadController::class, 'show']);
     Route::put('leads/{id}', [LeadController::class, 'update']);
 

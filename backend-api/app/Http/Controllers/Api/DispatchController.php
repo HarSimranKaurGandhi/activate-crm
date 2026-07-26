@@ -25,7 +25,7 @@ class DispatchController extends ApiController
     public function uploadInvoice(DispatchInvoiceRequest $request,int|string $id):JsonResponse
     {
         $dispatch=$this->dispatches->find($id);
-        if($dispatch->status==='dispatched'||$dispatch->invoice_path)throw ValidationException::withMessages(['invoice'=>['An invoice cannot be replaced after it is uploaded or dispatched.']]);
+        if(in_array($dispatch->status,['dispatched','cancelled'],true)||$dispatch->invoice_path)throw ValidationException::withMessages(['invoice'=>['An invoice cannot be uploaded or replaced after the dispatch is cancelled, invoiced, or dispatched.']]);
         PublicAsset::delete($dispatch->invoice_path);
         $dispatch->update(['invoice_path'=>PublicAsset::store($request->file('invoice'),'uploads/dispatches/invoices'),'status'=>'invoiced']);
         return $this->ok('Invoice uploaded and dispatch marked as invoiced',$this->data($this->dispatches->find($id)));
@@ -38,5 +38,20 @@ class DispatchController extends ApiController
         PublicAsset::delete($dispatch->invoice_path);
         $dispatch->update(['status'=>'new','invoice_path'=>null]);
         return $this->ok('Dispatch changed back to NEW',$this->data($this->dispatches->find($id)));
+    }
+
+    public function cancel(int|string $id):JsonResponse
+    {
+        return $this->ok(
+            'Dispatch cancelled successfully',
+            $this->data($this->dispatches->cancel($this->dispatches->find($id))),
+        );
+    }
+
+    public function destroy(int|string $id):JsonResponse
+    {
+        $this->dispatches->deleteCancelled($this->dispatches->find($id));
+
+        return $this->ok('Cancelled dispatch deleted successfully');
     }
 }

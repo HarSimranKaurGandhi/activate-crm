@@ -134,6 +134,17 @@ class LeadController extends ApiController
         );
     }
 
+    public function favourite(Request $request, int|string $id): JsonResponse
+    {
+        $data = $request->validate(['favourite' => ['required', 'boolean']]);
+        $lead = $this->leads->find($id);
+
+        return $this->ok(
+            $data['favourite'] ? 'Lead added to favourites' : 'Lead removed from favourites',
+            ['is_favourite' => $this->leads->setFavourite($lead, $request->user(), (bool) $data['favourite'])],
+        );
+    }
+
     public function destroy(int|string $id): JsonResponse
     {
         $this->leads->delete($this->leads->find($id));

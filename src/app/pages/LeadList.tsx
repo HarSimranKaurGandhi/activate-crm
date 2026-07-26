@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowUpDown, ChevronDown, Filter, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, Filter, Plus, Search, Star, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { PaginationControls } from '../components/common/Pagination';
@@ -123,12 +123,14 @@ export const LeadList = () => {
   const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [favouriteUpdating, setFavouriteUpdating] = useState<string[]>([]);
   const [filters, setFilters] = useState(() => ({
     search: '',
     leadSources: [] as string[],
     statuses: [] as string[],
     assignedTo: isAdmin && user?.id ? [String(user.id)] : [] as string[],
     showClosed: false,
+    favouritesOnly: false,
   }));
   const [sort, setSort] = useState<{ key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'createdAt' | 'status'; direction: 'asc' | 'desc' }>({
     key: 'followUpDate',
@@ -168,6 +170,28 @@ export const LeadList = () => {
     }
   };
 
+  const handleFavourite = async (lead: any) => {
+    const nextFavourite = !lead.isFavourite;
+    setFavouriteUpdating((current) => [...current, lead.id]);
+
+    try {
+      await leadService.favourite(lead.id, nextFavourite);
+      if (filters.favouritesOnly && !nextFavourite) {
+        setLeads((current) => current.filter((item) => item.id !== lead.id));
+        setTotalItems((current) => Math.max(0, current - 1));
+      } else {
+        setLeads((current) => current.map((item) =>
+          item.id === lead.id ? { ...item, isFavourite: nextFavourite } : item
+        ));
+      }
+      toast.success(nextFavourite ? 'Lead added to favourites' : 'Lead removed from favourites');
+    } catch {
+      toast.error('Unable to update favourite lead');
+    } finally {
+      setFavouriteUpdating((current) => current.filter((id) => id !== lead.id));
+    }
+  };
+
   useEffect(() => {
     const loadUsers = async () => {
       try {
@@ -189,6 +213,7 @@ export const LeadList = () => {
           page,
           per_page: pageSize,
           include_closed: filters.showClosed ? 1 : 0,
+          favourites_only: filters.favouritesOnly ? 1 : 0,
           ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
           ...(filters.leadSources.length > 0 ? { lead_source: filters.leadSources } : {}),
           ...(filters.statuses.length > 0 ? { status: filters.statuses } : {}),
@@ -218,7 +243,7 @@ export const LeadList = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [filters.search, filters.leadSources, filters.statuses, filters.assignedTo, filters.showClosed, sort.key, sort.direction]);
+  }, [filters.search, filters.leadSources, filters.statuses, filters.assignedTo, filters.showClosed, filters.favouritesOnly, sort.key, sort.direction]);
 
   useEffect(() => {
     if (filters.showClosed) {
@@ -239,6 +264,8 @@ export const LeadList = () => {
   }, [filters.showClosed]);
 
   const sortedLeads = leads;
+  const selectedLeadIndex = sortedLeads.findIndex((lead) => lead.id === selectedLeadId);
+  const nextLeadId = selectedLeadIndex >= 0 ? sortedLeads[selectedLeadIndex + 1]?.id : null;
 
   const toggleSort = (key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'createdAt' | 'status') => {
     setSort((current) => ({
@@ -271,6 +298,7 @@ export const LeadList = () => {
     filters.leadSources.length > 0 ? 1 : 0,
     filters.statuses.length > 0 ? 1 : 0,
     filters.assignedTo.length > 0 ? 1 : 0,
+    filters.favouritesOnly ? 1 : 0,
   ].reduce((sum, count) => sum + count, 0);
   const assigneeOptions = users.map((user) => ({ value: String(user.id), label: user.name }));
   const visibleStatusOptions = filters.showClosed
@@ -283,6 +311,25 @@ export const LeadList = () => {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Leads</h2>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium ${
+              filters.favouritesOnly
+                ? 'border-amber-300 bg-amber-50 text-amber-800'
+                : 'border-gray-200 bg-white text-gray-700'
+            }`}>
+              <input
+                type="checkbox"
+                checked={filters.favouritesOnly}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    favouritesOnly: event.target.checked,
+                  }))
+                }
+                className="sr-only"
+              />
+              <Star className={`h-4 w-4 ${filters.favouritesOnly ? 'fill-amber-400 text-amber-500' : 'text-gray-400'}`} />
+              My Favourite Leads
+            </label>
             <label className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700">
               <input
                 type="checkbox"
@@ -341,6 +388,7 @@ export const LeadList = () => {
                     statuses: [],
                     assignedTo: [],
                     showClosed: filters.showClosed,
+                    favouritesOnly: filters.favouritesOnly,
                   })
                 }
                 className="text-sm font-medium text-blue-600 hover:underline"
@@ -575,9 +623,23 @@ export const LeadList = () => {
                       </div>
                       {lead.email && <div className="break-words text-sm text-gray-500">{lead.email}</div>}
                     </div>
-                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[lead.status] || statusBadgeClass.new}`}>
-                      {statusLabel(lead.status)}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleFavourite(lead);
+                        }}
+                        disabled={favouriteUpdating.includes(lead.id)}
+                        className="rounded-lg p-1.5 hover:bg-amber-50 disabled:opacity-50"
+                        title={lead.isFavourite ? 'Remove from favourites' : 'Add to favourites'}
+                      >
+                        <Star className={`h-5 w-5 ${lead.isFavourite ? 'fill-amber-400 text-amber-500' : 'text-gray-300'}`} />
+                      </button>
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[lead.status] || statusBadgeClass.new}`}>
+                        {statusLabel(lead.status)}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm">
@@ -675,6 +737,18 @@ export const LeadList = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
                           <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleFavourite(lead);
+                            }}
+                            disabled={favouriteUpdating.includes(lead.id)}
+                            className="rounded-lg p-2 transition-colors hover:bg-amber-50 disabled:opacity-50"
+                            title={lead.isFavourite ? 'Remove from favourites' : 'Add to favourites'}
+                          >
+                            <Star className={`h-4 w-4 ${lead.isFavourite ? 'fill-amber-400 text-amber-500' : 'text-gray-300'}`} />
+                          </button>
+                          <button
                             onClick={(event) => {
                               event.stopPropagation();
                               void handleDelete(lead.id);
@@ -723,6 +797,7 @@ export const LeadList = () => {
           }
         }}
         onSaved={updateLeadInList}
+        onNext={nextLeadId ? () => setSelectedLeadId(nextLeadId) : undefined}
       />
       <LeadBulkUploadDialog
         open={isBulkUploadOpen}

@@ -265,7 +265,11 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
-          <div className={`rounded-2xl bg-white p-6 transition-all hover:shadow-lg xl:col-span-2 ${overdueFollowUpsResolved ? 'border border-emerald-200' : 'border border-rose-200'}`}>
+          <button
+            type="button"
+            onClick={() => document.getElementById('past-due-follow-ups')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className={`w-full rounded-2xl bg-white p-6 text-left transition-all hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2 xl:col-span-2 ${overdueFollowUpsResolved ? 'border border-emerald-200' : 'border border-rose-200'}`}
+          >
             <div className="flex items-start justify-between">
               <div>
                 <p className={`text-sm font-medium ${overdueFollowUpsResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</p>
@@ -276,7 +280,7 @@ export const Dashboard = () => {
                 <AlertTriangle className={`h-7 w-7 ${overdueFollowUpsResolved ? 'text-emerald-600' : 'text-rose-600'}`} />
               </div>
             </div>
-          </div>
+          </button>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
@@ -372,7 +376,7 @@ export const Dashboard = () => {
         </div>
 
         {!isLoading && summary.overdue_tasks.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-rose-200 bg-white">
+          <div id="past-due-follow-ups" className="scroll-mt-6 overflow-hidden rounded-2xl border border-rose-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="px-4 pt-4 text-lg font-semibold text-rose-700 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</h3>
               <button

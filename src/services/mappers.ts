@@ -307,6 +307,7 @@ export const mapLead = (lead: any) => ({
   status: (lead.status || 'new') as LeadStatus,
   failureReason: lead.failure_reason || '',
   failureReasonDetails: lead.failure_reason_details || '',
+  isFavourite: Boolean(lead.is_favourite),
   tags: Array.isArray(lead.tags) ? lead.tags : [],
   followUpDate: lead.follow_up_date || '',
   assignedTo: lead.assigned_to ? String(lead.assigned_to) : '',
