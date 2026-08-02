@@ -11,7 +11,7 @@ class Quotation extends Model
     protected $table = 'quotations';
 
     protected $fillable = [
-        'quotation_number', 'customer_id', 'salesperson_name', 'salesperson_phone',
+        'quotation_number', 'customer_id', 'lead_id', 'salesperson_name', 'salesperson_phone',
         'salesperson_email', 'quote_date', 'valid_until', 'pricing_mode',
         'show_discount_to_customer', 'show_mrp_to_customer', 'show_item_wise_gst_to_customer', 'round_off_net_amount_to_customer', 'show_uom_to_customer', 'show_brand_banner_to_customer', 'brand_banner_id', 'default_discount_percent', 'default_discount_amount',
         'intro_text', 'remarks', 'internal_notes', 'subtotal_before_discount',
@@ -46,6 +46,11 @@ class Quotation extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function lead(): BelongsTo
+    {
+        return $this->belongsTo(Lead::class);
     }
 
     public function brandBanner(): BelongsTo

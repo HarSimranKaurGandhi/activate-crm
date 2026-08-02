@@ -10,6 +10,7 @@ use App\Http\Requests\Leads\LeadIndexRequest;
 use App\Http\Requests\Leads\LeadRequest;
 use App\Http\Resources\LeadActivityResource;
 use App\Http\Resources\LeadResource;
+use App\Http\Resources\CustomerQuotationResource;
 use App\Services\LeadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -93,6 +94,17 @@ class LeadController extends ApiController
         return $this->ok(
             'Lead activity fetched successfully',
             LeadActivityResource::collection($this->leads->activity($id)),
+        );
+    }
+
+    public function quotations(Request $request, int|string $id): JsonResponse
+    {
+        $lead = $this->leads->find($id);
+
+        return $this->paginated(
+            'Lead quotations fetched successfully',
+            $this->leads->quotationHistory($lead, $request),
+            CustomerQuotationResource::class,
         );
     }
 

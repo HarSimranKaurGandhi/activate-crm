@@ -20,7 +20,7 @@ class QuotationIndexRequest extends FormRequest
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
             'from_date' => ['sometimes', 'nullable', 'date'],
             'to_date' => ['sometimes', 'nullable', 'date', 'after_or_equal:from_date'],
-            'status' => ['sometimes', 'nullable', Rule::in(['draft', 'pending_approval', 'approved', 'rejected', 'revised'])],
+            'status' => ['sometimes', 'nullable', Rule::in(['draft', 'pending_approval', 'approved', 'shared_with_client', 'rejected', 'revised'])],
             'customer_id' => ['sometimes', 'nullable', 'integer', 'exists:customers,id'],
             'created_by' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ];

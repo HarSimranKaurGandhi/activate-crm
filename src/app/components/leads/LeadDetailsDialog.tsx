@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight, LoaderCircle, MessageSquareText, Save } from 'lucide-react';
+import { ChevronRight, FileText, LoaderCircle, MessageSquareText, Save } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { leadPayload, mapLead } from '../../../services/mappers';
 import { leadService } from '../../../services/leadService';
@@ -32,6 +33,8 @@ const LEAD_TAG_OPTIONS = [
 ];
 
 const LEAD_EXPECTED_ORDER_VALUE_OPTIONS = [
+  { value: 'Less Than 1L', label: 'Less Than 1L' },
+  { value: '1L-5L', label: '1L-5L' },
   { value: '5L-10L', label: '5L-10L' },
   { value: '10L-30L', label: '10L-30L' },
   { value: '30L+', label: '30L+' },
@@ -213,6 +216,7 @@ export const LeadDetailsDialog = ({
   onSaved,
   onNext,
 }: LeadDetailsDialogProps) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('preview');
   const [loading, setLoading] = useState(false);
@@ -220,16 +224,42 @@ export const LeadDetailsDialog = ({
   const [lead, setLead] = useState<any | null>(null);
   const [activityItems, setActivityItems] = useState<any[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [quotations, setQuotations] = useState<any[]>([]);
+  const [quotationsLoading, setQuotationsLoading] = useState(false);
+  const [quotationsLoadedForLead, setQuotationsLoadedForLead] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
   const [formData, setFormData] = useState(createEmptyFormData);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [failureDialogOpen, setFailureDialogOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const quotationRequestRef = useRef(0);
 
   const changeTab = (tab: string) => {
     setActiveTab(tab);
     requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: 0 }));
+
+    if (tab !== 'quotations' || !leadId || quotationsLoading || quotationsLoadedForLead === leadId) {
+      return;
+    }
+
+    const requestId = ++quotationRequestRef.current;
+    setQuotationsLoading(true);
+    leadService.quotations(leadId, { page: 1, per_page: 100 })
+      .then((result) => {
+        if (requestId !== quotationRequestRef.current) return;
+        setQuotations(Array.isArray(result.data) ? result.data : []);
+        setQuotationsLoadedForLead(leadId);
+      })
+      .catch(() => {
+        if (requestId !== quotationRequestRef.current) return;
+        toast.error('Unable to load lead quotations');
+      })
+      .finally(() => {
+        if (requestId === quotationRequestRef.current) {
+          setQuotationsLoading(false);
+        }
+      });
   };
 
   const mergeActivity = (activity: any) => {
@@ -240,6 +270,10 @@ export const LeadDetailsDialog = ({
     if (!open || !leadId) {
       setLead(null);
       setActivityItems([]);
+      setQuotations([]);
+      setQuotationsLoadedForLead(null);
+      setQuotationsLoading(false);
+      quotationRequestRef.current += 1;
       setErrors({});
       setCommentText('');
       setFormData(createEmptyFormData());
@@ -247,7 +281,14 @@ export const LeadDetailsDialog = ({
       return;
     }
 
+    let cancelled = false;
+
     const load = async () => {
+      setLead(null);
+      setQuotations([]);
+      setQuotationsLoadedForLead(null);
+      setQuotationsLoading(false);
+      quotationRequestRef.current += 1;
       setLoading(true);
       setActivityLoading(true);
       try {
@@ -255,6 +296,8 @@ export const LeadDetailsDialog = ({
           leadService.show(leadId),
           leadService.activity(leadId),
         ]);
+        if (cancelled) return;
+
         const mapped = mapLead(result);
         setLead(mapped);
         setActivityItems(Array.isArray(activity) ? activity : []);
@@ -280,15 +323,21 @@ export const LeadDetailsDialog = ({
           assignedTo: mapped.assignedTo,
         });
       } catch {
+        if (cancelled) return;
         toast.error('Unable to load lead');
         onOpenChange(false);
       } finally {
+        if (cancelled) return;
         setLoading(false);
         setActivityLoading(false);
       }
     };
 
     void load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [leadId, onOpenChange, open]);
 
   const toggleTag = (tag: string) => {
@@ -437,7 +486,7 @@ export const LeadDetailsDialog = ({
             }}
             disabled={!onNext || loading}
             className="absolute right-3 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-600 shadow-lg transition-all hover:scale-105 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 sm:right-4 sm:h-14 sm:w-14"
-            title={onNext ? 'View next lead' : 'No next lead on this page'}
+            title={onNext ? 'View next lead' : 'No next lead'}
             aria-label="View next lead"
           >
             <ChevronRight className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={2.5} />
@@ -454,6 +503,7 @@ export const LeadDetailsDialog = ({
               <TabsList className="w-full max-w-sm">
                 <TabsTrigger value="preview">Preview</TabsTrigger>
                 <TabsTrigger value="edit">Edit</TabsTrigger>
+                <TabsTrigger value="quotations">Quotations</TabsTrigger>
               </TabsList>
             </div>
 
@@ -899,6 +949,52 @@ export const LeadDetailsDialog = ({
                     </button>
                   </div>
                 </form>
+              </TabsContent>
+
+              <TabsContent value="quotations">
+                <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                  <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-4 sm:px-5">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Lead Quotations</h3>
+                      <p className="text-sm text-gray-500">Quotations created directly for this Lead.</p>
+                    </div>
+                  </div>
+                  {quotationsLoading ? (
+                    <LoadingState label="Loading quotations..." />
+                  ) : quotations.length === 0 ? (
+                    <div className="px-5 py-10 text-center text-sm text-gray-500">No quotations found for this Lead.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[640px] text-sm">
+                        <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-600">
+                          <tr>
+                            <th className="px-4 py-3">Quotation</th>
+                            <th className="px-4 py-3">Date</th>
+                            <th className="px-4 py-3">Valid Until</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3 text-right">Amount</th>
+                            <th className="px-4 py-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {quotations.map((quotation) => (
+                            <tr key={quotation.id}>
+                              <td className="px-4 py-3 font-medium text-gray-900">{quotation.quotation_number}</td>
+                              <td className="px-4 py-3 text-gray-700">{formatDisplayDate(quotation.quote_date)}</td>
+                              <td className="px-4 py-3 text-gray-700">{formatDisplayDate(quotation.valid_until)}</td>
+                              <td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold uppercase text-slate-700">{String(quotation.status || '').replaceAll('_', ' ')}</span></td>
+                              <td className="px-4 py-3 text-right font-medium text-gray-900">₹{Number(quotation.grand_total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-4 py-3 text-right">
+                                <button type="button" onClick={() => { onOpenChange(false); navigate(`/quotations/${quotation.id}/preview`); }} className="font-medium text-blue-600 hover:underline">View</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
               </TabsContent>
             </div>
           </Tabs>

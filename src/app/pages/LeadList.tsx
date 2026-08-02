@@ -118,6 +118,8 @@ export const LeadList = () => {
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [loadedPage, setLoadedPage] = useState(0);
+  const [pendingDialogPage, setPendingDialogPage] = useState<number | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
@@ -231,7 +233,9 @@ export const LeadList = () => {
         setLeads((result.data || []).map(mapLead));
         setTotalItems(pagination?.total || 0);
         setTotalPages(pagination?.last_page || 1);
+        setLoadedPage(page);
       } catch {
+        setPendingDialogPage((current) => current === page ? null : current);
         toast.error('Unable to load leads');
       } finally {
         setLoading(false);
@@ -240,6 +244,23 @@ export const LeadList = () => {
 
     void loadLeads();
   }, [filters, page, pageSize, sort, reloadKey]);
+
+  useEffect(() => {
+    if (pendingDialogPage === null || loadedPage !== pendingDialogPage) {
+      return;
+    }
+
+    const firstLead = leads[0];
+    setPendingDialogPage(null);
+
+    if (firstLead) {
+      setSelectedLeadId(firstLead.id);
+    } else {
+      setIsLeadDialogOpen(false);
+      setSelectedLeadId(null);
+      toast.info('No more leads found');
+    }
+  }, [leads, loadedPage, pendingDialogPage]);
 
   useEffect(() => {
     setPage(1);
@@ -266,6 +287,20 @@ export const LeadList = () => {
   const sortedLeads = leads;
   const selectedLeadIndex = sortedLeads.findIndex((lead) => lead.id === selectedLeadId);
   const nextLeadId = selectedLeadIndex >= 0 ? sortedLeads[selectedLeadIndex + 1]?.id : null;
+  const hasNextPage = page < totalPages;
+
+  const showNextLead = () => {
+    if (nextLeadId) {
+      setSelectedLeadId(nextLeadId);
+      return;
+    }
+
+    if (hasNextPage && pendingDialogPage === null) {
+      const nextPage = page + 1;
+      setPendingDialogPage(nextPage);
+      setPage(nextPage);
+    }
+  };
 
   const toggleSort = (key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'createdAt' | 'status') => {
     setSort((current) => ({
@@ -797,7 +832,7 @@ export const LeadList = () => {
           }
         }}
         onSaved={updateLeadInList}
-        onNext={nextLeadId ? () => setSelectedLeadId(nextLeadId) : undefined}
+        onNext={(nextLeadId || hasNextPage) && pendingDialogPage === null ? showNextLead : undefined}
       />
       <LeadBulkUploadDialog
         open={isBulkUploadOpen}

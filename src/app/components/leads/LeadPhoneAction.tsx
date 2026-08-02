@@ -4,6 +4,20 @@ import { toast } from 'sonner';
 import { leadService } from '../../../services/leadService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 
+const phoneHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
+
+const whatsappHref = (phone: string) => {
+  const digits = phone.replace(/\D/g, '');
+  const internationalNumber = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${internationalNumber}`;
+};
+
+const WhatsAppIcon = ({ className = '' }: { className?: string }) => (
+  <svg viewBox="0 0 32 32" aria-hidden="true" className={className} fill="currentColor">
+    <path d="M16.04 3A12.86 12.86 0 0 0 5.08 22.62L3 29l6.58-2.03A12.93 12.93 0 1 0 16.04 3Zm0 23.65c-2.12 0-4.2-.57-6-1.65l-.43-.26-3.9 1.2 1.24-3.78-.28-.44a10.57 10.57 0 1 1 9.37 4.93Zm5.8-7.92c-.32-.16-1.87-.92-2.16-1.03-.29-.1-.5-.16-.71.16-.21.32-.82 1.03-1 1.24-.19.21-.37.24-.69.08-.32-.16-1.34-.49-2.55-1.58a9.55 9.55 0 0 1-1.77-2.2c-.19-.32-.02-.49.14-.65.14-.14.32-.37.48-.56.16-.18.21-.31.32-.53.1-.21.05-.4-.03-.56-.08-.16-.71-1.71-.97-2.34-.26-.62-.52-.54-.71-.55h-.61c-.21 0-.55.08-.84.4-.29.32-1.11 1.08-1.11 2.63s1.13 3.05 1.29 3.26c.16.21 2.22 3.39 5.38 4.75.75.32 1.34.52 1.8.66.76.24 1.44.2 1.99.12.61-.09 1.87-.77 2.14-1.5.26-.74.26-1.37.18-1.5-.08-.14-.29-.22-.61-.38Z" />
+  </svg>
+);
+
 interface LeadPhoneActionProps {
   leadId: string;
   phone?: string;
@@ -72,7 +86,7 @@ export const LeadPhoneAction = ({ leadId, phone, followUpDate, onActivitySaved, 
   return (
     <>
       {revealed ? (
-        <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} onClick={(event) => event.stopPropagation()}
+        <a href={phoneHref(phone)} onClick={(event) => event.stopPropagation()}
           className="inline-flex items-center gap-1.5 text-blue-600 hover:underline">
           <Phone className="h-3.5 w-3.5" />{phone}
         </a>
@@ -86,11 +100,27 @@ export const LeadPhoneAction = ({ leadId, phone, followUpDate, onActivitySaved, 
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent onClick={(event) => event.stopPropagation()} className="sm:max-w-md">
+          <a
+            href={whatsappHref(phone)}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
+            className="absolute right-12 top-4 inline-flex h-6 w-6 items-center justify-center text-emerald-600 transition-colors hover:text-emerald-700"
+            title={`Message ${phone} on WhatsApp`}
+            aria-label={`Message ${phone} on WhatsApp`}
+          >
+            <WhatsAppIcon className="h-5 w-5" />
+          </a>
           <DialogHeader>
             <DialogTitle className="space-y-2">
-              <span className="flex items-center gap-2 text-lg font-semibold text-blue-600">
+              <a
+                href={phoneHref(phone)}
+                onClick={(event) => event.stopPropagation()}
+                className="flex w-fit items-center gap-2 text-lg font-semibold text-blue-600 hover:underline"
+                title={`Call ${phone}`}
+              >
                 <Phone className="h-5 w-5" /> {phone}
-              </span>
+              </a>
               <span className="block text-lg font-semibold text-gray-900">Was the call connected?</span>
             </DialogTitle>
           </DialogHeader>

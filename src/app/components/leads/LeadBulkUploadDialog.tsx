@@ -110,7 +110,7 @@ export const LeadBulkUploadDialog = ({
                       failure_reason_details, tags, follow_up_date</b>.
                     </li>
                     <li>
-                      Expected order values: <b>5L-10L, 10L-30L, 30L+</b>. Expected closure values:
+                      Expected order values: <b>Less Than 1L, 1L-5L, 5L-10L, 10L-30L, 30L+</b>. Expected closure values:
                       <b> 10 days, 20 days, 30 days, 90 days</b>.
                     </li>
                     <li>

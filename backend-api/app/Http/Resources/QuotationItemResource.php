@@ -27,6 +27,7 @@ class QuotationItemResource extends JsonResource
             'product_name' => $this->product_name,
             'model_number' => $this->model_number,
             'specifications' => $this->specifications,
+            'additional_information' => $this->additional_information,
             'product_image_path' => $this->product_image_path
                 ? $request->getSchemeAndHttpHost().Storage::url($this->product_image_path)
                 : null,

@@ -13,6 +13,7 @@ export const QuotationPreview = () => {
   const { id } = useParams();
   const {
     quotations,
+    updateQuotationStatus,
     submitQuotationForApproval,
     approveQuotation,
     reviseQuotation,
@@ -133,6 +134,12 @@ export const QuotationPreview = () => {
     toast.success('Changes requested');
   };
 
+  const handleSharedWithClient = async () => {
+    await updateQuotationStatus(quotation.id, 'shared_with_client');
+    setPreviewQuotation({ ...quotation, status: 'shared_with_client' });
+    toast.success('Quotation marked as shared with client');
+  };
+
   const handlePrint = () => window.print();
 
   // const handleDownloadPdf = () => {
@@ -236,6 +243,9 @@ export const QuotationPreview = () => {
       return sum + (adjustment.type === 'percentage' ? quotation.subtotal * (adj.amount / 100) : adj.amount);
     },
     0,
+  ) + (quotation.customAdjustments || []).reduce(
+    (sum: number, adjustment: any) => sum + (Number(adjustment.amount) || 0),
+    0,
   );
   const handleDownloadPdf = async () => {
     toast.loading('Preparing PDF...', {
@@ -307,6 +317,16 @@ export const QuotationPreview = () => {
               </>
             )}
 
+            {quotation.status === 'approved' && (
+              <button
+                onClick={handleSharedWithClient}
+                className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-white shadow-sm hover:bg-blue-700"
+              >
+                <Send className="h-5 w-5" />
+                Mark as Shared with Client
+              </button>
+            )}
+
             <button
               onClick={() => navigate(`/quotations/${quotation.id}/edit`)}
               className="flex items-center gap-2 rounded-xl bg-slate-700 px-5 py-2.5 text-white shadow-sm hover:bg-slate-800"
@@ -373,7 +393,7 @@ export const QuotationPreview = () => {
   ref={quotationDocumentRef}
   className="quotation-print-root relative overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-slate-200 print:rounded-none print:shadow-none print:ring-0"
 >
-          {quotation.status !== 'approved' && (
+          {!['approved', 'shared_with_client'].includes(quotation.status) && (
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
               <div className="rotate-[-35deg] select-none whitespace-nowrap text-[96px] font-black tracking-[0.15em] text-slate-200/50 print:text-slate-200/35">
                 PENDING APPROVAL
@@ -666,6 +686,11 @@ export const QuotationPreview = () => {
                               {item.product.modelNumber && (
                                 <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-600">{item.product.modelNumber}</p>
                               )}
+                              {item.additionalInfo && (
+                                <div className="mt-3 w-full whitespace-pre-line rounded-md border border-slate-300 bg-slate-50 px-2.5 py-2 text-left text-xs leading-snug text-slate-700">
+                                  {item.additionalInfo}
+                                </div>
+                              )}
                             </div>
                           </td>
                           <td className="border-r border-slate-200 px-3 py-4 align-top text-[8.5px] leading-[1.24] text-slate-700">
@@ -724,6 +749,11 @@ export const QuotationPreview = () => {
                             {item.product.modelNumber && (
                               <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-600">{item.product.modelNumber}</p>
                             )}
+                            {item.additionalInfo && (
+                              <div className="mt-2 whitespace-pre-line rounded-md border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs leading-snug text-slate-700">
+                                {item.additionalInfo}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -773,6 +803,15 @@ export const QuotationPreview = () => {
                       </div>
                     );
                   })}
+
+                  {(quotation.customAdjustments || []).map((adjustment: any) => (
+                    <div key={adjustment.id} className="grid grid-cols-[1.1fr_0.9fr] border-b border-slate-300 sm:grid-cols-[1.2fr_0.8fr]">
+                      <div className="px-4 py-3 text-sm text-slate-800 sm:px-6">{adjustment.name}</div>
+                      <div className="border-l border-slate-300 px-4 py-3 text-right text-sm text-slate-800 sm:px-6">
+                        {Number(adjustment.amount) >= 0 ? '+' : '-'}{formatMoney(Math.abs(Number(adjustment.amount) || 0))}
+                      </div>
+                    </div>
+                  ))}
 
                   {!quotation.gstInclusive && quotation.taxAmount > 0 && (
                     <>

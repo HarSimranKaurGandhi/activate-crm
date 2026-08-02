@@ -35,7 +35,7 @@ class QuotationApprovalService
             'description' => 'Quotation rejected.',
         ],
         'revise' => [
-            'from' => ['pending_approval', 'approved', 'rejected'],
+            'from' => ['pending_approval', 'approved', 'shared_with_client', 'rejected'],
             'to' => 'revised',
             'description' => 'Quotation marked for revision.',
         ],

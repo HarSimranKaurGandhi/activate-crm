@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ActivityLog;
 use App\Models\Customer;
 use App\Models\Lead;
+use App\Models\Quotation;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -371,7 +372,7 @@ class LeadService extends CrudService
             'pincode' => ['nullable', 'string', 'max:20'],
             'country' => ['nullable', 'string', 'max:100'],
             'requirement' => ['required', 'string'],
-            'expected_order_value' => ['nullable', Rule::in(['5L-10L', '10L-30L', '30L+']), 'required_if:status,in_progress'],
+            'expected_order_value' => ['nullable', Rule::in(['Less Than 1L', '1L-5L', '5L-10L', '10L-30L', '30L+']), 'required_if:status,in_progress'],
             'expected_closure' => ['nullable', Rule::in(['10 days', '20 days', '30 days', '90 days']), 'required_if:status,in_progress'],
             'status' => ['required', Rule::in(['new', 'enquiry', 'in_progress', 'on_hold', 'closed_success', 'closed_fail'])],
             'failure_reason' => [
@@ -541,6 +542,46 @@ class LeadService extends CrudService
             ->values();
     }
 
+    public function quotationHistory(Lead $lead, Request $request): LengthAwarePaginator
+    {
+        $customerIds = collect();
+        if (filled($lead->phone) || filled($lead->email)) {
+            $customerIds = Customer::query()
+                ->where(function (Builder $query) use ($lead): void {
+                    if (filled($lead->phone)) {
+                        $query->where('phone', $lead->phone);
+                    }
+
+                    if (filled($lead->email)) {
+                        $method = filled($lead->phone) ? 'orWhere' : 'where';
+                        $query->{$method}('email', $lead->email);
+                    }
+                })
+                ->pluck('id');
+        }
+
+        $query = Quotation::query()
+            ->where(function (Builder $quotations) use ($lead, $customerIds): void {
+                $quotations->where('lead_id', $lead->id);
+
+                if ($customerIds->isNotEmpty()) {
+                    $quotations->orWhere(function (Builder $historical) use ($customerIds): void {
+                        $historical->whereNull('lead_id')->whereIn('customer_id', $customerIds);
+                    });
+                }
+            });
+
+        $user = $request->user();
+        if ($user instanceof User) {
+            $user->loadMissing('role');
+            if (! $user->hasAnyRole(['admin', 'operations'])) {
+                $query->where('created_by', $user->id);
+            }
+        }
+
+        return $query->latest('quote_date')->latest('id')->paginate((int) $request->integer('per_page', 15));
+    }
+
     public function addComment(Lead $lead, string $comment, ?User $actor = null, ?string $ipAddress = null): array
     {
         $activity = $this->logActivity(
@@ -548,7 +589,14 @@ class LeadService extends CrudService
             'commented',
             trim($comment),
             [],
-            ['comment' => trim($comment)],
+            [
+                'comment' => trim($comment),
+                'actor' => $actor ? [
+                    'id' => $actor->id,
+                    'name' => $actor->name,
+                    'email' => $actor->email,
+                ] : null,
+            ],
             $actor,
             $ipAddress,
         );
@@ -565,7 +613,7 @@ class LeadService extends CrudService
                 'id' => $activity->user->id,
                 'name' => $activity->user->name,
                 'email' => $activity->user->email,
-            ] : null,
+            ] : ($activity->new_values['actor'] ?? null),
             'occurred_at' => optional($activity->created_at)->toISOString(),
         ];
     }

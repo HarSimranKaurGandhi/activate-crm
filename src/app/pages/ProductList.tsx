@@ -30,7 +30,7 @@ const sortMap = {
 
 export const ProductList = () => {
   const navigate = useNavigate();
-  const { categories, brands, deleteProduct, loading, refreshAll } = useData();
+  const { categories, brands, deleteProduct, loading } = useData();
   const [products, setProducts] = useState<any[]>([]);
   const [pagination, setPagination] = useState(emptyPagination);
   const [productLoading, setProductLoading] = useState(false);
@@ -124,7 +124,7 @@ export const ProductList = () => {
     setBulkUploading(true);
     try {
       const result = await productService.bulkUpload(file);
-      await Promise.all([refreshAll(), fetchProducts(1, pagination.per_page)]);
+      await fetchProducts(1, pagination.per_page);
       toast.success(`Bulk upload complete: ${result.created} created, ${result.updated} updated`);
     } catch (error: any) {
       toast.error(error.message || 'Bulk upload failed');

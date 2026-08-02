@@ -67,6 +67,7 @@ interface DataContextType {
   updateQuotation: (id: string, quotation: any) => Promise<void>;
   deleteQuotation: (id: string) => Promise<void>;
   duplicateQuotation: (id: string) => Promise<any>;
+  updateQuotationStatus: (id: string, status: string) => Promise<void>;
   submitQuotationForApproval: (id: string) => Promise<void>;
   approveQuotation: (id: string, remarks?: string) => Promise<void>;
   rejectQuotation: (id: string, remarks: string) => Promise<void>;
@@ -219,17 +220,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const loaders: Array<Promise<void> | undefined> = [];
 
-    if (pathname === '/') {
-      loaders.push(loadQuotations());
-    }
-
     if (pathname.startsWith('/quotations')) {
       if (pathname === '/quotations' || pathname === '/quotations/approvals') {
         loaders.push(loadQuotations());
       }
 
       if (pathname === '/quotations/new' || /^\/quotations\/[^/]+\/edit$/.test(pathname)) {
-        loaders.push(loadCategories(), loadBrands(), loadAdjustments(), loadTerms(), loadSettings(), loadQuotations());
+        loaders.push(loadCategories(), loadBrands(), loadAdjustments(), loadTerms(), loadSettings());
       }
 
       if (/^\/quotations\/[^/]+\/preview$/.test(pathname)) {
@@ -409,6 +406,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const mapped = mapQuotation(duplicated);
       setQuotations((current) => [mapped, ...current]);
       return mapped;
+    },
+    async updateQuotationStatus(id, status) {
+      const updated = await quotationService.updateStatus(id, status);
+      replaceById(setQuotations, mapQuotation(updated));
     },
     async submitQuotationForApproval(id) {
       const updated = await quotationService.submitForApproval(id);

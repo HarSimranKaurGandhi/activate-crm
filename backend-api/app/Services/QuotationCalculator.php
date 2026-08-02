@@ -48,6 +48,7 @@ class QuotationCalculator
             'product_name' => $quotationItemName,
             'model_number' => $product->model_number,
             'specifications' => $product->specifications,
+            'additional_information' => trim((string) ($item['additional_information'] ?? '')) ?: null,
             'product_image_path' => $primaryImagePath,
             'unit' => $product->unit ?? 'nos',
             'quantity' => $quantity,

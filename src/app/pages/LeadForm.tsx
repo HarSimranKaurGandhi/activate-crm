@@ -31,6 +31,8 @@ const LEAD_TAG_OPTIONS = [
 ];
 
 const LEAD_EXPECTED_ORDER_VALUE_OPTIONS = [
+  { value: 'Less Than 1L', label: 'Less Than 1L' },
+  { value: '1L-5L', label: '1L-5L' },
   { value: '5L-10L', label: '5L-10L' },
   { value: '10L-30L', label: '10L-30L' },
   { value: '30L+', label: '30L+' },

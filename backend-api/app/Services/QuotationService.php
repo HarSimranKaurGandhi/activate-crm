@@ -25,7 +25,7 @@ class QuotationService extends CrudService
 
     protected array $searchColumns = [];
 
-    protected array $relations = ['customer', 'items', 'adjustments', 'terms'];
+    protected array $relations = ['customer', 'lead', 'items', 'adjustments', 'terms'];
 
     private ?array $discountOverrideColumns = null;
 
@@ -196,7 +196,7 @@ class QuotationService extends CrudService
             'active_adjustments' => AdjustmentMaster::where('is_active', true)->orderBy('display_order')->orderBy('name')->get(),
             'active_terms' => TermMaster::where('is_active', true)->orderBy('display_order')->orderBy('title')->get(),
             'pricing_modes' => ['exclusive_gst', 'inclusive_gst'],
-            'statuses' => ['draft', 'pending_approval', 'approved', 'rejected', 'revised'],
+            'statuses' => ['draft', 'pending_approval', 'approved', 'shared_with_client', 'rejected', 'revised'],
         ];
     }
 
@@ -408,6 +408,7 @@ class QuotationService extends CrudService
     {
         return [
             'customer' => fn ($query) => $query->select($this->customerColumns()),
+            'lead',
             'brandBanner',
             'items.product.measurementUnit',
             'adjustments',
@@ -419,6 +420,7 @@ class QuotationService extends CrudService
     {
         return [
             'customer' => fn ($query) => $query->select($this->customerColumns()),
+            'lead',
             'brandBanner',
             'items.product.measurementUnit',
             Schema::hasTable('quotation_item_discount_overrides') ? 'items.discountOverrides' : 'items',
@@ -443,47 +445,37 @@ class QuotationService extends CrudService
         $leadId = $data['lead_id'] ?? null;
 
         if (! $leadId) {
-            unset($data['lead_id']);
+            $data['lead_id'] = null;
 
             return $data;
         }
 
-        /** @var Lead $lead */
-        $lead = Lead::query()->findOrFail($leadId);
-
-        $customer = Customer::query()
-            ->where('phone', $lead->phone)
-            ->when(
-                filled($lead->email),
-                fn (Builder $query) => $query->orWhere('email', $lead->email)
-            )
-            ->first();
-
-        if (! $customer) {
-            $customer = Customer::create([
-                'primary_name' => $lead->name ?: "Lead {$lead->phone}",
-                'company_name' => null,
-                'email' => $lead->email,
-                'phone' => $lead->phone,
-                'address_line_1' => $lead->address_line_1 ?: 'N/A',
-                'address_line_2' => $lead->address_line_2,
-                'city' => $lead->city,
-                'state' => $lead->state ?: 'N/A',
-                'pincode' => $lead->pincode,
-                'country' => $lead->country ?: 'India',
-                'notes' => $lead->requirement ?: null,
-                'is_active' => true,
-            ]);
-        }
-
-        $data['customer_id'] = $customer->id;
-        unset($data['lead_id']);
+        Lead::query()->findOrFail($leadId);
+        $data['lead_id'] = (int) $leadId;
+        $data['customer_id'] = null;
 
         return $data;
     }
 
     private function buildAdjustmentSnapshot(array $input, float $subtotalAfterDiscount): array
     {
+        if (empty($input['adjustment_master_id'])) {
+            $name = trim((string) ($input['name'] ?? ''));
+            $amount = round((float) ($input['value'] ?? 0), 2);
+
+            return [
+                'adjustment_master_id' => null,
+                'name' => $name,
+                'code' => 'CUSTOM',
+                'adjustment_type' => $amount < 0 ? 'discount' : 'charge',
+                'value_type' => 'fixed',
+                'value' => $amount,
+                'amount' => $amount,
+                'is_taxable' => false,
+                'display_order' => (int) ($input['display_order'] ?? 0),
+            ];
+        }
+
         $master = AdjustmentMaster::findOrFail($input['adjustment_master_id']);
         $value = (float) ($input['value'] ?? $master->default_value ?? 0);
         $amount = $master->value_type === 'percent'

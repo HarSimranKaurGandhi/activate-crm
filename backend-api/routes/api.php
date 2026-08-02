@@ -144,6 +144,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('leads', [LeadController::class, 'store']);
     Route::delete('leads/{id}', [LeadController::class, 'destroy']);
     Route::get('leads/{id}/activity', [LeadController::class, 'activity']);
+    Route::get('leads/{id}/quotations', [LeadController::class, 'quotations']);
     Route::post('leads/{id}/comments', [LeadController::class, 'comment']);
     Route::post('leads/{id}/calls', [LeadController::class, 'startCall']);
     Route::patch('leads/{id}/calls/{activityId}', [LeadController::class, 'resolveCall']);

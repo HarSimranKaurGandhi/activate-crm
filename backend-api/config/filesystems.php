@@ -2,6 +2,7 @@
 
 return [
     'default' => env('FILESYSTEM_DISK', 'local'),
+    'public_upload_root' => env('PUBLIC_UPLOAD_ROOT', public_path()),
     'disks' => [
         'local' => [
             'driver' => 'local',

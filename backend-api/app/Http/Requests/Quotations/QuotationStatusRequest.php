@@ -14,6 +14,6 @@ class QuotationStatusRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['status' => ['required', Rule::in(['draft', 'pending_approval', 'approved', 'rejected', 'revised'])]];
+        return ['status' => ['required', Rule::in(['draft', 'pending_approval', 'approved', 'shared_with_client', 'rejected', 'revised'])]];
     }
 }

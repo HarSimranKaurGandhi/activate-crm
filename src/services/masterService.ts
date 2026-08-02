@@ -1,4 +1,4 @@
-import { apiClient, unwrap, unwrapEnvelope } from './apiClient';
+import { apiClient, cachedDropdown, invalidateDropdownCache, unwrap, unwrapEnvelope } from './apiClient';
 
 const listParams = { per_page: 100 };
 
@@ -10,41 +10,55 @@ const crud = (resource: string) => ({
     return unwrap<any>(await apiClient.get(`/${resource}/${id}`));
   },
   async create(payload: Record<string, unknown>) {
-    return unwrap<any>(await apiClient.post(`/${resource}`, payload));
+    const result = unwrap<any>(await apiClient.post(`/${resource}`, payload));
+    invalidateDropdownCache(`/${resource}/dropdown`);
+    return result;
   },
   async update(id: string, payload: Record<string, unknown>) {
-    return unwrap<any>(await apiClient.put(`/${resource}/${id}`, payload));
+    const result = unwrap<any>(await apiClient.put(`/${resource}/${id}`, payload));
+    invalidateDropdownCache(`/${resource}/dropdown`);
+    return result;
   },
   async remove(id: string) {
-    return unwrap<any>(await apiClient.delete(`/${resource}/${id}`));
+    const result = unwrap<any>(await apiClient.delete(`/${resource}/${id}`));
+    invalidateDropdownCache(`/${resource}/dropdown`);
+    return result;
   },
   async status(id: string, isActive: boolean) {
-    return unwrap<any>(await apiClient.patch(`/${resource}/${id}/status`, { is_active: isActive }));
+    const result = unwrap<any>(await apiClient.patch(`/${resource}/${id}/status`, { is_active: isActive }));
+    invalidateDropdownCache(`/${resource}/dropdown`);
+    return result;
   },
 });
 
 export const categoryService = {
   ...crud('categories'),
   async dropdown(params: Record<string, unknown> = {}) {
-    return unwrap<any[]>(await apiClient.get('/categories/dropdown', { params }));
+    return cachedDropdown<any[]>('/categories/dropdown', params);
   },
 };
 
 export const brandService = {
   ...crud('brands'),
   async create(payload: FormData | Record<string, unknown>) {
-    return unwrap<any>(await apiClient.post('/brands', payload));
+    const brand = unwrap<any>(await apiClient.post('/brands', payload));
+    invalidateDropdownCache('/brands/dropdown');
+    return brand;
   },
   async update(id: string, payload: FormData | Record<string, unknown>) {
     if (payload instanceof FormData) {
       payload.append('_method', 'PUT');
-      return unwrap<any>(await apiClient.post(`/brands/${id}`, payload));
+      const brand = unwrap<any>(await apiClient.post(`/brands/${id}`, payload));
+      invalidateDropdownCache('/brands/dropdown');
+      return brand;
     }
 
-    return unwrap<any>(await apiClient.put(`/brands/${id}`, payload));
+    const brand = unwrap<any>(await apiClient.put(`/brands/${id}`, payload));
+    invalidateDropdownCache('/brands/dropdown');
+    return brand;
   },
   async dropdown(params: Record<string, unknown> = {}) {
-    return unwrap<any[]>(await apiClient.get('/brands/dropdown', { params }));
+    return cachedDropdown<any[]>('/brands/dropdown', params);
   },
 };
 

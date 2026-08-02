@@ -11,7 +11,7 @@ class QuotationItem extends Model
     protected $table = 'quotation_items';
 
     protected $fillable = [
-        'quotation_id', 'product_id', 'sort_order', 'product_name', 'model_number', 'specifications',
+        'quotation_id', 'product_id', 'sort_order', 'product_name', 'model_number', 'specifications', 'additional_information',
         'product_image_path', 'unit', 'quantity', 'mrp', 'base_price', 'edited_price',
         'gst_percent', 'discount_percent', 'discount_amount', 'price_after_discount',
         'taxable_amount', 'tax_amount', 'line_total',

@@ -66,7 +66,7 @@ class PublicAsset
 
     private static function baseRoot(): string
     {
-        $configuredRoot = trim((string) env('PUBLIC_UPLOAD_ROOT', ''));
+        $configuredRoot = trim((string) config('filesystems.public_upload_root', public_path()));
 
         if ($configuredRoot !== '') {
             return rtrim($configuredRoot, DIRECTORY_SEPARATOR);

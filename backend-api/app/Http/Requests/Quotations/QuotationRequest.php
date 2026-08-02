@@ -4,6 +4,7 @@ namespace App\Http\Requests\Quotations;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class QuotationRequest extends FormRequest
 {
@@ -35,7 +36,7 @@ class QuotationRequest extends FormRequest
             'intro_text' => ['nullable', 'string'],
             'remarks' => ['nullable', 'string'],
             'internal_notes' => ['nullable', 'string'],
-            'status' => ['sometimes', Rule::in(['draft', 'pending_approval', 'approved', 'rejected', 'revised'])],
+            'status' => ['sometimes', Rule::in(['draft', 'pending_approval', 'approved', 'shared_with_client', 'rejected', 'revised'])],
             'internal_remarks' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
@@ -44,9 +45,11 @@ class QuotationRequest extends FormRequest
             'items.*.edited_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'items.*.discount_amount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.additional_information' => ['nullable', 'string', 'max:255'],
             'adjustments' => ['sometimes', 'array'],
-            'adjustments.*.adjustment_master_id' => ['required_with:adjustments', 'exists:adjustment_masters,id'],
-            'adjustments.*.value' => ['nullable', 'numeric'],
+            'adjustments.*.adjustment_master_id' => ['nullable', 'exists:adjustment_masters,id', 'required_without:adjustments.*.name'],
+            'adjustments.*.name' => ['nullable', 'string', 'max:255', 'required_without:adjustments.*.adjustment_master_id'],
+            'adjustments.*.value' => ['required', 'numeric'],
             'adjustments.*.display_order' => ['sometimes', 'integer', 'min:0'],
             'terms' => ['sometimes', 'array'],
             'terms.*.term_master_id' => ['nullable', 'integer', 'exists:term_masters,id', 'required_without:terms.*.content'],
@@ -54,5 +57,27 @@ class QuotationRequest extends FormRequest
             'terms.*.content' => ['nullable', 'string', 'required_without:terms.*.term_master_id'],
             'terms.*.display_order' => ['sometimes', 'integer', 'min:0'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($this->filled('customer_id') && $this->filled('lead_id')) {
+                $validator->errors()->add(
+                    'lead_id',
+                    'Select either a customer or a lead, not both.'
+                );
+            }
+
+            foreach ((array) $this->input('items', []) as $index => $item) {
+                $information = trim((string) ($item['additional_information'] ?? ''));
+                if ($information !== '' && count(preg_split('/\s+/u', $information) ?: []) > 20) {
+                    $validator->errors()->add(
+                        "items.{$index}.additional_information",
+                        'Additional information may not contain more than 20 words.'
+                    );
+                }
+            }
+        });
     }
 }

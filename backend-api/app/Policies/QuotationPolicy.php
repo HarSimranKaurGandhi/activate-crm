@@ -14,7 +14,7 @@ class QuotationPolicy
 
     public function update(User $user, Quotation $quotation): bool
     {
-        return $quotation->status !== 'approved'
+        return ! in_array($quotation->status, ['approved', 'shared_with_client'], true)
             && ($user->hasAnyRole(['admin', 'sales']) || (int) $quotation->created_by === (int) $user->id);
     }
 

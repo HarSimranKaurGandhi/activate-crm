@@ -13,7 +13,7 @@ export const QuotationList = () => {
   const navigate = useNavigate();
   const { quotations, loading, deleteQuotation, duplicateQuotation } = useData();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('draft');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sort, setSort] = useState<{ key: 'number' | 'date' | 'customer' | 'items' | 'grandTotal' | 'status'; direction: SortDirection }>({
@@ -28,7 +28,9 @@ export const QuotationList = () => {
       q.customer?.name,
       q.customer?.company,
     ].some((value) => String(value || '').toLowerCase().includes(search));
-    const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
+    const matchesStatus = statusFilter === 'draft'
+      ? ['draft', 'rejected', 'revised'].includes(q.status)
+      : q.status === statusFilter;
 
     let matchesDate = true;
     if (dateRange.start || dateRange.end) {
@@ -93,14 +95,12 @@ export const QuotationList = () => {
 
   const activeFilterCount = [
     searchTerm.trim() ? 1 : 0,
-    statusFilter !== 'all' ? 1 : 0,
     dateRange.start ? 1 : 0,
     dateRange.end ? 1 : 0,
   ].reduce((sum, count) => sum + count, 0);
 
   const clearFilters = () => {
     setSearchTerm('');
-    setStatusFilter('all');
     setDateRange({ start: '', end: '' });
   };
 
@@ -117,6 +117,32 @@ export const QuotationList = () => {
             <Plus className="w-5 h-5" />
             Create Quotation
           </button>
+        </div>
+
+        <div className="flex overflow-x-auto rounded-2xl border border-gray-200 bg-white p-1.5">
+          {[
+            { value: 'draft', label: 'Drafts' },
+            { value: 'pending', label: 'Pending Approval' },
+            { value: 'approved', label: 'Approved' },
+            { value: 'shared_with_client', label: 'Shared with Client' },
+          ].map((tab) => {
+            const count = quotations.filter((quotation) => tab.value === 'draft'
+              ? ['draft', 'rejected', 'revised'].includes(quotation.status)
+              : quotation.status === tab.value).length;
+
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setStatusFilter(tab.value)}
+                className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+                  statusFilter === tab.value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {tab.label} <span className="ml-1 opacity-75">({count})</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Filters */}
@@ -162,21 +188,6 @@ export const QuotationList = () => {
               </div>
             </div>
 
-            {/* Status Filter */}
-            <div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="draft">Draft</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
-
             {/* Date Range - Start */}
             <div>
               <input
@@ -200,7 +211,7 @@ export const QuotationList = () => {
             </div>
           </div>
 
-          <div className="hidden md:grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -212,20 +223,6 @@ export const QuotationList = () => {
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-            </div>
-
-            <div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="draft">Draft</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
             </div>
 
             <div className="flex gap-2">

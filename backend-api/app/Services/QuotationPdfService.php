@@ -162,12 +162,13 @@ class QuotationPdfService
 
     private function buildHtml(Quotation $quotation): string
     {
-        $quotation->loadMissing(['customer', 'items', 'adjustments', 'terms', 'brandBanner']);
+        $quotation->loadMissing(['customer', 'lead', 'items', 'adjustments', 'terms', 'brandBanner']);
         $quotation->loadMissing(['items.product.measurementUnit']);
         $company = CompanySetting::query()->first();
         $bank = CompanyBankDetail::query()->where('is_default', true)->first() ?? CompanyBankDetail::query()->first();
 
         $customer = $quotation->customer;
+        $lead = $quotation->lead;
         $gstInclusive = $quotation->pricing_mode === 'inclusive_gst';
         $terms = $quotation->terms->sortBy('display_order')->values();
         $adjustments = $quotation->adjustments->sortBy('display_order')->values();
@@ -185,7 +186,7 @@ class QuotationPdfService
                 : '30 Days from Date of Issue',
             'status_key' => $this->statusKey($quotation->status),
             'status_label' => $this->statusLabel($quotation->status),
-            'requires_watermark' => $quotation->status !== 'approved',
+            'requires_watermark' => ! in_array($quotation->status, ['approved', 'shared_with_client'], true),
             'show_discount' => (bool) $quotation->show_discount_to_customer,
             'show_mrp' => $quotation->show_mrp_to_customer === null ? true : (bool) $quotation->show_mrp_to_customer,
             'show_item_wise_gst' => $quotation->show_item_wise_gst_to_customer === null ? false : (bool) $quotation->show_item_wise_gst_to_customer,
@@ -202,18 +203,18 @@ class QuotationPdfService
             'before_tax_total_label' => $this->money((float) $quotation->subtotal_after_discount + $totalAdjustments),
             'grand_total_label' => $this->money($quotation->grand_total),
             'customer' => [
-                'primary_name' => $customer?->primary_name ?: '',
+                'primary_name' => $customer?->primary_name ?: ($lead?->name ?: ''),
                 'company_name' => $customer?->company_name ?: '',
-                'phone' => $this->maskPhone($customer?->phone),
-                'email' => $customer?->email ?: '',
+                'phone' => $this->maskPhone($customer?->phone ?: $lead?->phone),
+                'email' => $customer?->email ?: ($lead?->email ?: ''),
                 'gst_number' => $customer?->gst_number ?: '',
                 'address' => collect([
-                    $customer?->address_line_1,
-                    $customer?->address_line_2,
-                    $customer?->city,
-                    $customer?->state,
-                    $customer?->pincode,
-                    $customer?->country,
+                    $customer?->address_line_1 ?: $lead?->address_line_1,
+                    $customer?->address_line_2 ?: $lead?->address_line_2,
+                    $customer?->city ?: $lead?->city,
+                    $customer?->state ?: $lead?->state,
+                    $customer?->pincode ?: $lead?->pincode,
+                    $customer?->country ?: $lead?->country,
                 ])->filter()->implode(', '),
             ],
             'salesperson' => [
@@ -225,6 +226,7 @@ class QuotationPdfService
                 $unitLabel = trim((string) ($item->product?->measurementUnit?->name ?: $item->unit ?: ''));
                 return [
                     'product_name' => $item->product_name,
+                    'additional_information' => $item->additional_information,
                     'model_number' => $item->model_number,
                     'product_image_src' => $this->assetSource($item->product_image_path),
                     'specifications_html' => $this->sanitizeQuotationHtml($item->specifications ?: ''),
@@ -368,6 +370,7 @@ class QuotationPdfService
         return match ($status) {
             'pending_approval' => 'Pending',
             'approved' => 'Approved',
+            'shared_with_client' => 'Shared with Client',
             'rejected' => 'Rejected',
             'revised' => 'Revised',
             default => 'Draft',
@@ -379,6 +382,7 @@ class QuotationPdfService
         return match ($status) {
             'pending_approval' => 'pending',
             'approved' => 'approved',
+            'shared_with_client' => 'approved',
             'rejected' => 'rejected',
             'revised' => 'revised',
             default => 'draft',
@@ -419,7 +423,12 @@ class QuotationPdfService
 
     private function downloadFilename(Quotation $quotation): string
     {
-        $clientName = trim((string) ($quotation->customer?->company_name ?: $quotation->customer?->primary_name ?: 'Client'));
+        $clientName = trim((string) (
+            $quotation->customer?->company_name
+            ?: $quotation->customer?->primary_name
+            ?: $quotation->lead?->name
+            ?: 'Client'
+        ));
         $quoteNumber = trim((string) ($quotation->quotation_number ?: 'quotation'));
 
         $filename = trim(sprintf('Quote %s %s', $clientName, $quoteNumber));

@@ -16,6 +16,8 @@ export const CustomerDetailsDialog = ({ customerId, open, onOpenChange }: Props)
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsLoaded, setProductsLoaded] = useState(false);
   const [productId, setProductId] = useState('');
   const [productDescription, setProductDescription] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -42,10 +44,20 @@ export const CustomerDetailsDialog = ({ customerId, open, onOpenChange }: Props)
       return;
     }
     void load();
-    productService.selectable({ per_page: 50 })
-      .then((result) => setProducts(result.data || []))
-      .catch(() => setProducts([]));
   }, [customerId, open]);
+
+  useEffect(() => {
+    if (!productPopupOpen || productsLoaded || productsLoading) return;
+
+    setProductsLoading(true);
+    productService.selectable({ per_page: 50 })
+      .then((result) => {
+        setProducts(result.data || []);
+        setProductsLoaded(true);
+      })
+      .catch(() => setProducts([]))
+      .finally(() => setProductsLoading(false));
+  }, [productPopupOpen, productsLoaded, productsLoading]);
 
   const addProduct = async () => {
     if (!customerId || (!productId && !productDescription.trim()) || Number(quantity) <= 0) {
@@ -189,8 +201,9 @@ export const CustomerDetailsDialog = ({ customerId, open, onOpenChange }: Props)
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">CRM Product (optional)</label>
               <select value={productId} onChange={(event) => setProductId(event.target.value)}
+                disabled={productsLoading}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm">
-                <option value="">Not from Product Master</option>
+                <option value="">{productsLoading ? 'Loading products...' : 'Not from Product Master'}</option>
                 {products.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.product_name}{product.model_number ? ` — ${product.model_number}` : ''}

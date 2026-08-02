@@ -8,7 +8,8 @@ import { productService } from '../../services/productService';
 import type { PaginationMeta } from '../../services/productService';
 import { userService } from '../../services/userService';
 import { leadService } from '../../services/leadService';
-import { mapProduct } from '../../services/mappers';
+import { quotationService } from '../../services/quotationService';
+import { mapProduct, mapQuotation } from '../../services/mappers';
 import { useAuth } from '../auth/AuthContext';
 import { LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
@@ -24,6 +25,14 @@ const maskPhone = (value?: string) => {
 const getQuotationBasePrice = (product: any) => Number(product?.mrp ?? product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
 const normalizeDiscount = (value: number) => Math.min(100, Math.max(0, Number(value.toFixed(2))));
 const normalizeAmount = (value: number) => Math.max(0, Number.isFinite(value) ? value : 0);
+const limitWords = (value: string, maximum: number) => {
+  const words = Array.from(value.matchAll(/\S+/g));
+  if (words.length <= maximum) return value;
+
+  const lastAllowedWord = words[maximum - 1];
+  return value.slice(0, (lastAllowedWord.index || 0) + lastAllowedWord[0].length);
+};
+const wordCount = (value: string) => value.trim().split(/\s+/).filter(Boolean).length;
 const getDiscountedUnitPrice = (item: Pick<QuotationItem, 'price' | 'discount' | 'discountedPrice'>) => {
   if (Number.isFinite(item.discountedPrice)) {
     return normalizeAmount(item.discountedPrice);
@@ -61,6 +70,13 @@ interface QuotationItem {
   discount: number;
   discountedPrice: number;
   specifications: string;
+  additionalInfo: string;
+}
+
+interface CustomAdjustment {
+  id: string;
+  name: string;
+  amount: number;
 }
 
 const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }: any) => {
@@ -101,6 +117,16 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
             <div className="text-xs text-gray-500 truncate">{item.product.modelNumber}</div>
             {item.specifications && <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{stripHtml(item.specifications)}</div>}
           </div>
+        </div>
+        <div className="mt-2">
+          <textarea
+            value={item.additionalInfo || ''}
+            onChange={(event) => onUpdate(item.id, { additionalInfo: limitWords(event.target.value, 20) })}
+            placeholder="Additional information (maximum 20 words)"
+            rows={2}
+            className="w-full resize-none rounded-md border border-gray-200 px-2.5 py-2 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+          <div className="mt-0.5 text-right text-[10px] text-gray-400">{wordCount(item.additionalInfo || '')}/20 words</div>
         </div>
       </td>
       <td className="px-2 py-3 align-middle">
@@ -203,7 +229,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
 export const QuotationBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { quotations, brands, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
+  const { brands, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
   const { user } = useAuth();
 
   const [selectedLead, setSelectedLead] = useState<any>(null);
@@ -216,6 +242,7 @@ export const QuotationBuilder = () => {
   const [salesUsers, setSalesUsers] = useState<any[]>([]);
   const [items, setItems] = useState<QuotationItem[]>([]);
   const [globalDiscount, setGlobalDiscount] = useState(0);
+  const [customAdjustments, setCustomAdjustments] = useState<CustomAdjustment[]>([]);
   const [gstInclusive, setGstInclusive] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [showMrp, setShowMrp] = useState(false);
@@ -237,11 +264,41 @@ export const QuotationBuilder = () => {
   const [productsLoading, setProductsLoading] = useState(false);
   const [inProgressLeads, setInProgressLeads] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [editingQuotation, setEditingQuotation] = useState<any>(null);
+  const [quotationLoading, setQuotationLoading] = useState(Boolean(id));
 
   const brandBannerOptions = brands.filter(
     (brand) => brand.status === 'active' && String(brand.logoPath || '').trim() !== '',
   );
   const selectedBrandBanner = brandBannerOptions.find((brand) => brand.id === brandBannerId) || null;
+
+  useEffect(() => {
+    if (!id) {
+      setEditingQuotation(null);
+      setQuotationLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setQuotationLoading(true);
+    quotationService.get(id)
+      .then((quotation) => {
+        if (!cancelled) setEditingQuotation(mapQuotation(quotation));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error('Unable to load quotation');
+          navigate('/quotations');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setQuotationLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate]);
 
   useEffect(() => {
     userService
@@ -251,22 +308,14 @@ export const QuotationBuilder = () => {
   }, []);
 
   useEffect(() => {
-    const quotation = id ? quotations.find(q => q.id === id) : null;
+    const quotation = id ? editingQuotation : null;
     if (id) {
       if (quotation) {
-        setSelectedLead(quotation.customer ? {
-          id: quotation.customer.id,
-          sourceType: 'customer',
-          customerId: quotation.customer.id,
-          name: quotation.customer.name,
-          phone: quotation.customer.phone,
-          email: quotation.customer.email,
-          company: quotation.customer.company,
-          address: quotation.customer.address,
-        } : null);
+        setSelectedLead(quotation.lead || null);
         setSalesperson(quotation.salesperson);
         setItems(quotation.items);
         setGlobalDiscount(quotation.globalDiscount);
+        setCustomAdjustments(quotation.customAdjustments || []);
         setGstInclusive(quotation.gstInclusive);
         setShowDiscount(quotation.showDiscount);
         setShowMrp(quotation.showMrp ?? true);
@@ -289,6 +338,7 @@ export const QuotationBuilder = () => {
       setBrandBannerId('');
       setCustomTermEnabled(false);
       setCustomTermText('');
+      setCustomAdjustments([]);
 
       if (user) {
         setSelectedSalespersonId(String(user.id || ''));
@@ -306,7 +356,7 @@ export const QuotationBuilder = () => {
       }
     }
 
-  }, [id, quotations, settings, masterTerms, user]);
+  }, [editingQuotation, id, settings, masterTerms, user]);
 
   useEffect(() => {
     if (id || !user || selectedSalespersonId) {
@@ -406,6 +456,7 @@ export const QuotationBuilder = () => {
       discount: 0,
       discountedPrice: getQuotationBasePrice(product),
       specifications: product.specifications,
+      additionalInfo: '',
     };
     setItems([...items, newItem]);
     setShowProductModal(false);
@@ -466,9 +517,10 @@ export const QuotationBuilder = () => {
       });
     }
 
-    const grandTotal = subtotal + taxAmount;
+    const adjustmentTotal = customAdjustments.reduce((sum, adjustment) => sum + (Number(adjustment.amount) || 0), 0);
+    const grandTotal = subtotal + taxAmount + adjustmentTotal;
 
-    return { subtotal, taxAmount, grandTotal };
+    return { subtotal, taxAmount, adjustmentTotal, grandTotal };
   };
 
   const totals = calculateTotals();
@@ -490,7 +542,7 @@ export const QuotationBuilder = () => {
   });
   const leadPagination = usePagination(filteredLeads, 8);
 
-  if (loading && id) {
+  if ((loading || quotationLoading) && id) {
     return (
       <div className="p-4">
         <LoadingState label="Loading quotation..." />
@@ -511,6 +563,10 @@ export const QuotationBuilder = () => {
       toast.error('Please select a brand for the brand banner');
       return;
     }
+    if (customAdjustments.some((adjustment) => !adjustment.name.trim())) {
+      toast.error('Please enter a description for every custom summary field');
+      return;
+    }
 
     const quotationData = {
       date: new Date().toISOString(),
@@ -518,6 +574,7 @@ export const QuotationBuilder = () => {
       salesperson,
       items,
       globalDiscount,
+      customAdjustments,
       gstInclusive,
       showDiscount,
       showMrp,
@@ -877,6 +934,53 @@ export const QuotationBuilder = () => {
                     <span className="font-medium text-gray-900">₹{totals.taxAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                   </div>
                 )}
+                <div className="space-y-2 border-t border-blue-100 pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-gray-700">Custom fields</span>
+                    <button
+                      type="button"
+                      onClick={() => setCustomAdjustments((current) => [...current, { id: `custom-${Date.now()}`, name: '', amount: 0 }])}
+                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add field
+                    </button>
+                  </div>
+                  {customAdjustments.map((adjustment) => (
+                    <div key={adjustment.id} className="grid grid-cols-[minmax(0,1fr)_120px_32px] gap-2">
+                      <input
+                        type="text"
+                        value={adjustment.name}
+                        onChange={(event) => setCustomAdjustments((current) => current.map((row) => row.id === adjustment.id ? { ...row, name: event.target.value } : row))}
+                        placeholder="Discount, service, expense..."
+                        className="min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={adjustment.amount}
+                        onChange={(event) => setCustomAdjustments((current) => current.map((row) => row.id === adjustment.id ? { ...row, amount: Number(event.target.value) || 0 } : row))}
+                        placeholder="+ / - amount"
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-right text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCustomAdjustments((current) => current.filter((row) => row.id !== adjustment.id))}
+                        className="rounded-lg text-red-600 hover:bg-red-50"
+                        title="Remove custom field"
+                      >
+                        <Trash2 className="mx-auto h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {customAdjustments.length > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Custom adjustment total</span>
+                      <span className={`font-medium ${totals.adjustmentTotal < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                        {totals.adjustmentTotal >= 0 ? '+' : '-'}₹{Math.abs(totals.adjustmentTotal).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <div className="pt-3 border-t-2 border-blue-200">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-gray-900">Grand Total</span>

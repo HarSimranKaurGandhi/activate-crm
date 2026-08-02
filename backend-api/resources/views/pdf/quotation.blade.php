@@ -318,6 +318,7 @@
                     @if($item['product_image_src'])<img class="product-image" src="{{ $item['product_image_src'] }}" alt="{{ $item['product_name'] }}">@else<div class="product-image-placeholder">Product Image</div>@endif
                     <div class="product-name">{{ $item['product_name'] }}</div>
                     @if($item['model_number'])<div class="product-model">{{ $item['model_number'] }}</div>@endif
+                    @if($item['additional_information'])<div style="margin-top: 6px; padding: 5px 7px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 8px; line-height: 1.3; text-align: left;">{!! nl2br(e($item['additional_information'])) !!}</div>@endif
                   </td>
                   <td class="specs col-specs" style="width: {{ $columnWidths['specs'] }};">{!! $item['specifications_html'] !!}</td>
                   <td class="right amount-strong col-price" style="width: {{ $columnWidths['price'] }};">{{ $quotation['show_mrp'] ? $item['edited_price_label'] : $item['discounted_price_label'] }}</td>

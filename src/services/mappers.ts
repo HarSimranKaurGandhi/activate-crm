@@ -1,7 +1,7 @@
 import { apiOrigin } from './apiClient';
 
 export type Status = 'active' | 'inactive';
-export type QuotationStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'revised';
+export type QuotationStatus = 'draft' | 'pending' | 'approved' | 'shared_with_client' | 'rejected' | 'revised';
 export type TaskStatus = 'new' | 'in_progress' | 'completed' | 'on_hold';
 export type LeadStatus = 'new' | 'enquiry' | 'in_progress' | 'on_hold' | 'closed_success' | 'closed_fail';
 
@@ -405,6 +405,23 @@ export const termPayload = (term: any) => ({
 
 export const mapQuotation = (quotation: any) => {
   const customTerm = (quotation.terms || []).find((term: any) => !term.term_master_id);
+  const linkedLead = quotation.lead?.id ? {
+    id: String(quotation.lead.id),
+    sourceType: 'lead',
+    name: quotation.lead.name || '',
+    company: '',
+    email: quotation.lead.email || '',
+    phone: quotation.lead.phone || '',
+    address: [
+      quotation.lead.address_line_1,
+      quotation.lead.address_line_2,
+      quotation.lead.city,
+      quotation.lead.state,
+      quotation.lead.pincode,
+      quotation.lead.country,
+    ].filter(Boolean).join(', '),
+  } : null;
+  const linkedCustomer = quotation.customer?.id ? mapCustomer(quotation.customer) : null;
 
   return {
   customTermEnabled: Boolean(customTerm),
@@ -413,8 +430,14 @@ export const mapQuotation = (quotation: any) => {
   number: quotation.quotation_number || '',
   date: quotation.quote_date || quotation.created_at || '',
   validUntil: quotation.valid_until || '',
-  customer: quotation.customer?.id ? mapCustomer(quotation.customer) : null,
+  customer: linkedCustomer || linkedLead,
   customerId: quotation.customer_id ? String(quotation.customer_id) : '',
+  leadId: quotation.lead_id ? String(quotation.lead_id) : '',
+  lead: linkedLead || (linkedCustomer ? {
+    ...linkedCustomer,
+    sourceType: 'customer',
+    customerId: linkedCustomer.id,
+  } : null),
   salesperson: {
     name: quotation.salesperson_name || '',
     phone: quotation.salesperson_phone || '',
@@ -446,13 +469,23 @@ export const mapQuotation = (quotation: any) => {
       ?? item.base_price
     ),
     specifications: item.specifications || '',
+    additionalInfo: item.additional_information || '',
     lineTotal: asNumber(item.line_total),
   })),
   globalDiscount: asNumber(quotation.default_discount_percent),
   adjustments: (quotation.adjustments || []).reduce((acc: Record<string, { enabled: boolean; amount: number }>, adjustment: any) => {
-    acc[String(adjustment.adjustment_master_id)] = { enabled: true, amount: asNumber(adjustment.value) };
+    if (adjustment.adjustment_master_id) {
+      acc[String(adjustment.adjustment_master_id)] = { enabled: true, amount: asNumber(adjustment.value) };
+    }
     return acc;
   }, {}),
+  customAdjustments: (quotation.adjustments || [])
+    .filter((adjustment: any) => !adjustment.adjustment_master_id)
+    .map((adjustment: any) => ({
+      id: String(adjustment.id),
+      name: adjustment.name || '',
+      amount: asNumber(adjustment.amount ?? adjustment.value),
+    })),
   gstInclusive: quotation.pricing_mode === 'inclusive_gst',
   showDiscount: Boolean(quotation.show_discount_to_customer),
   showMrp: quotation.show_mrp_to_customer === undefined || quotation.show_mrp_to_customer === null
@@ -490,7 +523,9 @@ export const quotationPayload = (quotation: any) => ({
   customer_id:
     quotation.lead?.sourceType === 'customer'
       ? Number(quotation.lead?.customerId || quotation.lead?.id)
-      : (quotation.customer?.id || quotation.customerId ? Number(quotation.customer?.id || quotation.customerId) : null),
+      : (quotation.lead?.sourceType === 'lead'
+        ? null
+        : (quotation.customer?.id || quotation.customerId ? Number(quotation.customer?.id || quotation.customerId) : null)),
   lead_id:
     quotation.lead?.sourceType === 'lead'
       ? Number(quotation.lead?.id || quotation.leadId)
@@ -518,6 +553,7 @@ export const quotationPayload = (quotation: any) => ({
     edited_price: asNumber(item.price),
     discount_percent: asNumber(item.discount),
     discount_amount: null,
+    additional_information: String(item.additionalInfo || '').trim() || null,
   })),
   adjustments: Object.entries(quotation.adjustments || {})
     .filter(([, value]: any) => value?.enabled)
@@ -525,7 +561,12 @@ export const quotationPayload = (quotation: any) => ({
       adjustment_master_id: Number(adjustmentId),
       value: asNumber(value.amount),
       display_order: index,
-    })),
+    })).concat((quotation.customAdjustments || []).map((adjustment: any, index: number) => ({
+      adjustment_master_id: null,
+      name: String(adjustment.name || '').trim(),
+      value: asNumber(adjustment.amount),
+      display_order: Object.keys(quotation.adjustments || {}).length + index,
+    }))),
   terms: [
     ...(quotation.terms || []).map((termId: string, index: number) => ({
       term_master_id: Number(termId),

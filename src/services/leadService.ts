@@ -16,6 +16,9 @@ export const leadService = {
   async activity(id: string) {
     return unwrap<any[]>(await apiClient.get(`/leads/${id}/activity`));
   },
+  async quotations(id: string, params: Record<string, unknown> = {}) {
+    return unwrapEnvelope<any[]>(await apiClient.get(`/leads/${id}/quotations`, { params }));
+  },
   async addComment(id: string, comment: string) {
     return unwrap<any>(await apiClient.post(`/leads/${id}/comments`, { comment }));
   },

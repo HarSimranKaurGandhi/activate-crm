@@ -72,7 +72,7 @@ class QuotationController extends ApiController
 
         return $this->ok('Quotation preview fetched successfully', [
             'quotation' => new QuotationResource($quotation),
-            'requires_watermark' => $quotation->status !== 'approved',
+            'requires_watermark' => ! in_array($quotation->status, ['approved', 'shared_with_client'], true),
         ]);
     }
 
