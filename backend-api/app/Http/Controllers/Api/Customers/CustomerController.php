@@ -99,6 +99,7 @@ class CustomerController extends ApiController
             'product_id' => ['nullable', 'integer', 'exists:products,id', 'required_without:product_description'],
             'product_description' => ['nullable', 'string', 'max:2000', 'required_without:product_id'],
             'quantity' => ['required', 'numeric', 'gt:0'],
+            'purchase_date' => ['required', 'date', 'before_or_equal:today'],
         ]);
 
         $this->customers->addOwnedProduct($this->customers->find($id), $validated, $request->user());

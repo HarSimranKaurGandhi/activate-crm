@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Lead extends Model
 {
@@ -26,6 +27,8 @@ class Lead extends Model
         'failure_reason',
         'failure_reason_details',
         'tags',
+        'customer_importance',
+        'customer_category',
         'follow_up_date',
         'assigned_to',
         'created_by',
@@ -52,5 +55,10 @@ class Lead extends Model
     public function favouritedBy(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'lead_favourites')->withTimestamps();
+    }
+
+    public function whatsappFollowUps(): HasMany
+    {
+        return $this->hasMany(LeadWhatsappFollowUp::class);
     }
 }

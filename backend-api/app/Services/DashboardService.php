@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 
 class DashboardService
 {
+    private const CLOSED_LEAD_STATUSES = ['closed_success', 'closed_fail'];
+
     public function quotationSummary(Request $request): array
     {
         $user = $request->user();
@@ -108,6 +110,7 @@ class DashboardService
 
         $leadFollowUpBaseQuery = Lead::query()
             ->with('assignedUser')
+            ->whereNotIn('status', self::CLOSED_LEAD_STATUSES)
             ->orderBy('follow_up_date')
             ->latest('id');
 
@@ -148,7 +151,6 @@ class DashboardService
 
         $overdueFollowUps = (clone $leadFollowUpBaseQuery)
             ->whereDate('follow_up_date', '<', $today)
-            ->whereNotIn('status', ['closed_success', 'closed_fail'])
             ->get()
             ->map($mapLead)
             ->values()

@@ -71,6 +71,7 @@ class LeaderboardService
             ->selectRaw('assigned_to, COUNT(*) as aggregate')
             ->whereNotNull('assigned_to')
             ->whereBetween('follow_up_date', [$start->toDateString(), $end->toDateString()])
+            ->whereNotIn('status', self::CLOSED_STATUSES)
             ->groupBy('assigned_to')
             ->pluck('aggregate', 'assigned_to');
 

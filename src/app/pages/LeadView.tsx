@@ -29,6 +29,12 @@ const sourceLabel = (source: string) => {
       return 'India Mart';
     case 'website':
       return 'Website';
+    case 'johnson':
+      return 'Johnson';
+    case 'hercules':
+      return 'Hercules';
+    case 'affiliate':
+      return 'Affiliate';
     default:
       return 'Walk In';
   }

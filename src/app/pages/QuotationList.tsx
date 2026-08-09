@@ -50,7 +50,7 @@ export const QuotationList = () => {
         (quotation) => {
           switch (sort.key) {
             case 'customer':
-              return quotation.customer.company || quotation.customer.name || '';
+              return quotation.customer?.company || quotation.customer?.name || quotation.lead?.name || '';
             case 'items':
               return quotation.items.length;
             default:
@@ -287,8 +287,8 @@ export const QuotationList = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="font-medium text-gray-900">{quotation.customer.company}</div>
-                        <div className="text-sm text-gray-500">{quotation.customer.name}</div>
+                        <div className="font-medium text-gray-900">{quotation.customer?.company || quotation.customer?.name || quotation.lead?.name || 'Customer unavailable'}</div>
+                        {(quotation.customer?.company && quotation.customer?.name) && <div className="text-sm text-gray-500">{quotation.customer.name}</div>}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\InventoryIndexRequest;
 use App\Http\Requests\InventoryMovementRequest;
 use App\Services\InventoryService;
 use App\Support\ApiResponse;
@@ -11,7 +12,7 @@ use Illuminate\Http\Request;
 class InventoryController extends ApiController
 {
     public function __construct(private InventoryService $inventory) {}
-    public function index(Request $request): JsonResponse
+    public function index(InventoryIndexRequest $request): JsonResponse
     {
         $result = $this->inventory->overview($request);
         return $this->ok('Inventory fetched successfully', ['godowns' => $result['godowns'], 'products' => $result['products']->items()],

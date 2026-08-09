@@ -30,4 +30,7 @@ export const settingsService = {
   async updateQuotationNumbering(payload: Record<string, unknown>) {
     return unwrap<any>(await apiClient.put('/settings/quotation-numbering', payload));
   },
+  async leadApiTokens(){return unwrap<any[]>(await apiClient.get('/settings/lead-api-tokens'));},
+  async createLeadApiToken(name:string){return unwrap<any>(await apiClient.post('/settings/lead-api-tokens',{name}));},
+  async revokeLeadApiToken(id:string|number){return unwrap<any>(await apiClient.delete(`/settings/lead-api-tokens/${id}`));},
 };

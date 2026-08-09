@@ -7,6 +7,44 @@ import { userService } from '../../../services/userService';
 import { SortableHeader, type SortDirection } from '../../components/common/SortableHeader';
 import { sortItems } from '../../utils/sort';
 
+const MODULES = [
+  ['dashboard', 'Dashboard'],
+  ['quotations', 'Quotations'],
+  ['tasks', 'Tasks'],
+  ['leads', 'Leads'],
+  ['customers', 'Customers'],
+  ['products', 'Products'],
+  ['inventory', 'Inventory'],
+  ['dispatches', 'Dispatches'],
+  ['services', 'Service'],
+  ['masters', 'Masters'],
+  ['reports', 'Reports'],
+  ['settings', 'Settings'],
+] as const;
+const ALL_MODULES = MODULES.map(([key]) => key);
+type ModulePermission = { module: string; can_view: boolean; can_edit: boolean };
+const allPermissions = (): ModulePermission[] => ALL_MODULES.map((module) => ({
+  module,
+  can_view: true,
+  can_edit: true,
+}));
+
+const normalizePermissions = (permissions: unknown): ModulePermission[] => {
+  const values = Array.isArray(permissions) ? permissions : [];
+
+  return ALL_MODULES.map((module) => {
+    const saved = values.find((permission: any) =>
+      typeof permission === 'string' ? permission === module : permission?.module === module
+    );
+
+    return {
+      module,
+      can_view: typeof saved === 'string' ? true : Boolean(saved?.can_view),
+      can_edit: typeof saved === 'string' ? true : Boolean(saved?.can_edit),
+    };
+  });
+};
+
 const emptyForm = {
   name: '',
   email: '',
@@ -15,6 +53,7 @@ const emptyForm = {
   password: '',
   roleId: '',
   status: 'active' as 'active' | 'inactive',
+  modulePermissions: allPermissions(),
 };
 
 const mapUser = (user: any) => ({
@@ -26,6 +65,7 @@ const mapUser = (user: any) => ({
   roleId: user.role_id ? String(user.role_id) : '',
   roleName: user.role?.display_name || user.role?.name || '',
   status: user.is_active ? 'active' : 'inactive',
+  modulePermissions: normalizePermissions(user.module_permissions),
 });
 
 const mergeRoleOptions = (users: any[], roles: any[]) => {
@@ -108,6 +148,7 @@ export const UserMaster = () => {
       designation: formData.designation || null,
       role_id: formData.roleId ? Number(formData.roleId) : null,
       is_active: formData.status === 'active',
+      module_permissions: formData.modulePermissions,
     };
 
     if (formData.password) {
@@ -142,6 +183,7 @@ export const UserMaster = () => {
       password: '',
       roleId: user.roleId,
       status: user.status,
+      modulePermissions: user.modulePermissions,
     });
     setShowModal(true);
   };
@@ -431,6 +473,71 @@ export const UserMaster = () => {
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
+              </div>
+              <div className="rounded-xl border border-gray-200 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-medium text-gray-900">Module Permissions</h4>
+                    <p className="text-xs text-gray-500">Choose whether the user can view or edit each module.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({
+                      ...formData,
+                      modulePermissions: formData.modulePermissions.every((permission) => permission.can_view && permission.can_edit)
+                        ? formData.modulePermissions.map((permission) => ({ ...permission, can_view: false, can_edit: false }))
+                        : allPermissions(),
+                    })}
+                    className="text-xs font-medium text-blue-600"
+                  >
+                    {formData.modulePermissions.every((permission) => permission.can_view && permission.can_edit) ? 'Clear all' : 'Select all'}
+                  </button>
+                </div>
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  <div className="grid grid-cols-[1fr_72px_72px] bg-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <span>Module</span>
+                    <span className="text-center">View</span>
+                    <span className="text-center">Edit</span>
+                  </div>
+                  {MODULES.map(([key, label]) => {
+                    const permission = formData.modulePermissions.find((item) => item.module === key)!;
+
+                    return (
+                      <div key={key} className="grid grid-cols-[1fr_72px_72px] items-center border-t border-slate-200 px-3 py-2 text-sm first:border-t-0">
+                        <span className="text-slate-700">{label}</span>
+                        <label className="flex cursor-pointer justify-center" title={`View ${label}`}>
+                          <input
+                            type="checkbox"
+                            checked={permission.can_view}
+                            onChange={(event) => setFormData({
+                              ...formData,
+                              modulePermissions: formData.modulePermissions.map((item) => item.module === key
+                                ? { ...item, can_view: event.target.checked, can_edit: event.target.checked ? item.can_edit : false }
+                                : item),
+                            })}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                        </label>
+                        <label className="flex cursor-pointer justify-center" title={`Edit ${label}`}>
+                          <input
+                            type="checkbox"
+                            checked={permission.can_edit}
+                            onChange={(event) => setFormData({
+                              ...formData,
+                              modulePermissions: formData.modulePermissions.map((item) => item.module === key
+                                ? { ...item, can_edit: event.target.checked, can_view: event.target.checked ? true : item.can_view }
+                                : item),
+                            })}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+                {errors.module_permissions?.[0] && (
+                  <p className="mt-2 text-sm text-red-600">{errors.module_permissions[0]}</p>
+                )}
               </div>
               <div className="flex flex-col gap-3 pt-4 sm:flex-row">
                 <button

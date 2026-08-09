@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Leads\LeadCommentRequest;
 use App\Http\Requests\Leads\LeadCallOutcomeRequest;
 use App\Http\Requests\Leads\LeadBulkUploadRequest;
+use App\Http\Requests\Leads\LeadBulkUpdateRequest;
 use App\Http\Requests\Leads\LeadIndexRequest;
 use App\Http\Requests\Leads\LeadRequest;
 use App\Http\Resources\LeadActivityResource;
@@ -54,6 +55,16 @@ class LeadController extends ApiController
                 $request->file('file')->getRealPath(),
                 $request->user(),
                 $request->ip(),
+            ),
+        );
+    }
+
+    public function bulkUpdate(LeadBulkUpdateRequest $request): JsonResponse
+    {
+        return $this->ok(
+            'Selected leads updated successfully',
+            LeadResource::collection(
+                $this->leads->bulkUpdate($request->validated(), $request->user(), $request->ip(), $request)
             ),
         );
     }

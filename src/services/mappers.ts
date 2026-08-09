@@ -232,6 +232,8 @@ export const mapCustomer = (customer: any) => {
     pincode: customer.pincode || '',
     country: customer.country || 'India',
     rating: asNumber(customer.rating),
+    customerImportance: customer.customer_importance || '',
+    customerCategory: customer.customer_category || '',
     notes: customer.notes || '',
     address: addressParts.join(', '),
     gstNumber: customer.gst_number || '',
@@ -253,6 +255,8 @@ export const customerPayload = (customer: any, definitions: any[] = []) => ({
   pincode: customer.pincode || null,
   country: customer.country || 'India',
   rating: customer.rating ? asNumber(customer.rating) : null,
+  customer_importance: customer.customerImportance || null,
+  customer_category: customer.customerCategory || null,
   notes: customer.notes || null,
   is_active: toIsActive(customer.status),
   custom_fields: definitions.map((field) => ({
@@ -309,6 +313,8 @@ export const mapLead = (lead: any) => ({
   failureReasonDetails: lead.failure_reason_details || '',
   isFavourite: Boolean(lead.is_favourite),
   tags: Array.isArray(lead.tags) ? lead.tags : [],
+  customerImportance: lead.customer_importance || '',
+  customerCategory: lead.customer_category || '',
   followUpDate: lead.follow_up_date || '',
   assignedTo: lead.assigned_to ? String(lead.assigned_to) : '',
   assignedUser: lead.assigned_user
@@ -352,6 +358,8 @@ export const leadPayload = (lead: any) => ({
     ? lead.failureReasonDetails || null
     : null,
   tags: Array.isArray(lead.tags) ? lead.tags.filter(Boolean) : [],
+  customer_importance: lead.customerImportance || null,
+  customer_category: lead.customerCategory || null,
   follow_up_date: lead.followUpDate || null,
   assigned_to: lead.assignedTo ? Number(lead.assignedTo) : null,
 });
@@ -470,6 +478,7 @@ export const mapQuotation = (quotation: any) => {
     ),
     specifications: item.specifications || '',
     additionalInfo: item.additional_information || '',
+    gstAmount: asNumber(item.tax_amount),
     lineTotal: asNumber(item.line_total),
   })),
   globalDiscount: asNumber(quotation.default_discount_percent),

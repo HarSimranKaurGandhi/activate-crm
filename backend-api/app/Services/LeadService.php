@@ -50,6 +50,8 @@ class LeadService extends CrudService
         'failure_reason' => 'Failure Reason',
         'failure_reason_details' => 'Failure Details',
         'tags' => 'Tags',
+        'customer_importance' => 'Customer Importance',
+        'customer_category' => 'Customer Category',
         'follow_up_date' => 'Follow Up Date',
         'assigned_to' => 'Assigned To',
     ];
@@ -128,6 +130,48 @@ class LeadService extends CrudService
     private function normalizePhone(?string $phone): string
     {
         return preg_replace('/\D+/', '', trim((string) $phone)) ?? '';
+    }
+
+    public function importApiBatch(array $rows,User $actor,?string $ipAddress=null): array
+    {
+        return DB::transaction(function()use($rows,$actor,$ipAddress):array{
+            $existing=Lead::query()->with($this->relations)->lockForUpdate()->get();
+            $salesUsers=User::query()->with('role:id,name,code')->where('is_active',true)->get()->filter(function(User $user){$role=strtolower(trim((string)($user->role?->code?:$user->role?->name)));return in_array($role,['sales','sales_user','sales user','sales_manager','sales manager'],true);})->values();
+            if($salesUsers->isEmpty())throw ValidationException::withMessages(['assigned_user'=>['No active Sales User or Sales Manager is available for lead assignment.']]);
+            $byPhone=$existing->filter(fn(Lead $lead)=>$this->normalizePhone($lead->phone)!=='')->keyBy(fn(Lead $lead)=>$this->normalizePhone($lead->phone));
+            $byEmail=$existing->filter(fn(Lead $lead)=>filled($lead->email))->keyBy(fn(Lead $lead)=>strtolower(trim((string)$lead->email)));
+            $results=[];$created=0;$updated=0;
+            foreach($rows as $index=>$incoming){
+                if(empty($incoming['assigned_to'])){$initials=strtoupper(preg_replace('/[^A-Z0-9]/','',(string)($incoming['assigned_user']??''))??'');$matching=$initials===''?collect():$salesUsers->filter(fn(User $user)=>$this->userInitials($user->name)===$initials)->values();$incoming['assigned_to']=($matching->isNotEmpty()?$matching:$salesUsers)->random()->id;}
+                unset($incoming['assigned_user']);
+                $phone=$this->normalizePhone($incoming['phone']??null);$email=strtolower(trim((string)($incoming['email']??'')));
+                $phoneMatch=$phone!==''?$byPhone->get($phone):null;$emailMatch=$email!==''?$byEmail->get($email):null;
+                if($phoneMatch&&$emailMatch&&$phoneMatch->id!==$emailMatch->id)throw ValidationException::withMessages(["leads.{$index}"=>['Phone and email match two different existing leads.']]);
+                /** @var Lead|null $lead */
+                $lead=$phoneMatch?:$emailMatch;
+                if($lead){
+                    $changes=[];
+                    foreach(['name','phone','email','address_line_1','address_line_2','city','state','pincode','country','expected_order_value','expected_closure','customer_importance','customer_category','follow_up_date','assigned_to'] as $field){if(blank($lead->{$field})&&filled($incoming[$field]??null))$changes[$field]=$incoming[$field];}
+                    $newRequirement=trim((string)$incoming['requirement']);$current=trim((string)$lead->requirement);
+                    $requirements=array_map(fn($value)=>mb_strtolower(trim(preg_replace('/^\[\d{2}\s+[A-Za-z]{3}\s+\d{4}\]\s*/','',trim($value))??'')),preg_split('/\R+/',$current,-1,PREG_SPLIT_NO_EMPTY)?:[]);
+                    if($newRequirement!==''&&!in_array(mb_strtolower($newRequirement),$requirements,true)){$datedRequirement='['.now()->format('d M Y').'] '.$newRequirement;$changes['requirement']=$current===''?$datedRequirement:$current."\n".$datedRequirement;}
+                    $incomingTags=$incoming['tags']??[];if($incomingTags!==[])$changes['tags']=array_values(array_unique([...($lead->tags??[]),...$incomingTags]));
+                    if($changes!==[])$lead=$this->update($lead,$changes,$actor,$ipAddress);
+                    $updated++;$action='updated';
+                }else{
+                    $data=[...$incoming,'lead_source'=>$incoming['lead_source']??'website','status'=>$incoming['status']??'new','follow_up_date'=>$incoming['follow_up_date']??now()->toDateString(),'assigned_to'=>$incoming['assigned_to']??$actor->id,'created_by'=>$actor->id,'tags'=>$incoming['tags']??[]];
+                    $lead=$this->create($data,$actor,$ipAddress);$created++;$action='created';
+                    if($phone!=='')$byPhone->put($phone,$lead);if($email!=='')$byEmail->put($email,$lead);
+                }
+                $results[]=['index'=>$index,'lead_id'=>$lead->id,'action'=>$action,'name'=>$lead->name,'phone'=>$lead->phone,'email'=>$lead->email];
+            }
+            return ['created'=>$created,'updated'=>$updated,'total'=>count($rows),'results'=>$results];
+        });
+    }
+
+    private function userInitials(string $name): string
+    {
+        return collect(preg_split('/\s+/',trim($name),-1,PREG_SPLIT_NO_EMPTY)?:[])->map(fn(string $part)=>mb_strtoupper(mb_substr($part,0,1)))->join('');
     }
 
     public function bulkImportCsv(string $path, ?User $actor = null, ?string $ipAddress = null): array
@@ -316,6 +360,7 @@ class LeadService extends CrudService
         $source = match ($source) {
             'walkin' => 'walk_in',
             'indiamart' => 'india_mart',
+            'affliate' => 'affiliate',
             default => $source,
         };
 
@@ -354,7 +399,7 @@ class LeadService extends CrudService
     private function bulkLeadRules(): array
     {
         return [
-            'lead_source' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website'])],
+            'lead_source' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website', 'johnson', 'hercules', 'affiliate'])],
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'digits:10'],
             '_raw_phone' => [
@@ -483,6 +528,34 @@ class LeadService extends CrudService
         });
     }
 
+    public function bulkUpdate(array $data, User $actor, ?string $ipAddress, Request $request): Collection
+    {
+        return DB::transaction(function () use ($data, $actor, $ipAddress, $request): Collection {
+            $leadIds = collect($data['lead_ids'])->map(fn (mixed $id): int => (int) $id)->unique()->values();
+            $updates = Arr::only($data, ['status', 'assigned_to', 'follow_up_date']);
+
+            if (isset($updates['status']) && $updates['status'] !== 'closed_fail') {
+                $updates['failure_reason'] = null;
+                $updates['failure_reason_details'] = null;
+            }
+
+            $leads = $this->visibleQuery($request)
+                ->whereKey($leadIds)
+                ->lockForUpdate()
+                ->get();
+
+            if ($leads->count() !== $leadIds->count()) {
+                throw ValidationException::withMessages([
+                    'lead_ids' => ['One or more selected leads are unavailable or you do not have permission to update them.'],
+                ]);
+            }
+
+            return $leads
+                ->map(fn (Lead $lead): Model => $this->update($lead, $updates, $actor, $ipAddress))
+                ->values();
+        });
+    }
+
     public function setFavourite(Lead $lead, User $user, bool $favourite): bool
     {
         if ($favourite) {
@@ -507,19 +580,26 @@ class LeadService extends CrudService
             ->latest('created_at')
             ->latest('id')
             ->get()
-            ->map(fn (ActivityLog $log): array => [
-                'id' => $log->id,
-                'action' => $log->action,
-                'description' => $log->description,
-                'old_values' => $log->old_values ?? [],
-                'new_values' => $log->new_values ?? [],
-                'actor' => $log->user ? [
-                    'id' => $log->user->id,
-                    'name' => $log->user->name,
-                    'email' => $log->user->email,
-                ] : ($log->new_values['actor'] ?? null),
-                'occurred_at' => optional($log->created_at)->toISOString(),
-            ]);
+            ->map(function (ActivityLog $log): array {
+                $newValues = $log->new_values ?? [];
+                $embeddedActor = $newValues['_actor'] ?? $newValues['actor'] ?? null;
+                $embeddedDescription = $newValues['_description'] ?? null;
+                unset($newValues['_actor'], $newValues['_description']);
+
+                return [
+                    'id' => $log->id,
+                    'action' => $log->action,
+                    'description' => $log->description ?? $embeddedDescription,
+                    'old_values' => $log->old_values ?? [],
+                    'new_values' => $newValues,
+                    'actor' => $log->user ? [
+                        'id' => $log->user->id,
+                        'name' => $log->user->name,
+                        'email' => $log->user->email,
+                    ] : $embeddedActor,
+                    'occurred_at' => optional($log->created_at)->toISOString(),
+                ];
+            });
 
         if (! $logs->contains(fn (array $entry): bool => $entry['action'] === 'created')) {
             $logs->push([
@@ -668,6 +748,7 @@ class LeadService extends CrudService
                 'follow_up_date' => $dateChanged ? $followUpDate : null,
                 'actor' => $activity->new_values['actor'] ?? ($actor ? ['id' => $actor->id, 'name' => $actor->name, 'email' => $actor->email] : null),
             ],
+            'user_id' => $activity->user_id ?: $actor?->id,
             'created_by' => $activity->created_by ?: $actor?->id,
         ];
 
@@ -800,18 +881,16 @@ class LeadService extends CrudService
             return;
         }
 
-        $customer = Customer::query()
-            ->where('phone', $lead->phone)
-            ->when(
-                filled($lead->email),
-                fn (Builder $query) => $query->orWhere('email', $lead->email)
-            )
-            ->first();
+        $phoneCustomer = Customer::query()->where('phone', $lead->phone)->first();
+        $emailCustomer = filled($lead->email)
+            ? Customer::query()->where('email', strtolower(trim($lead->email)))->first()
+            : null;
+        $customer = $phoneCustomer ?: $emailCustomer;
 
         $payload = [
             'primary_name' => $lead->name ?: "Lead {$lead->phone}",
             'company_name' => null,
-            'email' => $lead->email,
+            'email' => filled($lead->email) ? strtolower(trim($lead->email)) : null,
             'phone' => $lead->phone,
             'address_line_1' => $lead->address_line_1 ?: 'N/A',
             'address_line_2' => $lead->address_line_2,
@@ -819,22 +898,28 @@ class LeadService extends CrudService
             'state' => $lead->state ?: 'N/A',
             'pincode' => $lead->pincode,
             'country' => $lead->country ?: 'India',
+            'customer_importance' => $lead->customer_importance,
+            'customer_category' => $lead->customer_category,
             'notes' => $lead->requirement ?: null,
             'is_active' => true,
         ];
 
         if ($customer) {
+            $emailCanBeUsed = ! $emailCustomer || $emailCustomer->is($customer);
+            $phoneCanBeUsed = ! $phoneCustomer || $phoneCustomer->is($customer);
             $customer->update([
                 'primary_name' => $customer->primary_name ?: $payload['primary_name'],
                 'company_name' => $customer->company_name ?: $payload['company_name'],
-                'email' => $customer->email ?: $payload['email'],
-                'phone' => $customer->phone ?: $payload['phone'],
+                'email' => $customer->email ?: ($emailCanBeUsed ? $payload['email'] : null),
+                'phone' => $customer->phone ?: ($phoneCanBeUsed ? $payload['phone'] : null),
                 'address_line_1' => $customer->address_line_1 ?: $payload['address_line_1'],
                 'address_line_2' => $customer->address_line_2 ?: $payload['address_line_2'],
                 'city' => $customer->city ?: $payload['city'],
                 'state' => $customer->state ?: $payload['state'],
                 'pincode' => $customer->pincode ?: $payload['pincode'],
                 'country' => $customer->country ?: $payload['country'],
+                'customer_importance' => $customer->customer_importance ?: $payload['customer_importance'],
+                'customer_category' => $customer->customer_category ?: $payload['customer_category'],
                 'notes' => $customer->notes ?: $payload['notes'],
                 'is_active' => true,
             ]);
@@ -862,6 +947,9 @@ class LeadService extends CrudService
                 'reference' => 'Reference',
                 'india_mart' => 'India Mart',
                 'website' => 'Website',
+                'johnson' => 'Johnson',
+                'hercules' => 'Hercules',
+                'affiliate' => 'Affiliate',
                 default => (string) ($value ?? '-'),
             };
         }
@@ -955,6 +1043,20 @@ class LeadService extends CrudService
         ?User $actor,
         ?string $ipAddress,
     ): ActivityLog {
+        $activityLogColumns = $this->getActivityLogColumns();
+
+        if ($actor) {
+            $newValues['_actor'] = [
+                'id' => $actor->id,
+                'name' => $actor->name,
+                'email' => $actor->email,
+            ];
+        }
+
+        if (! in_array('description', $activityLogColumns, true)) {
+            $newValues['_description'] = $description;
+        }
+
         $activity = new ActivityLog(Arr::only([
             'module' => 'leads',
             'entity_type' => 'lead',
@@ -963,11 +1065,12 @@ class LeadService extends CrudService
             'description' => $description,
             'old_values' => $oldValues,
             'new_values' => $newValues,
+            'user_id' => $actor?->id,
             'created_by' => $actor?->id,
             'ip_address' => $ipAddress,
-        ], $this->getActivityLogColumns()));
+        ], $activityLogColumns));
 
-        $activity->timestamps = $this->usesTimestamps($this->getActivityLogColumns());
+        $activity->timestamps = $this->usesTimestamps($activityLogColumns);
         $activity->save();
 
         return $activity;

@@ -35,6 +35,8 @@ class LeadResource extends JsonResource
             'failure_reason_details' => $this->failure_reason_details,
             'is_favourite' => $isFavourite,
             'tags' => $this->tags ?? [],
+            'customer_importance' => $this->customer_importance,
+            'customer_category' => $this->customer_category,
             'follow_up_date' => optional($this->follow_up_date)?->format('Y-m-d'),
             'assigned_to' => $this->assigned_to,
             'assigned_user' => $this->assignedUser ? [

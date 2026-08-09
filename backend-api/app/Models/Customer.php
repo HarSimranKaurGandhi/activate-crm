@@ -21,6 +21,8 @@ class Customer extends Model
         'pincode',
         'country',
         'rating',
+        'customer_importance',
+        'customer_category',
         'notes',
         'is_active',
     ];

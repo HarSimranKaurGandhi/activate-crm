@@ -16,6 +16,8 @@ const INDIAN_STATES = [
 ];
 
 const COUNTRIES = ['India', 'United Arab Emirates', 'United States', 'United Kingdom', 'Australia', 'Canada', 'Singapore'];
+const CUSTOMER_IMPORTANCE_OPTIONS = ['UVIP', 'VIP', 'IMP'];
+const CUSTOMER_CATEGORY_OPTIONS = ['GYM OWNER', 'GOVT OFFICIAL', 'BUILDER', 'CORPORATE', 'DEALER'];
 
 export const CustomerForm = () => {
   const navigate = useNavigate();
@@ -36,6 +38,8 @@ export const CustomerForm = () => {
     pincode: '',
     country: 'India',
     rating: 0,
+    customerImportance: '',
+    customerCategory: '',
     notes: '',
     customFields: {} as Record<string, any>,
   });
@@ -329,6 +333,40 @@ export const CustomerForm = () => {
                 <option value={5}>5 / 5</option>
               </select>
               {errors.rating?.[0] && <p className="text-sm text-red-600 mt-1">{errors.rating[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer Importance
+              </label>
+              <select
+                value={formData.customerImportance}
+                onChange={(e) => setFormData({ ...formData, customerImportance: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">None</option>
+                {CUSTOMER_IMPORTANCE_OPTIONS.map((importance) => (
+                  <option key={importance} value={importance}>{importance}</option>
+                ))}
+              </select>
+              {errors.customer_importance?.[0] && <p className="text-sm text-red-600 mt-1">{errors.customer_importance[0]}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer Category
+              </label>
+              <select
+                value={formData.customerCategory}
+                onChange={(e) => setFormData({ ...formData, customerCategory: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">None</option>
+                {CUSTOMER_CATEGORY_OPTIONS.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+              {errors.customer_category?.[0] && <p className="text-sm text-red-600 mt-1">{errors.customer_category[0]}</p>}
             </div>
 
             <div className="md:col-span-2">

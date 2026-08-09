@@ -19,11 +19,18 @@ class InventoryService
 {
     public function overview(Request $request): array
     {
+        $categoryId = $request->filled('category_id') ? (int) $request->integer('category_id') : null;
+        $brandId = $request->filled('brand_id') ? (int) $request->integer('brand_id') : null;
+        $godownId = $request->filled('godown_id') ? (int) $request->integer('godown_id') : null;
         $godowns = Godown::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $products = Product::query()->with(['brand:id,name', 'measurementUnit'])->where('is_active', true)
-            ->whereExists(function ($query): void {
+        $displayGodowns = $godownId === null ? $godowns : $godowns->where('id', $godownId);
+        $products = Product::query()->with(['category:id,name', 'brand:id,name', 'measurementUnit'])->where('is_active', true)
+            ->when($categoryId !== null, fn ($query) => $query->where('category_id', $categoryId))
+            ->when($brandId !== null, fn ($query) => $query->where('brand_id', $brandId))
+            ->whereExists(function ($query) use ($godownId): void {
                 $query->selectRaw('1')->from('inventory_stocks')
                     ->whereColumn('inventory_stocks.product_id', 'products.id')
+                    ->when($godownId !== null, fn ($stockQuery) => $stockQuery->where('inventory_stocks.godown_id', $godownId))
                     ->groupBy('inventory_stocks.product_id')
                     ->havingRaw('SUM(inventory_stocks.quantity) > 0');
             })
@@ -31,14 +38,19 @@ class InventoryService
                 $search = $request->string('search')->toString();
                 $query->where(fn ($q) => $q->where('product_name', 'like', "%{$search}%")->orWhere('model_number', 'like', "%{$search}%"));
             })->orderBy('product_name')->paginate((int) $request->integer('per_page', 15));
-        $stocks = InventoryStock::query()->whereIn('product_id', $products->getCollection()->pluck('id'))->get()->groupBy('product_id');
+        $stocks = InventoryStock::query()
+            ->whereIn('product_id', $products->getCollection()->pluck('id'))
+            ->when($godownId !== null, fn ($query) => $query->where('godown_id', $godownId))
+            ->get()
+            ->groupBy('product_id');
 
-        $products->setCollection($products->getCollection()->map(function (Product $product) use ($stocks, $godowns): array {
+        $products->setCollection($products->getCollection()->map(function (Product $product) use ($stocks, $displayGodowns): array {
             $byGodown = $stocks->get($product->id, collect())->keyBy('godown_id');
-            $quantities = $godowns->mapWithKeys(fn ($godown) => [(string) $godown->id => (float) ($byGodown->get($godown->id)?->quantity ?? 0)])->all();
+            $quantities = $displayGodowns->mapWithKeys(fn ($godown) => [(string) $godown->id => (float) ($byGodown->get($godown->id)?->quantity ?? 0)])->all();
             return ['id' => $product->id, 'product_name' => $product->product_name, 'model_number' => $product->model_number,
                 'measurement_unit' => $product->measurementUnit?->name ?: $product->unit,
-                'brand' => $product->brand?->name, 'quantities' => $quantities, 'total_quantity' => array_sum($quantities)];
+                'category' => $product->category?->name, 'brand' => $product->brand?->name,
+                'quantities' => $quantities, 'total_quantity' => array_sum($quantities)];
         }));
 
         return ['godowns' => $godowns, 'products' => $products];

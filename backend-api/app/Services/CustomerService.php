@@ -14,6 +14,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -87,7 +88,8 @@ class CustomerService extends CrudService
 
     public function quotationHistory(Customer $customer, Request $request): LengthAwarePaginator
     {
-        return $customer->quotations()
+        return Quotation::query()
+            ->whereIn('customer_id', $this->matchingCustomerIds($customer))
             ->latest('id')
             ->paginate((int) $request->integer('per_page', 15));
     }
@@ -115,7 +117,7 @@ class CustomerService extends CrudService
         $timeline = collect();
 
         Quotation::query()
-            ->where('customer_id', $customer->id)
+            ->whereIn('customer_id', $this->matchingCustomerIds($customer))
             ->latest('quote_date')
             ->limit(100)
             ->get()
@@ -230,6 +232,12 @@ class CustomerService extends CrudService
                 ? trim($data['product_description'])
                 : $owned->product_description;
             $owned->quantity = (float) ($owned->quantity ?? 0) + (float) $data['quantity'];
+            if (! $owned->first_purchased_at || $owned->first_purchased_at->toDateString() > $data['purchase_date']) {
+                $owned->first_purchased_at = $data['purchase_date'];
+            }
+            if (! $owned->last_purchased_at || $owned->last_purchased_at->toDateString() < $data['purchase_date']) {
+                $owned->last_purchased_at = $data['purchase_date'];
+            }
             $owned->created_by ??= $actor?->id;
             $owned->save();
 
@@ -240,6 +248,24 @@ class CustomerService extends CrudService
     public function removeOwnedProduct(Customer $customer, int|string $ownedProductId): void
     {
         $customer->ownedProducts()->whereKey($ownedProductId)->firstOrFail()->delete();
+    }
+
+    /** @return Collection<int, int> */
+    private function matchingCustomerIds(Customer $customer): Collection
+    {
+        return Customer::query()
+            ->where(function (Builder $query) use ($customer): void {
+                $query->whereKey($customer->id);
+
+                if (filled($customer->phone)) {
+                    $query->orWhere('phone', $customer->phone);
+                }
+
+                if (filled($customer->email)) {
+                    $query->orWhere('email', strtolower(trim($customer->email)));
+                }
+            })
+            ->pluck('id');
     }
 
     private function syncCustomFields(Customer $customer, array $customFields): void

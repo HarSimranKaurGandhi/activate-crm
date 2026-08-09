@@ -21,7 +21,7 @@ class LeadIndexRequest extends FormRequest
             'favourites_only' => ['sometimes', 'boolean'],
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
             'lead_source' => ['sometimes', 'array'],
-            'lead_source.*' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website'])],
+            'lead_source.*' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website', 'johnson', 'hercules', 'affiliate'])],
             'status' => ['sometimes', 'array'],
             'status.*' => ['required', Rule::in(['new', 'enquiry', 'in_progress', 'on_hold', 'closed_success', 'closed_fail'])],
             'tag' => ['sometimes', 'nullable', Rule::in(['hot', 'premium'])],

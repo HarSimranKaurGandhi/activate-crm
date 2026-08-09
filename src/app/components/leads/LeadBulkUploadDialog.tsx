@@ -102,7 +102,7 @@ export const LeadBulkUploadDialog = ({
                     <li>Mandatory columns: <b>name, phone_no, requirement, assignee_user_id, source</b>.</li>
                     <li>Phone formatting is removed and the last 10 digits are retained. Any preceding country-code digits are checked and discarded; values with fewer than 10 digits fail.</li>
                     <li>Full-precision scientific notation is supported. Rounded values such as <b>9.19888E+11</b> are rejected because Excel has removed digits. Format the phone column as <b>Text</b> before saving the CSV.</li>
-                    <li>Source values: <b>walk_in, reference, india_mart, website</b>.</li>
+                    <li>Source values: <b>walk_in, reference, india_mart, website, johnson, hercules, affiliate</b>.</li>
                     <li>Optional fields may be left blank. Status defaults to <b>new</b> and follow-up date defaults to two days from upload.</li>
                     <li>
                       Optional column names: <b>email, address_line_1, address_line_2, city, state, pincode,

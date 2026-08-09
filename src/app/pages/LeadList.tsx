@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowUpDown, ChevronDown, Filter, Plus, Search, Star, Trash2, Upload } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, Filter, LoaderCircle, PencilLine, Plus, Search, Star, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { EmptyState, LoadingState } from '../components/common/AsyncState';
+import { EmptyState } from '../components/common/AsyncState';
 import { PaginationControls } from '../components/common/Pagination';
 import { LeadDetailsDialog } from '../components/leads/LeadDetailsDialog';
 import {
@@ -15,6 +15,7 @@ import {
 } from '../components/ui/dropdown-menu';
 import { LeadPhoneAction } from '../components/leads/LeadPhoneAction';
 import { LeadBulkUploadDialog } from '../components/leads/LeadBulkUploadDialog';
+import { LeadBulkEditDialog, type LeadBulkUpdates } from '../components/leads/LeadBulkEditDialog';
 import { leadService } from '../../services/leadService';
 import { mapLead } from '../../services/mappers';
 import { userService } from '../../services/userService';
@@ -25,6 +26,9 @@ const LEAD_SOURCE_OPTIONS = [
   { value: 'reference', label: 'Reference' },
   { value: 'india_mart', label: 'India Mart' },
   { value: 'website', label: 'Website' },
+  { value: 'johnson', label: 'Johnson' },
+  { value: 'hercules', label: 'Hercules' },
+  { value: 'affiliate', label: 'Affiliate' },
 ];
 
 const LEAD_STATUS_OPTIONS = [
@@ -124,6 +128,9 @@ export const LeadList = () => {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
   const [favouriteUpdating, setFavouriteUpdating] = useState<string[]>([]);
   const [filters, setFilters] = useState(() => ({
@@ -165,6 +172,7 @@ export const LeadList = () => {
     try {
       await leadService.remove(leadId);
       setLeads((current) => current.filter((lead) => lead.id !== leadId));
+      setSelectedLeadIds((current) => current.filter((id) => id !== leadId));
       setTotalItems((current) => Math.max(0, current - 1));
       toast.success('Lead deleted');
     } catch {
@@ -267,6 +275,10 @@ export const LeadList = () => {
   }, [filters.search, filters.leadSources, filters.statuses, filters.assignedTo, filters.showClosed, filters.favouritesOnly, sort.key, sort.direction]);
 
   useEffect(() => {
+    setSelectedLeadIds([]);
+  }, [filters.search, filters.leadSources, filters.statuses, filters.assignedTo, filters.showClosed, filters.favouritesOnly, sort.key, sort.direction, pageSize]);
+
+  useEffect(() => {
     if (filters.showClosed) {
       return;
     }
@@ -285,6 +297,10 @@ export const LeadList = () => {
   }, [filters.showClosed]);
 
   const sortedLeads = leads;
+  const currentPageLeadIds = sortedLeads.map((lead) => String(lead.id));
+  const allPageSelected = currentPageLeadIds.length > 0
+    && currentPageLeadIds.every((leadId) => selectedLeadIds.includes(leadId));
+  const somePageSelected = currentPageLeadIds.some((leadId) => selectedLeadIds.includes(leadId));
   const selectedLeadIndex = sortedLeads.findIndex((lead) => lead.id === selectedLeadId);
   const nextLeadId = selectedLeadIndex >= 0 ? sortedLeads[selectedLeadIndex + 1]?.id : null;
   const hasNextPage = page < totalPages;
@@ -307,6 +323,39 @@ export const LeadList = () => {
       key,
       direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
     }));
+  };
+
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds((current) => current.includes(leadId)
+      ? current.filter((id) => id !== leadId)
+      : [...current, leadId]);
+  };
+
+  const toggleSelectCurrentPage = () => {
+    setSelectedLeadIds((current) => allPageSelected
+      ? current.filter((id) => !currentPageLeadIds.includes(id))
+      : Array.from(new Set([...current, ...currentPageLeadIds])));
+  };
+
+  const handleBulkUpdate = async (updates: LeadBulkUpdates) => {
+    if (selectedLeadIds.length === 0) {
+      toast.error('Select at least one lead');
+      return;
+    }
+
+    setBulkUpdating(true);
+    try {
+      await leadService.bulkUpdate(selectedLeadIds, updates);
+      const updatedCount = selectedLeadIds.length;
+      setSelectedLeadIds([]);
+      setIsBulkEditOpen(false);
+      setReloadKey((current) => current + 1);
+      toast.success(`Updated ${updatedCount} lead${updatedCount === 1 ? '' : 's'}`);
+    } catch (error: any) {
+      toast.error(error?.message || 'Unable to update selected leads');
+    } finally {
+      setBulkUpdating(false);
+    }
   };
 
   const SortableHeader = ({
@@ -627,7 +676,42 @@ export const LeadList = () => {
             </DropdownMenu>
           </div>
 
+          {selectedLeadIds.length > 0 && (
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm font-medium text-blue-900">
+                {selectedLeadIds.length} lead{selectedLeadIds.length === 1 ? '' : 's'} selected
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedLeadIds([])}
+                  className="rounded-xl px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                >
+                  Clear selection
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsBulkEditOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  <PencilLine className="h-4 w-4" />
+                  Bulk Edit
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-hidden rounded-xl border border-gray-200">
+            {loading && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex items-center justify-center gap-2 border-b border-blue-100 bg-blue-50/70 px-4 py-2 text-xs font-medium text-blue-700"
+              >
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Loading leads...
+              </div>
+            )}
             <div className="divide-y divide-gray-200 md:hidden">
               {sortedLeads.map((lead) => (
                 <div
@@ -641,9 +725,20 @@ export const LeadList = () => {
                       openLeadDialog(lead.id);
                     }
                   }}
-                  className="space-y-4 p-4 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+                  className={`space-y-4 p-4 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${
+                    selectedLeadIds.includes(String(lead.id)) ? 'bg-blue-50/60' : 'hover:bg-slate-50'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${lead.name || 'lead'}`}
+                      checked={selectedLeadIds.includes(String(lead.id))}
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      onChange={() => toggleLeadSelection(String(lead.id))}
+                      className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
                     <div className="min-w-0">
                       <div className="break-words text-base font-semibold text-gray-900">{lead.name}</div>
                       <div className="mt-1">
@@ -721,9 +816,21 @@ export const LeadList = () => {
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-              <table className="min-w-[1200px] w-full">
+              <table className="min-w-[1240px] w-full">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="px-4 py-4 text-left">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all leads on this page"
+                        checked={allPageSelected}
+                        ref={(element) => {
+                          if (element) element.indeterminate = somePageSelected && !allPageSelected;
+                        }}
+                        onChange={toggleSelectCurrentPage}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Lead" sortKey="name" /></th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Source" sortKey="leadSource" /></th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-600"><SortableHeader label="Assigned To" sortKey="assignedTo" /></th>
@@ -740,8 +847,18 @@ export const LeadList = () => {
                     <tr
                       key={lead.id}
                       onClick={() => openLeadDialog(lead.id)}
-                      className="cursor-pointer hover:bg-gray-50"
+                      className={`cursor-pointer ${selectedLeadIds.includes(String(lead.id)) ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}
                     >
+                      <td className="px-4 py-4 align-top">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${lead.name || 'lead'}`}
+                          checked={selectedLeadIds.includes(String(lead.id))}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => toggleLeadSelection(String(lead.id))}
+                          className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{lead.name}</div>
                         <div className="mt-1">
@@ -814,7 +931,6 @@ export const LeadList = () => {
             />
           </div>
 
-          {loading && <LoadingState label="Loading leads..." />}
           {!loading && leads.length === 0 && (
             <EmptyState label="No leads found. Create your first lead to get started." />
           )}
@@ -842,6 +958,14 @@ export const LeadList = () => {
           setPage(1);
           setReloadKey((current) => current + 1);
         }}
+      />
+      <LeadBulkEditDialog
+        open={isBulkEditOpen}
+        selectedCount={selectedLeadIds.length}
+        users={users}
+        saving={bulkUpdating}
+        onOpenChange={setIsBulkEditOpen}
+        onSubmit={handleBulkUpdate}
       />
     </div>
   );

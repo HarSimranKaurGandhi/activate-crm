@@ -20,7 +20,7 @@ class UserService extends CrudService
 
     protected array $searchColumns = ['name', 'email', 'phone', 'designation'];
 
-    protected array $relations = ['role'];
+    protected array $relations = ['role', 'modulePermissions'];
 
     public function __construct()
     {
@@ -45,15 +45,24 @@ class UserService extends CrudService
 
     public function create(array $data): User
     {
+        $permissions = $data['module_permissions'] ?? [];
+        unset($data['module_permissions']);
         $data['password'] = Hash::make($data['password']);
         $data['is_active'] = $data['is_active'] ?? true;
         $data = $this->sanitizeForCurrentSchema($data);
 
-        return User::create($data)->load($this->relations);
+        return DB::transaction(function () use ($data, $permissions): User {
+            $user = User::create($data);
+            $user->modulePermissions()->createMany($permissions);
+
+            return $user->load($this->relations);
+        });
     }
 
     public function update($model, array $data): User
     {
+        $permissions = $data['module_permissions'] ?? null;
+        unset($data['module_permissions']);
         if (! empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         } else {
@@ -61,9 +70,17 @@ class UserService extends CrudService
         }
 
         $data = $this->sanitizeForCurrentSchema($data);
-        $model->update($data);
 
-        return $model->refresh()->load($this->relations);
+        return DB::transaction(function () use ($model, $data, $permissions): User {
+            $model->update($data);
+
+            if ($permissions !== null) {
+                $model->modulePermissions()->delete();
+                $model->modulePermissions()->createMany($permissions);
+            }
+
+            return $model->refresh()->load($this->relations);
+        });
     }
 
     public function toggleStatus($model, bool $isActive): User

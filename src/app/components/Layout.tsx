@@ -1,20 +1,22 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { LayoutDashboard, FileText, Users, Package, Warehouse, Truck, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X, Phone } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Package, Warehouse, Truck, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X, Phone, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from './BrandLogo';
 
 const baseNavigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Quotations', href: '/quotations', icon: FileText },
-  { name: 'Tasks', href: '/tasks', icon: ListChecks },
-  { name: 'Leads', href: '/leads', icon: Phone },
-  { name: 'Customers', href: '/customers', icon: Users },
-  { name: 'Products', href: '/products', icon: Package },
-  { name: 'Inventory', href: '/inventory', icon: Warehouse },
-  { name: 'Dispatches', href: '/dispatches', icon: Truck },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, module: 'dashboard' },
+  { name: 'Quotations', href: '/quotations', icon: FileText, module: 'quotations' },
+  { name: 'Tasks', href: '/tasks', icon: ListChecks, module: 'tasks' },
+  { name: 'Leads', href: '/leads', icon: Phone, module: 'leads' },
+  { name: 'Customers', href: '/customers', icon: Users, module: 'customers' },
+  { name: 'Products', href: '/products', icon: Package, module: 'products' },
+  { name: 'Inventory', href: '/inventory', icon: Warehouse, module: 'inventory' },
+  { name: 'Dispatches', href: '/dispatches', icon: Truck, module: 'dispatches' },
+  { name: 'Service', href: '/services', icon: Wrench, module: 'services' },
   {
     name: 'Masters',
+    module: 'masters',
     icon: Database,
     children: [
       { name: 'Categories', href: '/masters/categories' },
@@ -26,8 +28,8 @@ const baseNavigation = [
       { name: 'Custom Fields', href: '/masters/custom-fields' },
     ]
   },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Reports', href: '/reports', icon: BarChart3, module: 'reports' },
+  { name: 'Settings', href: '/settings', icon: Settings, module: 'settings' },
 ];
 
 export const Layout = () => {
@@ -36,9 +38,18 @@ export const Layout = () => {
   const [mastersOpen, setMastersOpen] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
-  const canManageApprovals = ['admin', 'operations'].includes(role);
+  const hasLoadedModulePermissions = Array.isArray(user?.module_permissions);
+  const viewPermissions = new Set(
+    hasLoadedModulePermissions
+      ? user.module_permissions
+          .filter((permission: any) => typeof permission === 'string' || permission?.can_view)
+          .map((permission: any) => typeof permission === 'string' ? permission : permission.module)
+      : baseNavigation.map((item) => item.module),
+  );
+  const canManageApprovals = ['admin', 'operations'].includes(role)
+    && (role === 'admin' || viewPermissions.has('quotations'));
   const visibleBaseNavigation = baseNavigation
-    .filter((item) => (role === 'admin' ? true : !['Settings', 'Reports'].includes(item.name)))
+    .filter((item) => role === 'admin' || viewPermissions.has(item.module))
     .map((item) => {
       if (!item.children) {
         return item;

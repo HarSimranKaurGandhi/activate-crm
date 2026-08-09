@@ -41,8 +41,8 @@ export const QuotationApprovals = () => {
 
           return (
             quotation.number.toLowerCase().includes(search) ||
-            quotation.customer.company.toLowerCase().includes(search) ||
-            quotation.customer.name.toLowerCase().includes(search)
+            String(quotation.customer?.company || '').toLowerCase().includes(search) ||
+            String(quotation.customer?.name || quotation.lead?.name || '').toLowerCase().includes(search)
           );
         })
     [quotations, searchTerm],
@@ -55,7 +55,7 @@ export const QuotationApprovals = () => {
         (quotation) => {
           switch (sort.key) {
             case 'customer':
-              return quotation.customer.company || quotation.customer.name || '';
+              return quotation.customer?.company || quotation.customer?.name || quotation.lead?.name || '';
             default:
               return quotation[sort.key];
           }
@@ -227,8 +227,8 @@ export const QuotationApprovals = () => {
                       <div className="text-sm text-gray-500">{quotation.items.length} items</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{quotation.customer.company}</div>
-                      <div className="text-sm text-gray-500">{quotation.customer.name}</div>
+                      <div className="font-medium text-gray-900">{quotation.customer?.company || quotation.customer?.name || quotation.lead?.name || 'Customer unavailable'}</div>
+                      {(quotation.customer?.company && quotation.customer?.name) && <div className="text-sm text-gray-500">{quotation.customer.name}</div>}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {new Date(quotation.date).toLocaleDateString('en-IN')}
@@ -305,7 +305,7 @@ export const QuotationApprovals = () => {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-gray-900">{quotation.number}</p>
-                    <p className="mt-1 text-sm text-gray-600">{quotation.customer.company}</p>
+                    <p className="mt-1 text-sm text-gray-600">{quotation.customer?.company || quotation.customer?.name || quotation.lead?.name || 'Customer unavailable'}</p>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${quotationStatusClass(quotation.status)}`}>
                     {quotationStatusLabel(quotation.status)}

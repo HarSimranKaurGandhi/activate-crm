@@ -19,7 +19,7 @@ class AuthService
     public function login(array $credentials, Request $request): array
     {
         $user = User::query()
-            ->with('role')
+            ->with(['role', 'modulePermissions'])
             ->where('email', $credentials['email'])
             ->first();
 
@@ -63,7 +63,7 @@ class AuthService
 
     public function profile(User $user): User
     {
-        return $user->load('role');
+        return $user->load(['role', 'modulePermissions']);
     }
 
     public function logout(User $user): void

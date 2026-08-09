@@ -41,7 +41,7 @@ class QuotationApprovalService
         ],
     ];
 
-    private array $relations = ['customer', 'items.discountOverrides', 'adjustments', 'terms', 'approvals.actor'];
+    private array $relations = ['customer', 'lead', 'items.discountOverrides', 'adjustments', 'terms', 'approvals.actor'];
 
     public function submit(int|string $id, User $user, Request $request): Quotation
     {

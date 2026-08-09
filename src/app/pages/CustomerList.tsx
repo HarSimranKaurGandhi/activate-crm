@@ -248,7 +248,7 @@ export const CustomerList = () => {
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="min-w-[920px] w-full">
+            <table className="min-w-[1120px] w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Company" sortKey="company" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
@@ -256,6 +256,8 @@ export const CustomerList = () => {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Phone" sortKey="phone" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Location" sortKey="location" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Rating" sortKey="rating" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Importance</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Category</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -270,6 +272,8 @@ export const CustomerList = () => {
                     <td className="px-6 py-4 text-gray-700">{customer.phone || '-'}</td>
                     <td className="px-6 py-4 text-gray-700">{[customer.city, customer.state].filter(Boolean).join(', ') || '-'}</td>
                     <td className="px-6 py-4 text-gray-700">{customer.rating ? `${customer.rating}/5` : '-'}</td>
+                    <td className="px-6 py-4 text-gray-700">{customer.customerImportance || '-'}</td>
+                    <td className="px-6 py-4 text-gray-700">{customer.customerCategory || '-'}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button

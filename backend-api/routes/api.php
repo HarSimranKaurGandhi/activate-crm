@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\Customers\CustomerController;
 use App\Http\Controllers\Api\Dashboard\DashboardController;
 use App\Http\Controllers\Api\DispatchController;
 use App\Http\Controllers\Api\Leads\LeadController;
+use App\Http\Controllers\Api\Leads\LeadIntegrationController;
+use App\Http\Controllers\Api\Leads\LeadWhatsappFollowUpController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\Logs\ActivityLogController;
 use App\Http\Controllers\Api\Masters\AdjustmentController;
@@ -19,6 +21,9 @@ use App\Http\Controllers\Api\Quotations\QuotationApprovalController;
 use App\Http\Controllers\Api\Quotations\QuotationController;
 use App\Http\Controllers\Api\Reports\ReportController;
 use App\Http\Controllers\Api\Settings\SettingsController;
+use App\Http\Controllers\Api\Settings\LeadApiTokenController;
+use App\Http\Controllers\Api\Services\ServiceRequestController;
+use App\Http\Controllers\Api\Services\AmcController;
 use App\Http\Controllers\Api\Tasks\TaskController;
 use App\Http\Controllers\Api\Users\RoleController;
 use App\Http\Controllers\Api\Users\UserController;
@@ -33,7 +38,14 @@ Route::prefix('auth')->group(function (): void {
     });
 });
 
-Route::middleware('auth:sanctum')->group(function (): void {
+Route::post('integrations/leads/batch', [LeadIntegrationController::class, 'store'])->middleware('auth:sanctum');
+Route::get('integrations/leads/follow-ups', [LeadWhatsappFollowUpController::class, 'index'])->middleware('auth:sanctum');
+Route::post('integrations/leads/follow-ups/{lead}/sent', [LeadWhatsappFollowUpController::class, 'store'])->middleware('auth:sanctum');
+
+Route::middleware(['auth:sanctum','reject.lead.token'])->group(function (): void {
+    Route::get('settings/lead-api-tokens', [LeadApiTokenController::class, 'index']);
+    Route::post('settings/lead-api-tokens', [LeadApiTokenController::class, 'store']);
+    Route::delete('settings/lead-api-tokens/{id}', [LeadApiTokenController::class, 'destroy']);
     Route::get('dashboard/quotation-summary', [DashboardController::class, 'quotationSummary']);
     Route::get('dashboard/leaderboard', [DashboardController::class, 'leaderboard']);
     Route::get('users/dropdown', [UserController::class, 'dropdown']);
@@ -138,9 +150,24 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::put('tasks/{id}', [TaskController::class, 'update']);
     Route::delete('tasks/{id}', [TaskController::class, 'destroy'])->middleware('role:admin');
 
+    Route::get('service-requests', [ServiceRequestController::class, 'index']);
+    Route::post('service-requests', [ServiceRequestController::class, 'store']);
+    Route::get('service-requests/{id}/activity', [ServiceRequestController::class, 'activity']);
+    Route::post('service-requests/{id}/comments', [ServiceRequestController::class, 'comment']);
+    Route::get('service-requests/{id}', [ServiceRequestController::class, 'show']);
+    Route::put('service-requests/{id}', [ServiceRequestController::class, 'update']);
+    Route::get('amcs', [AmcController::class, 'index']);
+    Route::post('amcs', [AmcController::class, 'store']);
+    Route::get('amcs/{id}', [AmcController::class, 'show']);
+    Route::get('amcs/{id}/activity', [AmcController::class, 'activity']);
+    Route::post('amcs/{id}/comments', [AmcController::class, 'comment']);
+    Route::put('amcs/{id}', [AmcController::class, 'update']);
+    Route::patch('amcs/{id}/complete-visit', [AmcController::class, 'completeVisit']);
+
     Route::get('leads', [LeadController::class, 'index']);
     Route::get('leads/bulk-sample', [LeadController::class, 'bulkSample']);
     Route::post('leads/bulk-upload', [LeadController::class, 'bulkUpload']);
+    Route::patch('leads/bulk-update', [LeadController::class, 'bulkUpdate']);
     Route::post('leads', [LeadController::class, 'store']);
     Route::delete('leads/{id}', [LeadController::class, 'destroy']);
     Route::get('leads/{id}/activity', [LeadController::class, 'activity']);

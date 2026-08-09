@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { customerService } from '../../services/customerService';
 import { dispatchService } from '../../services/dispatchService';
 import { productService } from '../../services/productService';
+import { AddCustomerDialog } from '../components/customers/AddCustomerDialog';
 
 const localDate = (date: Date) => {
   const offset = date.getTimezoneOffset();
@@ -20,6 +21,7 @@ export const DispatchForm = () => {
   const [customerId, setCustomerId] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
   const [customers, setCustomers] = useState<any[]>([]);
   const [plannedDate, setPlannedDate] = useState(tomorrow);
@@ -72,6 +74,12 @@ export const DispatchForm = () => {
 
   const update = (index: number, key: string, value: any) =>
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item));
+
+  const selectCustomer = (customer: any) => {
+    setCustomerId(String(customer.id));
+    setSelectedCustomer(customer);
+    setCustomerOpen(false);
+  };
 
   const selectProduct = (product: any) => {
     if (selectingProduct === null) return;
@@ -176,7 +184,8 @@ export const DispatchForm = () => {
         </div>
         <div className="flex justify-end gap-3"><button type="button" onClick={() => navigate('/dispatches')} className="rounded-xl border px-6 py-3">Cancel</button><button disabled={saving} className="rounded-xl bg-blue-600 px-6 py-3 text-white">{saving ? 'Saving...' : 'Save Dispatch'}</button></div>
 
-        {customerOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6"><div className="mb-4 flex justify-between"><h3 className="text-xl font-semibold">Select Customer</h3><button type="button" onClick={() => setCustomerOpen(false)}>✕</button></div><div className="relative mb-4"><Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" /><input autoFocus value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} placeholder="Search name, company, phone or email" className="w-full rounded-xl border py-3 pl-10 pr-4" /></div><div className="space-y-2">{customers.map((customer) => <button type="button" key={customer.id} onClick={() => { setCustomerId(String(customer.id)); setSelectedCustomer(customer); setCustomerOpen(false); }} className="w-full rounded-xl border p-4 text-left hover:border-blue-500 hover:bg-blue-50"><div className="font-medium">{customer.company_name || customer.primary_name}</div><div className="text-sm text-gray-500">{customer.primary_name} • {customer.phone} • {customer.email}</div></button>)}</div></div></div>}
+        {customerOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6"><div className="mb-4 flex items-center justify-between gap-4"><h3 className="text-xl font-semibold">Select Customer</h3><div className="flex items-center gap-2"><button type="button" onClick={() => setAddCustomerOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white"><Plus className="h-4 w-4"/>Add Customer</button><button type="button" onClick={() => setCustomerOpen(false)}>✕</button></div></div><div className="relative mb-4"><Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" /><input autoFocus value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} placeholder="Search name, company, phone or email" className="w-full rounded-xl border py-3 pl-10 pr-4" /></div><div className="space-y-2">{customers.map((customer) => <button type="button" key={customer.id} onClick={() => selectCustomer(customer)} className="w-full rounded-xl border p-4 text-left hover:border-blue-500 hover:bg-blue-50"><div className="font-medium">{customer.company_name || customer.primary_name}</div><div className="text-sm text-gray-500">{customer.primary_name} • {customer.phone} • {customer.email}</div></button>)}</div></div></div>}
+        <AddCustomerDialog open={addCustomerOpen} onOpenChange={setAddCustomerOpen} onCreated={selectCustomer}/>
         {selectingProduct !== null && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[80vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6"><div className="mb-4 flex justify-between"><h3 className="text-xl font-semibold">Select Product</h3><button type="button" onClick={() => setSelectingProduct(null)}>✕</button></div><div className="relative mb-4"><Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" /><input autoFocus value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Search product, model or brand" className="w-full rounded-xl border py-3 pl-10 pr-4" /></div><div className="grid gap-3 md:grid-cols-2">{products.map((product) => <button type="button" key={product.id} onClick={() => selectProduct(product)} className="rounded-xl border p-4 text-left hover:border-blue-500"><div className="font-medium">{product.product_name}</div><div className="text-sm text-gray-500">{product.model_number || '-'} • {product.brand?.name || 'No brand'}</div><div className="mt-2 font-semibold text-blue-600">₹{Number(product.usual_selling_price || product.mrp || 0).toLocaleString('en-IN')}</div></button>)}</div><div className="mt-4 flex justify-end gap-3"><button type="button" disabled={productPage <= 1} onClick={() => void loadProducts(productPage - 1)} className="rounded-lg border px-4 py-2 disabled:opacity-40">Previous</button><span className="py-2 text-sm">{productPage} / {productMeta.last_page || 1}</span><button type="button" disabled={productPage >= (productMeta.last_page || 1)} onClick={() => void loadProducts(productPage + 1)} className="rounded-lg border px-4 py-2 disabled:opacity-40">Next</button></div></div></div>}
       </form>
     </div>

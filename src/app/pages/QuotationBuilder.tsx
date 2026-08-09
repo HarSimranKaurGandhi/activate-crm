@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router';
 import { useData } from '../context/DataContext';
-import { ArrowLeft, Plus, Search, GripVertical, Trash2, ChevronDown, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Search, GripVertical, Trash2, ChevronDown, Save, Lock, LockOpen, Check } from 'lucide-react';
 import { useCallback, useState, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { toast } from 'sonner';
@@ -258,6 +258,9 @@ export const QuotationBuilder = () => {
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [leadSearch, setLeadSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
+  const [brandSearch, setBrandSearch] = useState('');
+  const [selectedProductBrandIds, setSelectedProductBrandIds] = useState<string[]>([]);
+  const [brandFilterLocked, setBrandFilterLocked] = useState(false);
   const [debouncedProductSearch, setDebouncedProductSearch] = useState('');
   const [selectableProducts, setSelectableProducts] = useState<any[]>([]);
   const [productPagination, setProductPagination] = useState(emptyProductPagination);
@@ -271,6 +274,12 @@ export const QuotationBuilder = () => {
     (brand) => brand.status === 'active' && String(brand.logoPath || '').trim() !== '',
   );
   const selectedBrandBanner = brandBannerOptions.find((brand) => brand.id === brandBannerId) || null;
+
+  useEffect(() => {
+    setBrandSearch('');
+    setSelectedProductBrandIds([]);
+    setBrandFilterLocked(false);
+  }, [id]);
 
   useEffect(() => {
     if (!id) {
@@ -406,6 +415,7 @@ export const QuotationBuilder = () => {
         page,
         per_page: perPage,
         ...(debouncedProductSearch ? { search: debouncedProductSearch } : {}),
+        ...(selectedProductBrandIds.length > 0 ? { brand_ids: selectedProductBrandIds.map(Number) } : {}),
       });
       const data = Array.isArray(result.data) ? result.data : [];
       setSelectableProducts(data.map(mapProduct));
@@ -419,7 +429,7 @@ export const QuotationBuilder = () => {
     } finally {
       setProductsLoading(false);
     }
-  }, [debouncedProductSearch, showProductModal]);
+  }, [debouncedProductSearch, selectedProductBrandIds, showProductModal]);
 
   useEffect(() => {
     if (!showProductModal) {
@@ -459,7 +469,32 @@ export const QuotationBuilder = () => {
       additionalInfo: '',
     };
     setItems([...items, newItem]);
+    setProductSearch('');
+    setSelectableProducts([]);
+    setProductPagination(emptyProductPagination);
+    if (!brandFilterLocked) {
+      setSelectedProductBrandIds([]);
+      setBrandSearch('');
+    }
     setShowProductModal(false);
+  };
+
+  const closeProductModal = () => {
+    setProductSearch('');
+    setSelectableProducts([]);
+    setProductPagination(emptyProductPagination);
+    if (!brandFilterLocked) {
+      setSelectedProductBrandIds([]);
+      setBrandSearch('');
+    }
+    setShowProductModal(false);
+  };
+
+  const toggleProductBrand = (brandId: string) => {
+    if (brandFilterLocked) return;
+    setSelectedProductBrandIds((current) => current.includes(brandId)
+      ? current.filter((id) => id !== brandId)
+      : [...current, brandId]);
   };
 
   const updateItem = (itemId: string, updates: Partial<QuotationItem>) => {
@@ -510,14 +545,22 @@ export const QuotationBuilder = () => {
       subtotal += item.discountedPrice * item.quantity;
     });
 
-    let taxAmount = 0;
+    let taxBeforeDeduction = 0;
     if (!gstInclusive) {
       items.forEach(item => {
-        taxAmount += (item.discountedPrice * item.quantity) * (item.product.gstPercent / 100);
+        taxBeforeDeduction += (item.discountedPrice * item.quantity) * (item.product.gstPercent / 100);
       });
     }
 
     const adjustmentTotal = customAdjustments.reduce((sum, adjustment) => sum + (Number(adjustment.amount) || 0), 0);
+    const deductionTotal = customAdjustments.reduce(
+      (sum, adjustment) => sum + Math.min(Number(adjustment.amount) || 0, 0),
+      0,
+    );
+    const taxableSubtotal = Math.max(subtotal + deductionTotal, 0);
+    const taxAmount = subtotal > 0
+      ? taxBeforeDeduction * (taxableSubtotal / subtotal)
+      : 0;
     const grandTotal = subtotal + taxAmount + adjustmentTotal;
 
     return { subtotal, taxAmount, adjustmentTotal, grandTotal };
@@ -928,12 +971,6 @@ export const QuotationBuilder = () => {
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium text-gray-900">₹{totals.subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                 </div>
-                {!gstInclusive && totals.taxAmount > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">GST</span>
-                    <span className="font-medium text-gray-900">₹{totals.taxAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                  </div>
-                )}
                 <div className="space-y-2 border-t border-blue-100 pt-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-medium text-gray-700">Custom fields</span>
@@ -981,6 +1018,12 @@ export const QuotationBuilder = () => {
                     </div>
                   )}
                 </div>
+                {!gstInclusive && totals.taxAmount > 0 && (
+                  <div className="flex items-center justify-between border-t border-blue-100 pt-3 text-sm">
+                    <span className="text-gray-600">GST</span>
+                    <span className="font-medium text-gray-900">₹{totals.taxAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                  </div>
+                )}
                 <div className="pt-3 border-t-2 border-blue-200">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-gray-900">Grand Total</span>
@@ -1000,12 +1043,7 @@ export const QuotationBuilder = () => {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-gray-900">Select Product</h3>
               <button
-                onClick={() => {
-                  setProductSearch('');
-                  setSelectableProducts([]);
-                  setProductPagination(emptyProductPagination);
-                  setShowProductModal(false);
-                }}
+                onClick={closeProductModal}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 ✕
@@ -1021,15 +1059,58 @@ export const QuotationBuilder = () => {
                 className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+            <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Brand Filter</p>
+                  <p className="text-xs text-gray-500">Select multiple brands. Lock to reuse during this quotation.</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!brandFilterLocked && selectedProductBrandIds.length === 0}
+                  onClick={() => setBrandFilterLocked((current) => !current)}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${brandFilterLocked ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white text-gray-600'}`}
+                  title={brandFilterLocked ? 'Unlock brand filter' : 'Lock brand filter for repeated product additions'}
+                >
+                  {brandFilterLocked ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
+                  {brandFilterLocked ? 'Locked' : 'Unlocked'}
+                </button>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={brandSearch}
+                  disabled={brandFilterLocked}
+                  onChange={(event) => setBrandSearch(event.target.value)}
+                  placeholder="Search brands separately..."
+                  className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm disabled:bg-gray-100"
+                />
+              </div>
+              <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto">
+                {brands
+                  .filter((brand) => brand.status === 'active' && brand.name.toLowerCase().includes(brandSearch.trim().toLowerCase()))
+                  .map((brand) => {
+                    const selected = selectedProductBrandIds.includes(String(brand.id));
+                    return <button
+                      key={brand.id}
+                      type="button"
+                      disabled={brandFilterLocked}
+                      onClick={() => toggleProductBrand(String(brand.id))}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed ${selected ? 'border-blue-500 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                    >
+                      {selected && <Check className="h-3.5 w-3.5" />}{brand.name}
+                    </button>;
+                  })}
+                {!brandFilterLocked && selectedProductBrandIds.length > 0 && <button type="button" onClick={() => setSelectedProductBrandIds([])} className="px-2 py-1 text-xs font-medium text-red-600 hover:underline">Clear all</button>}
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {selectableProducts.map(product => (
                 <div
                   key={product.id}
                   onClick={() => {
                     addProduct(product);
-                    setProductSearch('');
-                    setSelectableProducts([]);
-                    setProductPagination(emptyProductPagination);
                   }}
                   className="flex gap-4 p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
                 >

@@ -68,6 +68,10 @@ export const QuotationPreview = () => {
     );
   }
 
+  const customer = quotation.customer || quotation.lead || {
+    name: 'Customer unavailable', company: '', address: '', phone: '', email: '',
+  };
+
   const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
   const canApprove = ['admin', 'sales_manager'].includes(role);
   const bannerBrandOptions = brands.filter(
@@ -180,7 +184,10 @@ export const QuotationPreview = () => {
     const basePrice = item.price * item.quantity;
     const discountAmount = basePrice * (item.discount / 100);
     const netAmount = basePrice - discountAmount;
-    const gstAmount = quotation.gstInclusive ? 0 : netAmount * (item.product.gstPercent / 100);
+    const savedGstAmount = Number(item.gstAmount);
+    const gstAmount = quotation.gstInclusive
+      ? 0
+      : (Number.isFinite(savedGstAmount) ? savedGstAmount : netAmount * (item.product.gstPercent / 100));
     const discountedUnitPrice = item.quantity > 0 ? netAmount / item.quantity : 0;
 
     return {
@@ -196,8 +203,9 @@ export const QuotationPreview = () => {
   );
 
   const quantityLabel = (item: any) => {
-    return [item.quantity, item.product.unitName || item.product.unit].filter(Boolean).join(' ');
+    return String(item.quantity ?? '');
   };
+  const unitLabel = (item: any) => String(item.product.unitName || item.product.unit || '').trim();
 
   const maskPhone = (value?: string) => {
     const phone = String(value || '').trim();
@@ -213,7 +221,7 @@ export const QuotationPreview = () => {
     })}`;
 
   const downloadFilename = () => {
-    const clientName = String(quotation.customer.company || quotation.customer.name || 'Client').trim();
+    const clientName = String(customer.company || customer.name || 'Client').trim();
     const quoteNumber = String(quotation.number || 'quotation').trim();
     const baseName = `Quote ${clientName} ${quoteNumber}`
       .replace(/[\/\\]+/g, '-')
@@ -566,13 +574,13 @@ export const QuotationPreview = () => {
                       <div className="mt-2 h-px w-full max-w-[390px] bg-slate-200" />
                       <div className="mt-[-1px] h-px w-24 bg-red-500" />
                     </div>
-                    <p className="text-xl font-black text-slate-950 sm:text-2xl">{quotation.customer.company || quotation.customer.name}</p>
-                    {quotation.customer.company && <p className="text-sm font-semibold text-slate-700">{quotation.customer.name}</p>}
-                    <p className="mt-3 text-sm font-medium leading-6 sm:leading-7 text-slate-700">{quotation.customer.address}</p>
+                    <p className="text-xl font-black text-slate-950 sm:text-2xl">{customer.company || customer.name}</p>
+                    {customer.company && <p className="text-sm font-semibold text-slate-700">{customer.name}</p>}
+                    <p className="mt-3 text-sm font-medium leading-6 sm:leading-7 text-slate-700">{customer.address}</p>
                     <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
-                      {quotation.customer.phone && <span>Phone: {maskPhone(quotation.customer.phone)}</span>}
-                      {(quotation.customer.phone && quotation.customer.email) && <span className="text-slate-400">|</span>}
-                      {quotation.customer.email && <span>Email: {quotation.customer.email}</span>}
+                      {customer.phone && <span>Phone: {maskPhone(customer.phone)}</span>}
+                      {(customer.phone && customer.email) && <span className="text-slate-400">|</span>}
+                      {customer.email && <span>Email: {customer.email}</span>}
                     </div>
                   </div>
                 </div>
@@ -701,7 +709,10 @@ export const QuotationPreview = () => {
                           <td className="border-r border-slate-200 px-3 py-4 text-right font-black text-slate-950">
                             {formatMoney(displayPrice, { whole: quotation.roundOffNetAmount })}
                           </td>
-                          <td className="border-r border-slate-200 px-2 py-4 text-center font-black text-slate-950">{quantityLabel(item)}</td>
+                          <td className="border-r border-slate-200 px-2 py-4 text-center text-slate-950">
+                            <div className="font-black">{quantityLabel(item)}</div>
+                            {quotation.showUom && unitLabel(item) && <div className="mt-1 text-[10px] font-semibold text-slate-500">{unitLabel(item)}</div>}
+                          </td>
                           {quotation.showDiscount && (
                             <td className="border-r border-slate-200 px-2 py-4 text-center font-bold text-slate-700">
                               {item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'}
@@ -766,7 +777,7 @@ export const QuotationPreview = () => {
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                           <MobileMetric label="Price" value={formatMoney(displayPrice, { whole: quotation.roundOffNetAmount })} />
-                          <MobileMetric label="Qty" value={quantityLabel(item)} />
+                          <MobileMetric label="Qty" value={<><span>{quantityLabel(item)}</span>{quotation.showUom && unitLabel(item) && <span className="block text-xs text-slate-500">{unitLabel(item)}</span>}</>} />
                           {quotation.showDiscount && <MobileMetric label="Disc%" value={item.discount > 0 ? `${item.discount.toFixed(1)}%` : '-'} />}
                           {quotation.showItemWiseGst && <MobileMetric label="GST" value={`${item.product.gstPercent}% (${formatMoney(gstAmount, { whole: quotation.roundOffNetAmount })})`} />}
                           <MobileMetric
@@ -1068,7 +1079,7 @@ const MobileMetric = ({
   strong = false,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   strong?: boolean;
 }) => (
   <div>

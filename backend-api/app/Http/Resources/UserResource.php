@@ -23,6 +23,14 @@ class UserResource extends JsonResource
                 'code' => $this->role?->code,
                 'display_name' => $this->role?->display_name,
             ]),
+            'module_permissions' => $this->whenLoaded(
+                'modulePermissions',
+                fn () => $this->modulePermissions->map(fn ($permission) => [
+                    'module' => $permission->module,
+                    'can_view' => (bool) $permission->can_view,
+                    'can_edit' => (bool) $permission->can_edit,
+                ])->values()
+            ),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

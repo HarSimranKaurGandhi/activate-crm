@@ -22,6 +22,8 @@ class CustomerResource extends JsonResource
             'pincode' => $this->pincode,
             'country' => $this->country,
             'rating' => $this->rating,
+            'customer_importance' => $this->customer_importance,
+            'customer_category' => $this->customer_category,
             'notes' => $this->notes,
             'is_active' => (bool) $this->is_active,
             'custom_fields' => CustomerFieldValueResource::collection($this->whenLoaded('fieldValues')),

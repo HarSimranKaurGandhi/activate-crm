@@ -32,6 +32,9 @@ import { UserMaster } from "./pages/masters/UserMaster";
 import { GodownMaster } from "./pages/masters/GodownMaster";
 import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
+import { ServiceDashboard } from "./pages/ServiceDashboard";
+import { ServiceRequestForm } from "./pages/ServiceRequestForm";
+import { AmcForm } from "./pages/AmcForm";
 import { Login } from "./pages/Login";
 import { AppProviders } from "./components/AppProviders";
 
@@ -74,6 +77,10 @@ export const router = createBrowserRouter([
               { path: "dispatches/new", Component: DispatchForm },
               { path: "dispatches/:id", Component: DispatchView },
               { path: "dispatches/:id/edit", Component: DispatchForm },
+              { path: "services", Component: ServiceDashboard },
+              { path: "services/new", Component: ServiceRequestForm },
+              { path: "services/amcs/new", Component: AmcForm },
+              { path: "services/amcs/:id/edit", Component: AmcForm },
               { path: "masters/categories", Component: CategoryMaster },
               { path: "masters/brands", Component: BrandMaster },
               { path: "masters/terms", Component: TermsMaster },

@@ -362,8 +362,35 @@ class QuotationService extends CrudService
             $snapshot = $this->buildAdjustmentSnapshot($adjustment, $totals['subtotal_after_discount']);
             $quotation->adjustments()->create($snapshot);
             $totals['total_adjustments'] += (float) $snapshot['amount'];
-            $totals['grand_total'] += (float) $snapshot['amount'];
         }
+
+        $deductionTotal = (float) $quotation->adjustments()
+            ->where('amount', '<', 0)
+            ->sum('amount');
+        $subtotal = (float) $totals['subtotal_after_discount'];
+        $taxFactor = $subtotal > 0
+            ? max($subtotal + $deductionTotal, 0) / $subtotal
+            : 0;
+
+        if ($taxFactor < 1) {
+            $totals['total_tax'] = 0;
+
+            foreach ($quotation->items as $item) {
+                $taxAmount = round((float) $item->tax_amount * $taxFactor, 2);
+                $item->tax_amount = $taxAmount;
+
+                if ($quotation->pricing_mode === 'exclusive_gst') {
+                    $item->line_total = round((float) $item->taxable_amount + $taxAmount, 2);
+                }
+
+                $item->save();
+                $totals['total_tax'] += $taxAmount;
+            }
+        }
+
+        $totals['grand_total'] = round($quotation->pricing_mode === 'inclusive_gst'
+            ? $subtotal + $totals['total_adjustments']
+            : $subtotal + $totals['total_tax'] + $totals['total_adjustments'], 2);
 
         foreach ($terms as $term) {
             $quotation->terms()->create($this->buildTermSnapshot($term));

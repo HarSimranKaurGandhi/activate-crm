@@ -14,6 +14,9 @@ const LEAD_SOURCE_OPTIONS = [
   { value: 'reference', label: 'Reference' },
   { value: 'india_mart', label: 'India Mart' },
   { value: 'website', label: 'Website' },
+  { value: 'johnson', label: 'Johnson' },
+  { value: 'hercules', label: 'Hercules' },
+  { value: 'affiliate', label: 'Affiliate' },
 ];
 
 const LEAD_STATUS_OPTIONS = [
@@ -29,6 +32,9 @@ const LEAD_TAG_OPTIONS = [
   { value: 'hot', label: 'Hot' },
   { value: 'premium', label: 'Premium' },
 ];
+
+const CUSTOMER_IMPORTANCE_OPTIONS = ['UVIP', 'VIP', 'IMP'];
+const CUSTOMER_CATEGORY_OPTIONS = ['GYM OWNER', 'GOVT OFFICIAL', 'BUILDER', 'CORPORATE', 'DEALER'];
 
 const LEAD_EXPECTED_ORDER_VALUE_OPTIONS = [
   { value: 'Less Than 1L', label: 'Less Than 1L' },
@@ -80,6 +86,8 @@ export const LeadForm = () => {
     failureReason: '',
     failureReasonDetails: '',
     tags: [] as string[],
+    customerImportance: '',
+    customerCategory: '',
     followUpDate: defaultFollowUpDate,
     assignedTo: user?.id ? String(user.id) : '',
   });
@@ -113,6 +121,8 @@ export const LeadForm = () => {
           failureReason: mapped.failureReason,
           failureReasonDetails: mapped.failureReasonDetails,
           tags: mapped.tags,
+          customerImportance: mapped.customerImportance,
+          customerCategory: mapped.customerCategory,
           followUpDate: mapped.followUpDate,
           assignedTo: mapped.assignedTo,
         });
@@ -347,6 +357,38 @@ export const LeadForm = () => {
                 />
                 <p className="mt-1 text-xs text-gray-500">Either email or phone number is required.</p>
                 {errors.email?.[0] && <p className="mt-1 text-sm text-red-600">{errors.email[0]}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Customer Importance</label>
+                <select
+                  value={formData.customerImportance}
+                  onChange={(event) => setFormData((current) => ({ ...current, customerImportance: event.target.value }))}
+                  className={fieldClassName(Boolean(errors.customer_importance?.[0]))}
+                >
+                  <option value="">None</option>
+                  {CUSTOMER_IMPORTANCE_OPTIONS.map((importance) => (
+                    <option key={importance} value={importance}>{importance}</option>
+                  ))}
+                </select>
+                {errors.customer_importance?.[0] && <p className="mt-1 text-sm text-red-600">{errors.customer_importance[0]}</p>}
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Customer Category</label>
+                <select
+                  value={formData.customerCategory}
+                  onChange={(event) => setFormData((current) => ({ ...current, customerCategory: event.target.value }))}
+                  className={fieldClassName(Boolean(errors.customer_category?.[0]))}
+                >
+                  <option value="">None</option>
+                  {CUSTOMER_CATEGORY_OPTIONS.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+                {errors.customer_category?.[0] && <p className="mt-1 text-sm text-red-600">{errors.customer_category[0]}</p>}
               </div>
             </div>
 

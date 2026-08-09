@@ -41,6 +41,8 @@ class ProductIndexRequest extends FormRequest
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
             'category_id' => ['sometimes', 'nullable', 'integer', 'exists:categories,id'],
             'brand_id' => ['sometimes', 'nullable', 'integer', 'exists:brands,id'],
+            'brand_ids' => ['sometimes', 'array', 'max:100'],
+            'brand_ids.*' => ['required', 'integer', 'distinct', 'exists:brands,id'],
             'gst_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
             'is_active' => ['sometimes', 'boolean'],
             'sort_by' => ['sometimes', 'string', 'in:id,product_name,model_number,category,brand,mrp,usual_selling_price,least_selling_price,gst_percent'],

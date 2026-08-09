@@ -9,6 +9,20 @@ class RoleService
 {
     public function dropdown(): Collection
     {
+        foreach ([
+            [
+                'code' => 'service_manager',
+                'name' => 'Service Manager',
+                'description' => 'Manages service requests and AMCs.',
+            ],
+            [
+                'code' => 'service_executive',
+                'name' => 'Service Executive',
+                'description' => 'Handles assigned service requests and AMC visits.',
+            ],
+        ] as $role) {
+            Role::firstOrCreate(['code' => $role['code']], $role);
+        }
         Role::firstOrCreate(
             ['code' => 'sales_manager'],
             [

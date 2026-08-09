@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('lead_whatsapp_follow_ups', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('lead_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->date('sent_on');
+            $table->text('message')->nullable();
+            $table->timestamps();
+            $table->unique(['lead_id', 'user_id', 'sent_on']);
+            $table->index(['user_id', 'sent_on']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('lead_whatsapp_follow_ups');
+    }
+};

@@ -15,7 +15,7 @@ class LeadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'lead_source' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website'])],
+            'lead_source' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website', 'johnson', 'hercules', 'affiliate'])],
             'name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'digits:10', 'required_without:email'],
             'email' => ['nullable', 'email', 'max:255', 'required_without:phone'],
@@ -37,6 +37,8 @@ class LeadRequest extends FormRequest
             'failure_reason_details' => ['nullable', 'string', 'max:2000', 'required_if:failure_reason,other'],
             'tags' => ['sometimes', 'nullable', 'array'],
             'tags.*' => ['string', Rule::in(['hot', 'premium'])],
+            'customer_importance' => ['nullable', 'string', Rule::in(['UVIP', 'VIP', 'IMP'])],
+            'customer_category' => ['nullable', 'string', Rule::in(['GYM OWNER', 'GOVT OFFICIAL', 'BUILDER', 'CORPORATE', 'DEALER'])],
             'follow_up_date' => ['required', 'date', 'after_or_equal:today'],
             'assigned_to' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ];
@@ -54,6 +56,12 @@ class LeadRequest extends FormRequest
 
         $this->merge([
             'expected_closure' => $expectedClosure,
+            'customer_importance' => filled($this->input('customer_importance'))
+                ? strtoupper(trim((string) $this->input('customer_importance')))
+                : null,
+            'customer_category' => filled($this->input('customer_category'))
+                ? strtoupper(trim((string) $this->input('customer_category')))
+                : null,
             'failure_reason' => $this->input('status') === 'closed_fail' ? $this->input('failure_reason') : null,
             'failure_reason_details' => $this->input('status') === 'closed_fail' && $this->input('failure_reason') === 'other'
                 ? $this->input('failure_reason_details')

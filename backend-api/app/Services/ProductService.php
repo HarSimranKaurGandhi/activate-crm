@@ -60,6 +60,7 @@ class ProductService extends CrudService
             })
             ->when($request->filled('category_id'), fn (Builder $q) => $q->where('category_id', $request->integer('category_id')))
             ->when($request->filled('brand_id'), fn (Builder $q) => $q->where('brand_id', $request->integer('brand_id')))
+            ->when($request->filled('brand_ids'), fn (Builder $q) => $q->whereIn('brand_id', $request->input('brand_ids', [])))
             ->when($request->filled('gst_percent'), fn (Builder $q) => $q->where('gst_percent', $request->input('gst_percent')))
             ->when(
                 $request->has('is_active'),

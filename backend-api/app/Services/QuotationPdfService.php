@@ -239,7 +239,7 @@ class QuotationPdfService
                         $roundOffNetAmount ? 0 : 2
                     ),
                     'quantity_label' => $this->number($item->quantity),
-                    'quantity_with_unit_label' => trim($this->number($item->quantity).' '.$unitLabel),
+                    'unit_label' => $unitLabel,
                     'discount_percent_label' => (float) $item->discount_percent > 0 ? $this->number($item->discount_percent).'%' : '-',
                     'gst_percent_label' => $this->number($item->gst_percent).'%',
                     'tax_amount_label' => $this->money(

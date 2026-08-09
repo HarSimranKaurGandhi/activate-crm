@@ -356,6 +356,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const replaceById = (setter: React.Dispatch<React.SetStateAction<any[]>>, item: any) => {
     setter((current) => current.map((existing) => (existing.id === item.id ? item : existing)));
   };
+  const replaceQuotationById = (item: any) => {
+    setQuotations((current) => current.map((existing) => existing.id === item.id ? {
+      ...existing,
+      ...item,
+      customer: item.customer || existing.customer || null,
+      lead: item.lead || existing.lead || null,
+    } : existing));
+  };
 
   const value = useMemo<DataContextType>(() => ({
     loading,
@@ -395,7 +403,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     async updateQuotation(id, quotation) {
       const updated = await quotationService.update(id, quotationPayload(quotation));
-      replaceById(setQuotations, mapQuotation(updated));
+      replaceQuotationById(mapQuotation(updated));
     },
     async deleteQuotation(id) {
       await quotationService.remove(id);
@@ -409,23 +417,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     async updateQuotationStatus(id, status) {
       const updated = await quotationService.updateStatus(id, status);
-      replaceById(setQuotations, mapQuotation(updated));
+      replaceQuotationById(mapQuotation(updated));
     },
     async submitQuotationForApproval(id) {
       const updated = await quotationService.submitForApproval(id);
-      replaceById(setQuotations, mapQuotation(updated));
+      replaceQuotationById(mapQuotation(updated));
     },
     async approveQuotation(id, remarks) {
       const updated = await quotationService.approve(id, remarks);
-      replaceById(setQuotations, mapQuotation(updated));
+      replaceQuotationById(mapQuotation(updated));
     },
     async rejectQuotation(id, remarks) {
       const updated = await quotationService.reject(id, remarks);
-      replaceById(setQuotations, mapQuotation(updated));
+      replaceQuotationById(mapQuotation(updated));
     },
     async reviseQuotation(id, remarks) {
       const updated = await quotationService.revise(id, remarks);
-      replaceById(setQuotations, mapQuotation(updated));
+      replaceQuotationById(mapQuotation(updated));
     },
     categories,
     async addCategory(category) {

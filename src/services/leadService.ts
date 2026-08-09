@@ -40,6 +40,12 @@ export const leadService = {
     payload.append('file', file);
     return unwrap<any>(await apiClient.post('/leads/bulk-upload', payload));
   },
+  async bulkUpdate(ids: string[], updates: { status?: string; assigned_to?: number; follow_up_date?: string }) {
+    return unwrap<any[]>(await apiClient.patch('/leads/bulk-update', {
+      lead_ids: ids.map(Number),
+      ...updates,
+    }));
+  },
   async downloadBulkTemplate() {
     const response = await apiClient.get('/leads/bulk-sample', { responseType: 'blob' });
     return response.data as Blob;

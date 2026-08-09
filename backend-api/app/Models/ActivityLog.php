@@ -11,7 +11,7 @@ class ActivityLog extends Model
 
     protected $fillable = [
         'module', 'entity_type', 'entity_id', 'action', 'description',
-        'old_values', 'new_values', 'created_by', 'ip_address',
+        'old_values', 'new_values', 'user_id', 'created_by', 'ip_address',
     ];
 
     protected function casts(): array
@@ -21,11 +21,11 @@ class ActivityLog extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

@@ -21,9 +21,11 @@ export const ProductForm = () => {
   const { id } = useParams();
   const { products, addProduct, updateProduct, categories, brands, loading } = useData();
   const [submitting, setSubmitting] = useState(false);
+  const [isDraggingImages, setIsDraggingImages] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const specsEditorRef = useRef<HTMLDivElement | null>(null);
   const specSelectionRef = useRef<Range | null>(null);
+  const imageDragDepthRef = useRef(0);
   const [measurementUnits, setMeasurementUnits] = useState<Array<{ id: string; code: string; name: string }>>([]);
   const [selectedFontSize, setSelectedFontSize] = useState(FONT_SIZE_OPTIONS[1].value);
 
@@ -224,14 +226,45 @@ export const ProductForm = () => {
     syncSpecifications();
   };
 
-  const handleImageSelection = (files: FileList | null) => {
-    const selectedFiles = Array.from(files || []);
+  const handleImageSelection = (files: FileList | File[] | null) => {
+    const incomingFiles = Array.from(files || []);
+    const selectedFiles = incomingFiles.filter((file) => file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024);
+
+    if (incomingFiles.some((file) => !file.type.startsWith('image/'))) {
+      toast.error('Only image files can be uploaded');
+    } else if (incomingFiles.some((file) => file.size > 5 * 1024 * 1024)) {
+      toast.error('Each product image must be 5 MB or smaller');
+    }
+
+    if (selectedFiles.length === 0) return;
 
     setFormData((current) => ({
       ...current,
       newImageFiles: [...current.newImageFiles, ...selectedFiles],
       primaryImageToken: current.primaryImageToken || (selectedFiles.length > 0 ? `new:${current.newImageFiles.length}` : current.primaryImageToken),
     }));
+  };
+
+  const handleImageDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    imageDragDepthRef.current += 1;
+    setIsDraggingImages(true);
+  };
+
+  const handleImageDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    imageDragDepthRef.current = Math.max(0, imageDragDepthRef.current - 1);
+    if (imageDragDepthRef.current === 0) setIsDraggingImages(false);
+  };
+
+  const handleImageDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    imageDragDepthRef.current = 0;
+    setIsDraggingImages(false);
+    handleImageSelection(event.dataTransfer.files);
   };
 
   const handleRemoveExistingImage = (imageId: string) => {
@@ -319,15 +352,37 @@ export const ProductForm = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Product Images
             </label>
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100">
-                <ImagePlus className="h-4 w-4" />
-                Upload multiple images
+            <div
+              onDragEnter={handleImageDragEnter}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                event.dataTransfer.dropEffect = 'copy';
+              }}
+              onDragLeave={handleImageDragLeave}
+              onDrop={handleImageDrop}
+              className={`rounded-2xl border-2 border-dashed p-4 transition-colors ${
+                isDraggingImages
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-300 bg-gray-50'
+              }`}
+            >
+              <label className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border px-4 py-5 text-center text-sm font-medium transition-colors ${
+                isDraggingImages
+                  ? 'border-blue-300 bg-white text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-100'
+              }`}>
+                <ImagePlus className="h-6 w-6" />
+                <span>{isDraggingImages ? 'Drop images here' : 'Drag and drop images here, or click to browse'}</span>
+                <span className="text-xs font-normal text-gray-500">Multiple images supported · 5 MB maximum per image</span>
                 <input
                   type="file"
                   accept="image/*"
                   multiple
-                  onChange={(e) => handleImageSelection(e.target.files)}
+                  onChange={(event) => {
+                    handleImageSelection(event.target.files);
+                    event.target.value = '';
+                  }}
                   className="hidden"
                 />
               </label>

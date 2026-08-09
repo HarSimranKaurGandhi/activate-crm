@@ -25,11 +25,12 @@ export const customerService = {
   async overview(id: string) {
     return unwrap<any>(await apiClient.get(`/customers/${id}/overview`));
   },
-  async addOwnedProduct(id: string, productId: string, description: string, quantity: number) {
+  async addOwnedProduct(id: string, productId: string, description: string, quantity: number, purchaseDate: string) {
     return unwrap<any>(await apiClient.post(`/customers/${id}/owned-products`, {
       product_id: productId ? Number(productId) : null,
       product_description: description.trim() || null,
       quantity,
+      purchase_date: purchaseDate,
     }));
   },
   async removeOwnedProduct(id: string, ownedProductId: string) {
