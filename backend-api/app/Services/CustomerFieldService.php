@@ -6,7 +6,6 @@ use App\Models\CustomerFieldDefinition;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class CustomerFieldService extends MasterService
 {
@@ -37,17 +36,6 @@ class CustomerFieldService extends MasterService
         $model->update($this->normalizeOptions($data));
 
         return $model->refresh();
-    }
-
-    public function reorder(array $items): void
-    {
-        DB::transaction(function () use ($items): void {
-            foreach ($items as $item) {
-                CustomerFieldDefinition::whereKey($item['id'])->update([
-                    'display_order' => $item['display_order'],
-                ]);
-            }
-        });
     }
 
     private function normalizeOptions(array $data): array

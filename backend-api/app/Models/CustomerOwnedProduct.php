@@ -21,6 +21,8 @@ class CustomerOwnedProduct extends Model
         ];
     }
 
+    public function references() { return $this->hasMany(OwnedProductReference::class); }
+
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function product(): BelongsTo { return $this->belongsTo(Product::class); }
     public function sourceDispatch(): BelongsTo { return $this->belongsTo(Dispatch::class, 'source_dispatch_id'); }

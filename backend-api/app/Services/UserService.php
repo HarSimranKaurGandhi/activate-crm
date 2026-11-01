@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Lead;
+use App\Models\Influencer;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Quotation;
@@ -39,6 +40,16 @@ class UserService extends CrudService
     public function dropdown(Request $request)
     {
         return $this->query($request)
+            ->when($request->boolean('sales_department_only'), function (Builder $query): void {
+                $query->whereJsonContains('departments', 'sales')
+                    ->where('is_active', true);
+            })
+            ->when($request->boolean('sales_only'), function (Builder $query): void {
+                $query->whereHas('role', function (Builder $role): void {
+                    $role->whereIn('code', ['sales', 'sales_user', 'sales_manager'])
+                        ->orWhereIn('name', ['Sales', 'Sales User', 'Sales Manager']);
+                })->where('is_active', true);
+            })
             ->orderBy('name')
             ->get();
     }
@@ -109,6 +120,10 @@ class UserService extends CrudService
                 ->where('assigned_to', $user->id)
                 ->update(['assigned_to' => $replacement->id]);
 
+            Influencer::query()
+                ->where('assigned_to', $user->id)
+                ->update(['assigned_to' => $replacement->id]);
+
             Task::query()
                 ->where('assigned_to', $user->id)
                 ->update(['assigned_to' => $replacement->id]);
@@ -130,6 +145,10 @@ class UserService extends CrudService
     {
         if (! Schema::hasColumn('users', 'designation')) {
             unset($data['designation']);
+        }
+
+        if (! Schema::hasColumn('users', 'departments')) {
+            unset($data['departments']);
         }
 
         return $data;

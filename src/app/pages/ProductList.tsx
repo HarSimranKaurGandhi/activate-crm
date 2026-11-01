@@ -240,7 +240,7 @@ export const ProductList = () => {
               className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">All Brands</option>
-              {brands.map((brand) => (
+              {brands.filter((brand) => brand.status === 'active').map((brand) => (
                 <option key={brand.id} value={brand.id}>{brand.name}</option>
               ))}
             </select>
@@ -292,7 +292,7 @@ export const ProductList = () => {
               className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">All Brands</option>
-              {brands.map((brand) => (
+              {brands.filter((brand) => brand.status === 'active').map((brand) => (
                 <option key={brand.id} value={brand.id}>{brand.name}</option>
               ))}
             </select>
@@ -352,8 +352,12 @@ export const ProductList = () => {
                     <td className="px-6 py-4 text-gray-700">{product.category || '-'}</td>
                     <td className="px-6 py-4 text-gray-700">{product.brand || '-'}</td>
                     <td className="px-6 py-4 text-right font-medium text-gray-900">₹{product.mrp.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 text-right font-medium text-blue-600">₹{product.usualSellingPrice.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 text-right font-medium text-amber-600">₹{product.leastSellingPrice.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 text-right font-medium text-blue-600">
+                      {product.usualSellingPrice === '' ? '-' : `₹${Number(product.usualSellingPrice).toLocaleString('en-IN')}`}
+                    </td>
+                    <td className="px-6 py-4 text-right font-medium text-amber-600">
+                      {product.leastSellingPrice === '' ? '-' : `₹${Number(product.leastSellingPrice).toLocaleString('en-IN')}`}
+                    </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">{product.gstPercent}%</div>
                       <div className="text-sm text-gray-500">{product.hsnCode || '-'}</div>

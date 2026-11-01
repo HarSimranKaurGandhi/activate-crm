@@ -14,9 +14,11 @@ const STATUS_OPTIONS = [
   { value: 'new', label: 'New (Requirement Confirmed)' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'on_hold', label: 'On Hold' },
+  { value: 'order_confirmed', label: 'Order Confirmed' },
   { value: 'closed_success', label: 'Closed - Success' },
   { value: 'closed_fail', label: 'Closed - Fail' },
 ];
+const CLOSED_LEAD_STATUSES = ['closed_success', 'closed_fail'];
 
 const localToday = () => {
   const date = new Date();
@@ -93,7 +95,13 @@ export const LeadBulkEditDialog = ({
             <label className="mb-2 block text-sm font-medium text-gray-700">Status</label>
             <select
               value={status}
-              onChange={(event) => setStatus(event.target.value)}
+              onChange={(event) => {
+                const nextStatus = event.target.value;
+                setStatus(nextStatus);
+                if (CLOSED_LEAD_STATUSES.includes(nextStatus)) {
+                  setFollowUpDate(localToday());
+                }
+              }}
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Leave unchanged</option>
@@ -118,14 +126,20 @@ export const LeadBulkEditDialog = ({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Follow-Up Date</label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              {CLOSED_LEAD_STATUSES.includes(status) ? 'Closure Date' : 'Follow-Up Date'}
+            </label>
             <input
               type="date"
               min={localToday()}
+              disabled={CLOSED_LEAD_STATUSES.includes(status)}
               value={followUpDate}
               onChange={(event) => setFollowUpDate(event.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600"
             />
+            {CLOSED_LEAD_STATUSES.includes(status) && (
+              <p className="mt-1 text-xs text-gray-500">Automatically set to today for the selected leads.</p>
+            )}
           </div>
 
           <DialogFooter className="pt-2">

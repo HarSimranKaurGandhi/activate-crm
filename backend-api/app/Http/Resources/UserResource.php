@@ -15,6 +15,7 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'designation' => $this->designation,
+            'departments' => array_values((array) ($this->departments ?? [])),
             'is_active' => (bool) $this->is_active,
             'role_id' => $this->role_id,
             'role' => $this->whenLoaded('role', fn () => [

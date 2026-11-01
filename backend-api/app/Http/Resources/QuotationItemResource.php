@@ -22,6 +22,10 @@ class QuotationItemResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'fulfillment' => $this->whenLoaded('fulfillment', fn () => $request->user()?->hasAnyRole(['influencer']) ? null : ($this->fulfillment ? [
+                'stock_status' => $this->fulfillment->stock_status,
+                'stock_comment' => $this->fulfillment->stock_comment,
+            ] : null)),
             'product_id' => $this->product_id,
             'sort_order' => $this->sort_order,
             'product_name' => $this->product_name,

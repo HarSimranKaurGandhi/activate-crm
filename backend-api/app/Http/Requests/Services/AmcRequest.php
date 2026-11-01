@@ -13,7 +13,7 @@ class AmcRequest extends FormRequest
         return [
             'customer_id'=>['required','integer','exists:customers,id'],
             'amc_type'=>['required',Rule::in(['amc','namc'])],
-            'status'=>['required',Rule::in(['new','active','inactive'])],
+            'status'=>['required',Rule::in(['new','proposal','active','inactive'])],
             'yearly_visits'=>['required','integer','min:2','max:11'],
             'visits_done'=>['nullable','integer','min:0','lte:yearly_visits'],
             'start_date'=>['required','date'],

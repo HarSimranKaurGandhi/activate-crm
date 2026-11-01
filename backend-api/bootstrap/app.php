@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo(fn (Request $request): ?string => $request->is('api/*') ? null : '/login');
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'reject.lead.token' => RejectLeadIntegrationToken::class,

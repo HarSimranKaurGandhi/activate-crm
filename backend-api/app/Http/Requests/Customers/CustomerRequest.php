@@ -9,14 +9,17 @@ class CustomerRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
-        $phone = preg_replace('/\D+/', '', (string) $this->input('phone', ''));
-        if (strlen($phone) > 10 && str_starts_with($phone, '91')) {
-            $phone = substr($phone, -10);
-        }
+        $phone = \App\Support\PhoneNumber::normalizeIndian($this->input('phone'));
 
         $this->merge([
             'phone' => $phone,
             'email' => filled($this->input('email')) ? strtolower(trim((string) $this->input('email'))) : null,
+            'company_name' => $this->input('customer_type') === 'business' && filled($this->input('company_name'))
+                ? trim((string) $this->input('company_name'))
+                : null,
+            'gst_number' => $this->input('customer_type') === 'business' && filled($this->input('gst_number'))
+                ? strtoupper(trim((string) $this->input('gst_number')))
+                : null,
             'customer_importance' => filled($this->input('customer_importance'))
                 ? strtoupper(trim((string) $this->input('customer_importance')))
                 : null,
@@ -37,7 +40,9 @@ class CustomerRequest extends FormRequest
 
         return [
             'primary_name' => ['required', 'string', 'max:255'],
-            'company_name' => ['nullable', 'string', 'max:255'],
+            'customer_type' => ['required', Rule::in(['individual', 'business'])],
+            'company_name' => ['nullable', 'required_if:customer_type,business', 'string', 'max:255'],
+            'gst_number' => ['nullable', 'string', 'size:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/'],
             'email' => ['nullable', 'email', 'max:255', Rule::unique('customers', 'email')->ignore($customerId)],
             'phone' => ['required', 'digits:10', Rule::unique('customers', 'phone')->ignore($customerId)],
             'address_line_1' => ['required', 'string', 'max:255'],
@@ -64,6 +69,8 @@ class CustomerRequest extends FormRequest
             'phone.digits' => 'Phone number must contain exactly 10 digits.',
             'phone.unique' => 'A customer with this phone number already exists.',
             'email.unique' => 'A customer with this email address already exists.',
+            'gst_number.regex' => 'Enter a valid 15-character GSTIN.',
+            'gst_number.size' => 'GSTIN must contain exactly 15 characters.',
         ];
     }
 }

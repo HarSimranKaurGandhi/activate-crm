@@ -12,14 +12,22 @@ const MODULES = [
   ['quotations', 'Quotations'],
   ['tasks', 'Tasks'],
   ['leads', 'Leads'],
+  ['influencers', 'Influencers'],
   ['customers', 'Customers'],
   ['products', 'Products'],
   ['inventory', 'Inventory'],
   ['dispatches', 'Dispatches'],
+  ['billing', 'Billing and Payments'],
   ['services', 'Service'],
   ['masters', 'Masters'],
   ['reports', 'Reports'],
   ['settings', 'Settings'],
+] as const;
+const DEPARTMENTS = [
+  { value: 'sales', label: 'Sales' },
+  { value: 'operations', label: 'Operations' },
+  { value: 'service', label: 'Service' },
+  { value: 'marketing', label: 'Marketing' },
 ] as const;
 const ALL_MODULES = MODULES.map(([key]) => key);
 type ModulePermission = { module: string; can_view: boolean; can_edit: boolean };
@@ -45,11 +53,23 @@ const normalizePermissions = (permissions: unknown): ModulePermission[] => {
   });
 };
 
+const normalizeDepartments = (departments: unknown): string[] => (
+  Array.isArray(departments)
+    ? departments
+      .map((department) => String(department).toLowerCase())
+      .filter((department) => DEPARTMENTS.some((option) => option.value === department))
+    : []
+);
+
+const departmentLabel = (department: string) =>
+  DEPARTMENTS.find((option) => option.value === department)?.label || department;
+
 const emptyForm = {
   name: '',
   email: '',
   phone: '',
   designation: '',
+  departments: [] as string[],
   password: '',
   roleId: '',
   status: 'active' as 'active' | 'inactive',
@@ -62,6 +82,8 @@ const mapUser = (user: any) => ({
   email: user.email || '',
   phone: user.phone || '',
   designation: user.designation || '',
+  departments: normalizeDepartments(user.departments),
+  departmentNames: normalizeDepartments(user.departments).map(departmentLabel).join(', '),
   roleId: user.role_id ? String(user.role_id) : '',
   roleName: user.role?.display_name || user.role?.name || '',
   status: user.is_active ? 'active' : 'inactive',
@@ -107,7 +129,7 @@ export const UserMaster = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [formData, setFormData] = useState(emptyForm);
-  const [sort, setSort] = useState<{ key: 'name' | 'roleName' | 'designation' | 'phone' | 'status'; direction: SortDirection }>({ key: 'name', direction: 'asc' });
+  const [sort, setSort] = useState<{ key: 'name' | 'roleName' | 'departmentNames' | 'designation' | 'phone' | 'status'; direction: SortDirection }>({ key: 'name', direction: 'asc' });
   const sortedUsers = useMemo(() => sortItems(users, (user) => user[sort.key], sort.direction), [users, sort]);
   const pagination = usePagination(sortedUsers, 10);
 
@@ -146,6 +168,7 @@ export const UserMaster = () => {
       email: formData.email,
       phone: formData.phone || null,
       designation: formData.designation || null,
+      departments: formData.departments,
       role_id: formData.roleId ? Number(formData.roleId) : null,
       is_active: formData.status === 'active',
       module_permissions: formData.modulePermissions,
@@ -180,6 +203,7 @@ export const UserMaster = () => {
       email: user.email,
       phone: user.phone,
       designation: user.designation,
+      departments: user.departments,
       password: '',
       roleId: user.roleId,
       status: user.status,
@@ -285,6 +309,18 @@ export const UserMaster = () => {
                     <div className="mt-1 font-medium text-slate-900">{user.designation || '-'}</div>
                   </div>
                   <div className="col-span-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Departments</div>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {user.departments.length > 0
+                        ? user.departments.map((department: string) => (
+                          <span key={department} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            {departmentLabel(department)}
+                          </span>
+                        ))
+                        : <span className="font-medium text-slate-900">-</span>}
+                    </div>
+                  </div>
+                  <div className="col-span-2">
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Phone</div>
                     <div className="mt-1 font-medium text-slate-900">{user.phone || '-'}</div>
                   </div>
@@ -311,11 +347,12 @@ export const UserMaster = () => {
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-          <table className="min-w-[860px] w-full">
+          <table className="min-w-[1040px] w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="User" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Role" sortKey="roleName" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Departments" sortKey="departmentNames" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Designation" sortKey="designation" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Phone" sortKey="phone" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Status" sortKey="status" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
@@ -337,6 +374,17 @@ export const UserMaster = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-gray-700">{user.roleName || '-'}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex max-w-56 flex-wrap gap-1.5">
+                      {user.departments.length > 0
+                        ? user.departments.map((department: string) => (
+                          <span key={department} className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
+                            {departmentLabel(department)}
+                          </span>
+                        ))
+                        : <span className="text-gray-500">-</span>}
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-gray-700">{user.designation || '-'}</td>
                   <td className="px-6 py-4 text-gray-700">{user.phone || '-'}</td>
                   <td className="px-6 py-4">
@@ -434,6 +482,36 @@ export const UserMaster = () => {
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {errors.designation?.[0] && <p className="mt-1 text-sm text-red-600">{errors.designation[0]}</p>}
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Departments</label>
+                <p className="mb-2 text-xs text-gray-500">Select all departments this user belongs to.</p>
+                <div className="grid grid-cols-2 gap-2 rounded-xl border border-gray-200 p-3">
+                  {DEPARTMENTS.map((department) => (
+                    <label
+                      key={department.value}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                        formData.departments.includes(department.value)
+                          ? 'border-blue-400 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 text-gray-700 hover:border-blue-200'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.departments.includes(department.value)}
+                        onChange={() => setFormData({
+                          ...formData,
+                          departments: formData.departments.includes(department.value)
+                            ? formData.departments.filter((value) => value !== department.value)
+                            : [...formData.departments, department.value],
+                        })}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                      />
+                      {department.label}
+                    </label>
+                  ))}
+                </div>
+                {errors.departments?.[0] && <p className="mt-1 text-sm text-red-600">{errors.departments[0]}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

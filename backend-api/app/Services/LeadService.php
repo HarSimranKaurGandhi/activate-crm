@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ActivityLog;
 use App\Models\Customer;
+use App\Models\Influencer;
 use App\Models\Lead;
 use App\Models\Quotation;
 use App\Models\User;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -24,11 +26,19 @@ class LeadService extends CrudService
 {
     private const CLOSED_STATUSES = ['closed_success', 'closed_fail'];
 
+    private const API_RANDOM_ASSIGNMENT_ROLES = [
+        'sales', 'sales_user', 'sales user', 'sales_manager', 'sales manager',
+    ];
+
+    private const API_INITIAL_ASSIGNMENT_ROLES = [
+        ...self::API_RANDOM_ASSIGNMENT_ROLES, 'admin',
+    ];
+
     protected string $modelClass = Lead::class;
 
     protected array $searchColumns = ['name', 'phone', 'email', 'city', 'state', 'country', 'requirement'];
 
-    protected array $relations = ['creator', 'assignedUser'];
+    protected array $relations = ['creator', 'assignedUser', 'influencer'];
 
     private ?array $activityLogColumns = null;
 
@@ -46,6 +56,7 @@ class LeadService extends CrudService
         'requirement' => 'Requirement',
         'expected_order_value' => 'Lead Expected Order Value',
         'expected_closure' => 'Expected Closure',
+        'closure_hot_level' => 'Closure Hot Level',
         'status' => 'Status',
         'failure_reason' => 'Failure Reason',
         'failure_reason_details' => 'Failure Details',
@@ -54,6 +65,7 @@ class LeadService extends CrudService
         'customer_category' => 'Customer Category',
         'follow_up_date' => 'Follow Up Date',
         'assigned_to' => 'Assigned To',
+        'influencer_id' => 'Influencer',
     ];
 
     public function paginate(Request $request): LengthAwarePaginator
@@ -87,9 +99,45 @@ class LeadService extends CrudService
             ->findOrFail($id);
     }
 
+    public function rolloverUnfollowedLeads(?string $forDate = null): int
+    {
+        $day = $forDate
+            ? Carbon::createFromFormat('!Y-m-d', $forDate, config('app.timezone'))
+            : now(config('app.timezone'))->startOfDay();
+        $today = $day->toDateString();
+        $tomorrow = $day->copy()->addDay()->toDateString();
+        $dayStart = $day->copy()->startOfDay();
+        $dayEnd = $day->copy()->endOfDay();
+
+        return DB::transaction(function () use ($today, $tomorrow, $dayStart, $dayEnd): int {
+            $leads = Lead::query()
+                ->whereBetween('follow_up_date', [$dayStart, $dayEnd])
+                ->whereNotIn('status', self::CLOSED_STATUSES)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($leads as $lead) {
+                $lead->update(['follow_up_date' => $tomorrow]);
+                $this->logActivity(
+                    $lead,
+                    'follow_up_rolled_over',
+                    'Unfollowed lead moved automatically to the next day.',
+                    ['follow_up_date' => $today],
+                    ['follow_up_date' => $tomorrow],
+                    null,
+                    null,
+                );
+            }
+
+            return $leads->count();
+        });
+    }
+
     public function create(array $data, ?User $actor = null, ?string $ipAddress = null): Model
     {
         return DB::transaction(function () use ($data, $actor, $ipAddress): Model {
+            $data = $this->withLockedClosureDate($data);
             $normalizedPhone = $this->normalizePhone($data['phone'] ?? null);
 
             if ($normalizedPhone !== '') {
@@ -127,6 +175,45 @@ class LeadService extends CrudService
         });
     }
 
+    public function generateCustomerRequirement(Customer $customer, array $data, User $actor, ?string $ipAddress = null): Model
+    {
+        return DB::transaction(function () use ($customer, $data, $actor, $ipAddress): Model {
+            $customer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
+            $phone = $this->normalizePhone($customer->phone);
+            $email = strtolower(trim((string) $customer->email));
+            if ($phone === '' && $email === '') {
+                throw ValidationException::withMessages(['customer' => ['Add a phone number or email to the customer first.']]);
+            }
+
+            // Prefer an active lead, then the most recent, matching phone before email.
+            $candidates = Lead::query()->orderByRaw("CASE WHEN status IN ('closed_success', 'closed_fail') THEN 1 ELSE 0 END")
+                ->orderByDesc('id')->lockForUpdate()->get();
+            $lead = $phone !== '' ? $candidates->first(fn (Lead $row) => $this->normalizePhone($row->phone) === $phone) : null;
+            $lead ??= $email !== '' ? $candidates->first(fn (Lead $row) => strtolower(trim((string) $row->email)) === $email) : null;
+            $payload = [
+                'requirement' => trim($data['requirement']),
+                'assigned_to' => $data['assigned_to'],
+                'status' => 'new',
+                'failure_reason' => null,
+                'failure_reason_details' => null,
+                'follow_up_date' => now()->addDays(2)->toDateString(),
+            ];
+            if ($lead) {
+                abort_unless($actor->hasAnyRole(['admin', 'sales_manager']) || (int) $lead->assigned_to === (int) $actor->id,
+                    403, 'This customer has a lead assigned to another user. Ask an administrator or sales manager to reopen it.');
+                return $this->update($lead, $payload, $actor, $ipAddress);
+            }
+
+            return $this->create([
+                ...$customer->only(['phone', 'email', 'address_line_1', 'address_line_2', 'city', 'state', 'pincode', 'country', 'customer_importance', 'customer_category']),
+                'name' => $customer->primary_name ?: $customer->company_name,
+                'lead_source' => 'reference',
+                'created_by' => $actor->id,
+                ...$payload,
+            ], $actor, $ipAddress);
+        });
+    }
+
     private function normalizePhone(?string $phone): string
     {
         return preg_replace('/\D+/', '', trim((string) $phone)) ?? '';
@@ -136,13 +223,20 @@ class LeadService extends CrudService
     {
         return DB::transaction(function()use($rows,$actor,$ipAddress):array{
             $existing=Lead::query()->with($this->relations)->lockForUpdate()->get();
-            $salesUsers=User::query()->with('role:id,name,code')->where('is_active',true)->get()->filter(function(User $user){$role=strtolower(trim((string)($user->role?->code?:$user->role?->name)));return in_array($role,['sales','sales_user','sales user','sales_manager','sales manager'],true);})->values();
-            if($salesUsers->isEmpty())throw ValidationException::withMessages(['assigned_user'=>['No active Sales User or Sales Manager is available for lead assignment.']]);
+            $activeUsers=User::query()->with('role:id,name,code')->where('is_active',true)->get();
+            $salesUsers=$activeUsers->filter(fn(User $user)=>in_array($this->apiAssignmentRole($user),self::API_RANDOM_ASSIGNMENT_ROLES,true))->values();
+            $initialAssignees=$activeUsers->filter(fn(User $user)=>in_array($this->apiAssignmentRole($user),self::API_INITIAL_ASSIGNMENT_ROLES,true))->values();
             $byPhone=$existing->filter(fn(Lead $lead)=>$this->normalizePhone($lead->phone)!=='')->keyBy(fn(Lead $lead)=>$this->normalizePhone($lead->phone));
             $byEmail=$existing->filter(fn(Lead $lead)=>filled($lead->email))->keyBy(fn(Lead $lead)=>strtolower(trim((string)$lead->email)));
             $results=[];$created=0;$updated=0;
             foreach($rows as $index=>$incoming){
-                if(empty($incoming['assigned_to'])){$initials=strtoupper(preg_replace('/[^A-Z0-9]/','',(string)($incoming['assigned_user']??''))??'');$matching=$initials===''?collect():$salesUsers->filter(fn(User $user)=>$this->userInitials($user->name)===$initials)->values();$incoming['assigned_to']=($matching->isNotEmpty()?$matching:$salesUsers)->random()->id;}
+                if(empty($incoming['assigned_to'])){
+                    $initials=strtoupper(preg_replace('/[^A-Z0-9]/','',(string)($incoming['assigned_user']??''))??'');
+                    $matching=$initials===''?collect():$initialAssignees->filter(fn(User $user)=>$this->userInitials($user->name)===$initials)->values();
+                    $assignmentPool=$matching->isNotEmpty()?$matching:$salesUsers;
+                    if($assignmentPool->isEmpty())throw ValidationException::withMessages(["leads.{$index}.assigned_user"=>['No active Sales User or Sales Manager is available for lead assignment.']]);
+                    $incoming['assigned_to']=$assignmentPool->random()->id;
+                }
                 unset($incoming['assigned_user']);
                 $phone=$this->normalizePhone($incoming['phone']??null);$email=strtolower(trim((string)($incoming['email']??'')));
                 $phoneMatch=$phone!==''?$byPhone->get($phone):null;$emailMatch=$email!==''?$byEmail->get($email):null;
@@ -172,6 +266,11 @@ class LeadService extends CrudService
     private function userInitials(string $name): string
     {
         return collect(preg_split('/\s+/',trim($name),-1,PREG_SPLIT_NO_EMPTY)?:[])->map(fn(string $part)=>mb_strtoupper(mb_substr($part,0,1)))->join('');
+    }
+
+    private function apiAssignmentRole(User $user): string
+    {
+        return strtolower(trim((string) ($user->role?->code ?: $user->role?->name)));
     }
 
     public function bulkImportCsv(string $path, ?User $actor = null, ?string $ipAddress = null): array
@@ -419,7 +518,7 @@ class LeadService extends CrudService
             'requirement' => ['required', 'string'],
             'expected_order_value' => ['nullable', Rule::in(['Less Than 1L', '1L-5L', '5L-10L', '10L-30L', '30L+']), 'required_if:status,in_progress'],
             'expected_closure' => ['nullable', Rule::in(['10 days', '20 days', '30 days', '90 days']), 'required_if:status,in_progress'],
-            'status' => ['required', Rule::in(['new', 'enquiry', 'in_progress', 'on_hold', 'closed_success', 'closed_fail'])],
+            'status' => ['required', Rule::in(['new', 'enquiry', 'in_progress', 'on_hold', 'order_confirmed', 'closed_success', 'closed_fail'])],
             'failure_reason' => [
                 'nullable',
                 Rule::in(['lost_to_competitor', 'no_enquiry_made', 'lost_interest', 'no_response', 'didnt_like_product', 'product_not_available', 'other']),
@@ -501,6 +600,7 @@ class LeadService extends CrudService
         return DB::transaction(function () use ($model, $data, $actor, $ipAddress): Model {
             /** @var Lead $lead */
             $before = $this->serializeLeadValues($lead = $model);
+            $data = $this->withLockedClosureDate($data, $lead);
             $lead = parent::update($model, $data);
 
             $this->syncCustomerForClosedSuccess($lead);
@@ -654,7 +754,7 @@ class LeadService extends CrudService
         $user = $request->user();
         if ($user instanceof User) {
             $user->loadMissing('role');
-            if (! $user->hasAnyRole(['admin', 'operations'])) {
+            if (! $user->hasAnyRole(['admin', 'operations', 'sales_manager'])) {
                 $query->where('created_by', $user->id);
             }
         }
@@ -734,7 +834,8 @@ class LeadService extends CrudService
             ->where('action', 'called')
             ->firstOrFail();
 
-        $dateChanged = filled($followUpDate)
+        $dateChanged = ! in_array($lead->status, self::CLOSED_STATUSES, true)
+            && filled($followUpDate)
             && optional($lead->follow_up_date)->format('Y-m-d') !== $followUpDate;
 
         $values = [
@@ -788,6 +889,17 @@ class LeadService extends CrudService
     protected function applyFilters(Builder $query, Request $request): Builder
     {
         $includeClosed = $request->boolean('include_closed');
+        $viewer = $request->user();
+        $favouriteUserId = $viewer instanceof User ? (int) $viewer->getKey() : null;
+
+        if ($viewer instanceof User && $request->filled('favourite_user_id')) {
+            $viewer->loadMissing('role');
+
+            if ($viewer->hasAnyRole(['admin'])) {
+                $favouriteUserId = $request->integer('favourite_user_id');
+            }
+        }
+
         $leadSources = collect(Arr::wrap($request->input('lead_source')))
             ->filter(fn (mixed $value): bool => filled($value))
             ->values()
@@ -809,11 +921,21 @@ class LeadService extends CrudService
             )
             ->when(
                 $leadSources !== [],
-                fn (Builder $builder) => $builder->whereIn('lead_source', $leadSources)
+                fn (Builder $builder) => $this->applyInclusionFilter(
+                    $builder,
+                    'lead_source',
+                    $leadSources,
+                    $request->input('lead_source_operator'),
+                )
             )
             ->when(
                 $statuses !== [],
-                fn (Builder $builder) => $builder->whereIn('status', $statuses)
+                fn (Builder $builder) => $this->applyInclusionFilter(
+                    $builder,
+                    'status',
+                    $statuses,
+                    $request->input('status_operator'),
+                )
             )
             ->when(
                 $request->filled('tag'),
@@ -825,7 +947,13 @@ class LeadService extends CrudService
             )
             ->when(
                 $assigneeIds !== [],
-                fn (Builder $builder) => $builder->whereIn('assigned_to', $assigneeIds)
+                fn (Builder $builder) => $this->applyInclusionFilter(
+                    $builder,
+                    'assigned_to',
+                    $assigneeIds,
+                    $request->input('assigned_to_operator'),
+                    true,
+                )
             )
             ->when(
                 $request->filled('follow_up_from'),
@@ -836,12 +964,32 @@ class LeadService extends CrudService
                 fn (Builder $builder) => $builder->whereDate('follow_up_date', '<=', $request->date('follow_up_to'))
             )
             ->when(
-                $request->boolean('favourites_only') && $request->user() instanceof User,
+                $request->boolean('favourites_only') && $favouriteUserId !== null,
                 fn (Builder $builder) => $builder->whereHas(
                     'favouritedBy',
-                    fn (Builder $favourites) => $favourites->where('users.id', $request->user()->id),
+                    fn (Builder $favourites) => $favourites->where('users.id', $favouriteUserId),
                 ),
             );
+    }
+
+    private function applyInclusionFilter(
+        Builder $builder,
+        string $column,
+        array $values,
+        mixed $operator,
+        bool $includeNullsOnExclude = false,
+    ): Builder {
+        if ($operator !== 'is_not') {
+            return $builder->whereIn($column, $values);
+        }
+
+        if (! $includeNullsOnExclude) {
+            return $builder->whereNotIn($column, $values);
+        }
+
+        return $builder->where(function (Builder $inner) use ($column, $values): void {
+            $inner->whereNotIn($column, $values)->orWhereNull($column);
+        });
     }
 
     private function visibleQuery(Request $request): Builder
@@ -862,13 +1010,19 @@ class LeadService extends CrudService
             return $query;
         }
 
+        $favouriteOwnerId = $user->hasAnyRole(['admin']) && $request->filled('favourite_user_id')
+            ? $request->integer('favourite_user_id') : $user->id;
         $query->withExists([
-            'favouritedBy as is_favourite' => fn (Builder $favourites) => $favourites->where('users.id', $user->id),
+            'favouritedBy as is_favourite' => fn (Builder $favourites) => $favourites->where('users.id', $favouriteOwnerId),
         ]);
 
         $user->loadMissing('role');
 
-        if ($user->hasAnyRole(['admin'])) {
+        if ($user->hasAnyRole(['influencer'])) {
+            return $query->whereIn('influencer_id', \App\Models\Influencer::query()->where('user_id', $user->id)->where('is_active', true)->select('id'));
+        }
+
+        if ($user->hasAnyRole(['admin', 'sales_manager'])) {
             return $query;
         }
 
@@ -881,15 +1035,22 @@ class LeadService extends CrudService
             return;
         }
 
-        $phoneCustomer = Customer::query()->where('phone', $lead->phone)->first();
+        $this->customerForLead($lead);
+    }
+
+    public function customerForLead(Lead $lead): Customer
+    {
+        $phoneCustomer = filled($lead->phone) ? Customer::query()->where('phone', $lead->phone)->first() : null;
         $emailCustomer = filled($lead->email)
             ? Customer::query()->where('email', strtolower(trim($lead->email)))->first()
             : null;
         $customer = $phoneCustomer ?: $emailCustomer;
 
         $payload = [
+            'customer_type' => 'individual',
             'primary_name' => $lead->name ?: "Lead {$lead->phone}",
             'company_name' => null,
+            'gst_number' => null,
             'email' => filled($lead->email) ? strtolower(trim($lead->email)) : null,
             'phone' => $lead->phone,
             'address_line_1' => $lead->address_line_1 ?: 'N/A',
@@ -924,10 +1085,28 @@ class LeadService extends CrudService
                 'is_active' => true,
             ]);
 
-            return;
+            return $customer;
         }
 
-        Customer::create($payload);
+        return Customer::create($payload);
+    }
+
+    private function withLockedClosureDate(array $data, ?Lead $existingLead = null): array
+    {
+        $status = (string) ($data['status'] ?? $existingLead?->status ?? '');
+
+        if (! in_array($status, self::CLOSED_STATUSES, true)) {
+            return $data;
+        }
+
+        $wasAlreadyClosed = $existingLead
+            && in_array($existingLead->status, self::CLOSED_STATUSES, true);
+
+        $data['follow_up_date'] = $wasAlreadyClosed
+            ? (optional($existingLead->follow_up_date)->format('Y-m-d') ?: now()->toDateString())
+            : now()->toDateString();
+
+        return $data;
     }
 
     private function serializeLeadValues(Lead $lead): array
@@ -960,6 +1139,7 @@ class LeadService extends CrudService
                 'enquiry' => 'Enquiry',
                 'in_progress' => 'In Progress',
                 'on_hold' => 'On Hold',
+                'order_confirmed' => 'Order Confirmed',
                 'closed_success' => 'Closed - Success',
                 'closed_fail' => 'Closed - Fail',
                 default => (string) ($value ?? '-'),
@@ -987,6 +1167,16 @@ class LeadService extends CrudService
             $user = User::query()->find($value);
 
             return $user?->name ?: (string) $value;
+        }
+
+        if ($field === 'influencer_id') {
+            if (! $value) {
+                return '-';
+            }
+
+            $influencer = Influencer::query()->find($value);
+
+            return $influencer?->name ?: (string) $value;
         }
 
         if ($field === 'follow_up_date') {

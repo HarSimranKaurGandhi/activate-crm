@@ -27,12 +27,12 @@ class AmcService
                 ->whereHas('amc',fn($query)=>$query->where('status','active'))
                 ->whereDate('scheduled_date','<',now()->startOfMonth()->addMonth())
                 ->where(fn($query)=>$query->whereDate('scheduled_date','>=',now()->startOfMonth())->orWhere('status','pending'))
-                ->when(!$includeCompleted,fn($query)=>$query->where('status','!=','completed'))
+                ->when(!$includeCompleted,fn($query)=>$query->where('status','pending'))
                 ->orderBy('scheduled_date')->orderBy('visit_number')->paginate($perPage);
         }
         $query=Amc::query()->with($this->relations);
         if($view==='active')$query->where('status','active')->whereDate('end_date','>=',today());
-        if($view==='prospect_expired')$query->where(fn($q)=>$q->where('status','new')->orWhere('status','inactive')->orWhereDate('end_date','<',today()));
+        if($view==='prospect_expired')$query->where(fn($q)=>$q->whereIn('status',['new','proposal','inactive'])->orWhereDate('end_date','<',today()));
         return $query->orderBy('end_date')->latest('id')->paginate($perPage);
     }
 
@@ -87,17 +87,56 @@ class AmcService
         });
     }
 
+    public function delete(Amc $amc): void
+    {
+        $amc->delete();
+    }
+
     public function completeNextVisit(Amc $amc,?User $actor=null,?string $ip=null): Amc
     {
         return DB::transaction(function () use ($amc,$actor,$ip): Amc {
             $locked=Amc::query()->lockForUpdate()->findOrFail($amc->id);
+            if($locked->status !== 'active')throw ValidationException::withMessages(['status'=>'Only active AMCs can have visits updated.']);
             if($locked->visits_done >= $locked->yearly_visits)throw ValidationException::withMessages(['visits_done'=>'All AMC visits are already completed.']);
-            $next=$locked->visits()->where('status','!=','completed')->orderBy('visit_number')->lockForUpdate()->first();
+            $next=$locked->visits()->where('status','pending')->orderBy('visit_number')->lockForUpdate()->first();
             if(!$next)throw ValidationException::withMessages(['visits_done'=>'No pending AMC visit was found.']);
             if($next->scheduled_date->startOfMonth()->isAfter(now()->startOfMonth()))throw ValidationException::withMessages(['visits_done'=>'This visit cannot be completed until its scheduled month begins.']);
             $next->update(['status'=>'completed','completed_at'=>now()]);
             $locked->update(['visits_done'=>$locked->visits()->where('status','completed')->count()]);
             $this->logActivity($locked,'visit_completed','AMC visit '.$next->visit_number.' marked as done.',[],['visits_done'=>$locked->visits_done],$actor,$ip);
+            return $locked->refresh()->load($this->relations);
+        });
+    }
+
+    public function updateVisitStatus(Amc $amc,array $data,?User $actor=null,?string $ip=null): Amc
+    {
+        return DB::transaction(function () use ($amc,$data,$actor,$ip): Amc {
+            $locked=Amc::query()->lockForUpdate()->findOrFail($amc->id);
+            if($locked->status !== 'active')throw ValidationException::withMessages(['status'=>'Only active AMCs can have visits updated.']);
+            $query=$locked->visits()->where('status','pending');
+            if(isset($data['visit_id']))$query->whereKey($data['visit_id']);
+            $visit=$query->orderBy('visit_number')->lockForUpdate()->first();
+            if(!$visit)throw ValidationException::withMessages(['visit_id'=>'No pending AMC visit was found.']);
+            if($visit->scheduled_date->startOfMonth()->isAfter(now()->startOfMonth()))throw ValidationException::withMessages(['visit_id'=>'This visit cannot be updated until its scheduled month begins.']);
+
+            $old=['status'=>$visit->status,'scheduled_date'=>$visit->scheduled_date->format('Y-m-d')];
+            $status=$data['status'];
+            if($status==='completed'){
+                $visit->update(['status'=>'completed','completed_at'=>now()]);
+                $description='AMC visit '.$visit->visit_number.' marked as done.';
+                $action='visit_completed';
+            }elseif($status==='skipped'){
+                $visit->update(['status'=>'skipped','completed_at'=>null,'notes'=>trim($data['reason'])]);
+                $description='AMC visit '.$visit->visit_number.' skipped. Reason: '.trim($data['reason']);
+                $action='visit_skipped';
+            }else{
+                $visit->update(['status'=>'pending','scheduled_date'=>Carbon::parse($data['rescheduled_date'])->startOfDay(),'completed_at'=>null,'notes'=>trim($data['reason'])]);
+                $description='AMC visit '.$visit->visit_number.' rescheduled to '.$visit->scheduled_date->format('d M Y').'. Reason: '.trim($data['reason']);
+                $action='visit_rescheduled';
+            }
+
+            $locked->update(['visits_done'=>$locked->visits()->where('status','completed')->count()]);
+            $this->logActivity($locked,$action,$description,$old,['status'=>$visit->status,'scheduled_date'=>$visit->scheduled_date->format('Y-m-d'),'reason'=>$data['reason']??null,'visits_done'=>$locked->visits_done],$actor,$ip);
             return $locked->refresh()->load($this->relations);
         });
     }

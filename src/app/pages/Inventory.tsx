@@ -1,3 +1,5 @@
+import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ArrowDownToLine,
@@ -5,6 +7,7 @@ import {
   ClipboardList,
   Filter,
   History,
+  Pencil,
   Search,
   X,
 } from 'lucide-react';
@@ -29,6 +32,10 @@ const emptyMeta = { total: 0, last_page: 1 };
 
 export const Inventory = () => {
   const navigate = useNavigate();
+  const [editingStyle, setEditingStyle] = useState<any>(null);
+  const [style, setStyle] = useState('');
+  const [styleSaving, setStyleSaving] = useState(false);
+  const [styleError, setStyleError] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('all');
@@ -86,6 +93,23 @@ export const Inventory = () => {
       .then((result) => setPlannedDispatches(result.data || []));
   }, []);
 
+  const saveStyle = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingStyle || styleSaving) return;
+    setStyleSaving(true);
+    setStyleError('');
+    try {
+      await inventoryService.updateStyle(String(editingStyle.id), editingStyle.style || '', style.trim());
+      setEditingStyle(null);
+      toast.success('Inventory style updated');
+      await load(page, pageSize);
+    } catch (error: any) {
+      setStyleError(error?.errors?.style?.[0] || error?.errors?.current_style?.[0] || 'Unable to update inventory style. Please try again.');
+    } finally {
+      setStyleSaving(false);
+    }
+  };
+
   const activeFilterCount = [
     categoryId !== 'all',
     brandId !== 'all',
@@ -107,6 +131,7 @@ export const Inventory = () => {
             <p className="text-sm text-gray-500">Stock across all godowns</p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <button onClick={() => navigate('/inventory/thresholds')} className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-gray-700">Threshold Quantities</button>
             <button
               onClick={() => navigate('/inventory/log')}
               className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-gray-700"
@@ -128,75 +153,6 @@ export const Inventory = () => {
               <ArrowUpFromLine className="h-4 w-4" />
               OUT ITEMS
             </button>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-              <Filter className="h-4 w-4 text-blue-600" />
-              Inventory Filters
-              {activeFilterCount > 0 && (
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                  {activeFilterCount} active
-                </span>
-              )}
-            </div>
-            {activeFilterCount > 0 && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800"
-              >
-                <X className="h-4 w-4" />
-                Clear filters
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search products"
-                className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-            <select
-              value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
-              aria-label="Filter inventory by product category"
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="all">All Product Categories</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>{category.name}</option>
-              ))}
-            </select>
-            <select
-              value={brandId}
-              onChange={(event) => setBrandId(event.target.value)}
-              aria-label="Filter inventory by brand"
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="all">All Brands</option>
-              {brands.map((brand) => (
-                <option key={brand.id} value={brand.id}>{brand.name}</option>
-              ))}
-            </select>
-            <select
-              value={godownId}
-              onChange={(event) => setGodownId(event.target.value)}
-              aria-label="Filter inventory by godown"
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="all">All Godowns</option>
-              {data.godowns.map((godown) => (
-                <option key={godown.id} value={godown.id}>{godown.name}</option>
-              ))}
-            </select>
           </div>
         </div>
 
@@ -247,6 +203,86 @@ export const Inventory = () => {
         </div>
 
         <div className="overflow-hidden rounded-2xl border bg-white">
+          <div className="border-b p-5">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Inventory List</h3>
+                <p className="text-sm text-gray-500">Search and filter available stock across godowns</p>
+              </div>
+              {(search.trim() || activeFilterCount > 0) && (
+                <button
+                  type="button"
+                  onClick={() => { setSearch(''); clearFilters(); }}
+                  className="flex items-center gap-1 self-start text-sm font-medium text-gray-500 hover:text-gray-800 sm:self-auto"
+                >
+                  <X className="h-4 w-4" />
+                  Clear search & filters
+                </button>
+              )}
+            </div>
+
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search inventory by product, model number, or style"
+                aria-label="Search inventory list"
+                className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-700">
+              <Filter className="h-4 w-4 text-blue-600" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                  {activeFilterCount} active
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <label className="space-y-1.5 text-sm font-medium text-gray-600">
+                <span>Product Category</span>
+                <select
+                  value={categoryId}
+                  onChange={(event) => setCategoryId(event.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 font-normal text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="all">All Product Categories</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1.5 text-sm font-medium text-gray-600">
+                <span>Brand</span>
+                <select
+                  value={brandId}
+                  onChange={(event) => setBrandId(event.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 font-normal text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="all">All Brands</option>
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>{brand.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1.5 text-sm font-medium text-gray-600">
+                <span>Godown</span>
+                <select
+                  value={godownId}
+                  onChange={(event) => setGodownId(event.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 font-normal text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="all">All Godowns</option>
+                  {data.godowns.map((godown) => (
+                    <option key={godown.id} value={godown.id}>{godown.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
           {loading ? (
             <LoadingState label="Loading inventory..." />
           ) : (
@@ -255,6 +291,7 @@ export const Inventory = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-5 py-4 text-left text-xs uppercase">Product</th>
+                    <th className="px-5 py-4 text-left text-xs uppercase">Style</th>
                     <th className="px-5 py-4 text-left text-xs uppercase">Category</th>
                     <th className="px-5 py-4 text-left text-xs uppercase">Brand</th>
                     <th className="px-5 py-4 text-left text-xs uppercase">Measurement Unit</th>
@@ -264,10 +301,20 @@ export const Inventory = () => {
                 </thead>
                 <tbody className="divide-y">
                   {data.products.map((product) => (
-                    <tr key={product.id}>
+                    <tr key={product.stock_key || `${product.id}-${product.style || ''}`}>
                       <td className="px-5 py-4">
                         <div className="font-medium">{product.product_name}</div>
                         <div className="text-xs text-gray-500">{product.model_number || '-'}</div>
+                      </td>
+                      <td className="px-5 py-4 font-medium text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <span>{product.style || '-'}</span>
+                          <button type="button" title="Edit style" aria-label={`Edit style for ${product.product_name}`}
+                            onClick={() => { setEditingStyle(product); setStyle(product.style || ''); setStyleError(''); }}
+                            className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50">
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                       <td className="px-5 py-4">{product.category || '-'}</td>
                       <td className="px-5 py-4">{product.brand || '-'}</td>
@@ -290,7 +337,7 @@ export const Inventory = () => {
                   ))}
                   {!data.products.length && (
                     <tr>
-                      <td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-500">
+                      <td colSpan={7} className="px-5 py-12 text-center text-sm text-gray-500">
                         No inventory matches the selected filters.
                       </td>
                     </tr>
@@ -309,6 +356,27 @@ export const Inventory = () => {
           />
         </div>
       </div>
+      <Dialog open={Boolean(editingStyle)} onOpenChange={(open) => { if (!open && !styleSaving) setEditingStyle(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Style</DialogTitle>
+            <DialogDescription>Update the style for {editingStyle?.product_name} across all godowns. Stock quantities stay the same. Previous inventory logs retain their original style.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={saveStyle} className="space-y-4">
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Style</span>
+              <input autoFocus value={style} maxLength={100} disabled={styleSaving}
+                onChange={(event) => setStyle(event.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2" placeholder="Enter style" />
+            </label>
+            {styleError && <p role="alert" className="text-sm text-red-600">{styleError}</p>}
+            <DialogFooter>
+              <button type="button" disabled={styleSaving} onClick={() => setEditingStyle(null)} className="rounded-xl border px-4 py-2">Cancel</button>
+              <button type="submit" disabled={styleSaving} className="rounded-xl bg-blue-600 px-4 py-2 text-white disabled:opacity-50">{styleSaving ? 'Saving...' : 'Save Style'}</button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

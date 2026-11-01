@@ -1,19 +1,26 @@
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
 import { Plus, Search, Edit, Trash2, Filter, ChevronDown } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
-import { PaginationControls, usePagination } from '../components/common/Pagination';
+import { PaginationControls } from '../components/common/Pagination';
 import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
-import { sortItems } from '../utils/sort';
+import { customerService } from '../../services/customerService';
+import { mapCustomer } from '../../services/mappers';
 import { CustomerDetailsDialog } from '../components/customers/CustomerDetailsDialog';
 
 export const CustomerList = () => {
   const navigate = useNavigate();
-  const { customers, deleteCustomer, loading } = useData();
+  const { deleteCustomer } = useData();
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [meta, setMeta] = useState({ total: 0, last_page: 1 });
+  const [reload, setReload] = useState(0);
   const [filters, setFilters] = useState({
-    company: '',
     name: '',
     email: '',
     phone: '',
@@ -22,46 +29,38 @@ export const CustomerList = () => {
   });
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [sort, setSort] = useState<{ key: 'company' | 'name' | 'phone' | 'location' | 'rating'; direction: SortDirection }>({
-    key: 'company',
+  const [sort, setSort] = useState<{ key: 'name' | 'phone' | 'location' | 'rating'; direction: SortDirection }>({
+    key: 'name',
     direction: 'asc',
   });
 
-  const filteredCustomers = useMemo(() => {
-    return customers.filter((customer) => {
-      const companyMatch = customer.company.toLowerCase().includes(filters.company.trim().toLowerCase());
-      const nameMatch = customer.name.toLowerCase().includes(filters.name.trim().toLowerCase());
-      const emailMatch = customer.email.toLowerCase().includes(filters.email.trim().toLowerCase());
-      const phoneMatch = customer.phone.toLowerCase().includes(filters.phone.trim().toLowerCase());
-      const cityMatch = (customer.city || '').toLowerCase().includes(filters.city.trim().toLowerCase());
-      const ratingMatch = filters.rating === 'all' || Number(customer.rating || 0) === Number(filters.rating);
-
-      return companyMatch && nameMatch && emailMatch && phoneMatch && cityMatch && ratingMatch;
-    });
-  }, [customers, filters]);
-
-  const sortedCustomers = useMemo(
-    () =>
-      sortItems(
-        filteredCustomers,
-        (customer) =>
-          sort.key === 'location'
-            ? [customer.city, customer.state].filter(Boolean).join(', ')
-            : customer[sort.key],
-        sort.direction,
-      ),
-    [filteredCustomers, sort],
-  );
-
-  const pagination = usePagination(sortedCustomers, 10);
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setError('');
+    const timer = window.setTimeout(() => {
+      customerService.list({
+        name: filters.name.trim(), email: filters.email.trim(), phone: filters.phone.trim(), city: filters.city.trim(),
+        ...(filters.rating !== 'all' ? { rating: filters.rating } : {}),
+        sort_by: sort.key, sort_direction: sort.direction, page, per_page: pageSize,
+      }).then(result => {
+        if (!active) return;
+        const pagination = result.meta?.pagination || { total: 0, last_page: 1 };
+        if (page > Math.max(1, pagination.last_page)) { setPage(Math.max(1, pagination.last_page)); return; }
+        setCustomers(result.data.map(mapCustomer)); setMeta(pagination);
+      }).catch(() => { if (active) setError('Unable to load customers. Please try again.'); })
+        .finally(() => { if (active) setLoading(false); });
+    }, 250);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [filters, sort, page, pageSize, reload]);
 
   const updateFilter = (key: keyof typeof filters, value: string) => {
+    setPage(1);
     setFilters((current) => ({ ...current, [key]: value }));
   };
 
   const clearFilters = () => {
+    setPage(1);
     setFilters({
-      company: '',
       name: '',
       email: '',
       phone: '',
@@ -71,7 +70,6 @@ export const CustomerList = () => {
   };
 
   const activeFilterCount = [
-    filters.company.trim() ? 1 : 0,
     filters.name.trim() ? 1 : 0,
     filters.email.trim() ? 1 : 0,
     filters.phone.trim() ? 1 : 0,
@@ -80,6 +78,7 @@ export const CustomerList = () => {
   ].reduce((sum, count) => sum + count, 0);
 
   const toggleSort = (key: typeof sort.key) => {
+    setPage(1);
     setSort((current) => ({
       key,
       direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
@@ -128,23 +127,7 @@ export const CustomerList = () => {
           </div>
 
           <div className={`${showMobileFilters ? 'grid' : 'hidden'} mb-4 grid-cols-1 gap-3 xl:hidden`}>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Company"
-                value={filters.company}
-                onChange={(event) => updateFilter('company', event.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <input
-              type="text"
-              placeholder="Contact name"
-              value={filters.name}
-              onChange={(event) => updateFilter('name', event.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input type="text" placeholder="Customer name" value={filters.name} onChange={(event) => updateFilter('name', event.target.value)} className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" /></div>
             <input
               type="text"
               placeholder="Email"
@@ -187,24 +170,17 @@ export const CustomerList = () => {
             </div>
           </div>
 
-          <div className="mb-4 hidden grid-cols-1 gap-3 md:grid-cols-3 xl:grid xl:grid-cols-8">
+          <div className="mb-4 hidden grid-cols-1 gap-3 md:grid-cols-3 xl:grid xl:grid-cols-7">
             <div className="relative md:col-span-2 xl:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Company"
-                value={filters.company}
-                onChange={(event) => updateFilter('company', event.target.value)}
+                placeholder="Customer name"
+                value={filters.name}
+                onChange={(event) => updateFilter('name', event.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <input
-              type="text"
-              placeholder="Contact name"
-              value={filters.name}
-              onChange={(event) => updateFilter('name', event.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
             <input
               type="text"
               placeholder="Email"
@@ -248,11 +224,10 @@ export const CustomerList = () => {
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="min-w-[1120px] w-full">
+            <table className="min-w-[960px] w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Company" sortKey="company" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Contact" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Customer" sortKey="name" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Phone" sortKey="phone" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Location" sortKey="location" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase"><SortableHeader label="Rating" sortKey="rating" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} /></th>
@@ -262,13 +237,9 @@ export const CustomerList = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {pagination.pageItems.map((customer) => (
+                {(!loading && !error ? customers : []).map((customer) => (
                   <tr key={customer.id} onClick={() => setSelectedCustomerId(customer.id)} className="cursor-pointer hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{customer.company || '-'}</div>
-                      <div className="text-sm text-gray-500">{customer.email || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-700">{customer.name || '-'}</td>
+                    <td className="px-6 py-4"><div className="font-medium text-gray-900">{customer.name || '-'}</div><div className="text-sm text-gray-500">{customer.email || '-'}</div></td>
                     <td className="px-6 py-4 text-gray-700">{customer.phone || '-'}</td>
                     <td className="px-6 py-4 text-gray-700">{[customer.city, customer.state].filter(Boolean).join(', ') || '-'}</td>
                     <td className="px-6 py-4 text-gray-700">{customer.rating ? `${customer.rating}/5` : '-'}</td>
@@ -287,8 +258,8 @@ export const CustomerList = () => {
                           onClick={async (event) => {
                             event.stopPropagation();
                             if (confirm('Delete this customer permanently?')) {
-                              await deleteCustomer(customer.id);
-                              toast.success('Customer deleted');
+                              try { await deleteCustomer(customer.id); setReload(value => value + 1); toast.success('Customer deleted'); }
+                              catch (failure: any) { toast.error(failure.message || 'Unable to delete customer'); }
                             }
                           }}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -303,18 +274,19 @@ export const CustomerList = () => {
               </tbody>
             </table>
             <PaginationControls
-              page={pagination.page}
-              pageSize={pagination.pageSize}
-              totalItems={pagination.totalItems}
-              totalPages={pagination.totalPages}
-              onPageChange={pagination.setPage}
-              onPageSizeChange={pagination.setPageSize}
+              page={page}
+              pageSize={pageSize}
+              totalItems={meta.total}
+              totalPages={meta.last_page}
+              onPageChange={setPage}
+              onPageSizeChange={size => { setPageSize(size); setPage(1); }}
             />
           </div>
 
+          {error && <p role="alert" className="py-4 text-red-600">{error} <button onClick={() => setReload(value => value + 1)} className="underline">Retry</button></p>}
           {loading && <LoadingState label="Loading customers..." />}
-          {!loading && sortedCustomers.length === 0 && (
-            <EmptyState label="No customers found. Add your first customer to get started." />
+          {!loading && !error && customers.length === 0 && (
+            <EmptyState label="No customers match the current filters." />
           )}
         </div>
       </div>

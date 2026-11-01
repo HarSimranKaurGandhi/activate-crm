@@ -35,6 +35,10 @@ class AuthService
             ]);
         }
 
+        if ($user->hasAnyRole(['influencer']) && ! \App\Models\Influencer::query()->where('user_id', $user->id)->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages(['email' => ['This influencer account is inactive. Contact an administrator.']]);
+        }
+
         $token = $user->createToken('react-api')->plainTextToken;
 
         if ($this->supportsLoginLogTimestamps()) {

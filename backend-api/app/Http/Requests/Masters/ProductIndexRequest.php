@@ -40,6 +40,7 @@ class ProductIndexRequest extends FormRequest
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
             'category_id' => ['sometimes', 'nullable', 'integer', 'exists:categories,id'],
+            'tag_id' => ['sometimes', 'nullable', 'integer', 'exists:tags,id'],
             'brand_id' => ['sometimes', 'nullable', 'integer', 'exists:brands,id'],
             'brand_ids' => ['sometimes', 'array', 'max:100'],
             'brand_ids.*' => ['required', 'integer', 'distinct', 'exists:brands,id'],

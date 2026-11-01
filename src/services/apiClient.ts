@@ -54,7 +54,11 @@ export const apiClient = axios.create({
   },
 });
 
-export const cachedDropdown = async <T>(path: string, params: Record<string, unknown> = {}): Promise<T> => {
+export const cachedDropdown = async <T>(
+  path: string,
+  params: Record<string, unknown> = {},
+  ttlMs = DROPDOWN_CACHE_TTL_MS,
+): Promise<T> => {
   const key = dropdownCacheKey(path, params);
 
   try {
@@ -76,7 +80,7 @@ export const cachedDropdown = async <T>(path: string, params: Record<string, unk
       const data = response.data.data;
       try {
         localStorage.setItem(key, JSON.stringify({
-          expiresAt: Date.now() + DROPDOWN_CACHE_TTL_MS,
+          expiresAt: Date.now() + ttlMs,
           data,
         }));
       } catch {

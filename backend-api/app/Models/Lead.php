@@ -23,6 +23,7 @@ class Lead extends Model
         'requirement',
         'expected_order_value',
         'expected_closure',
+        'closure_hot_level',
         'status',
         'failure_reason',
         'failure_reason_details',
@@ -31,6 +32,7 @@ class Lead extends Model
         'customer_category',
         'follow_up_date',
         'assigned_to',
+        'influencer_id',
         'created_by',
     ];
 
@@ -39,6 +41,7 @@ class Lead extends Model
         return [
             'tags' => 'array',
             'follow_up_date' => 'date',
+            'closure_hot_level' => 'integer',
         ];
     }
 
@@ -50,6 +53,11 @@ class Lead extends Model
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function influencer(): BelongsTo
+    {
+        return $this->belongsTo(Influencer::class);
     }
 
     public function favouritedBy(): BelongsToMany

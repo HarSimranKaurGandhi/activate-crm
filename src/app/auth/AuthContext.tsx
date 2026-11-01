@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { authService } from '../../services/authService';
 import { AUTH_TOKEN_KEY } from '../../services/apiClient';
 
-const AUTH_USER_CACHE_KEY = 'AUTH_USER_CACHE_V1';
+const AUTH_USER_CACHE_KEY = 'AUTH_USER_CACHE_V2';
 
 interface AuthContextValue {
   user: any;

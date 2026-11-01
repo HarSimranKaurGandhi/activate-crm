@@ -32,6 +32,17 @@ class InventoryController extends ApiController
         ]);
     }
 
+    public function updateStyle(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'current_style' => ['present', 'nullable', 'string', 'max:100'],
+            'style' => ['present', 'nullable', 'string', 'max:100'],
+        ]);
+        $this->inventory->updateStyle($id, $data['current_style'], $data['style']);
+
+        return $this->ok('Inventory style updated successfully');
+    }
+
     public function productStock(int|string $id): JsonResponse
     {
         return $this->ok('Product stock fetched successfully', $this->inventory->productStock($id));
@@ -51,7 +62,8 @@ class InventoryController extends ApiController
             'items' => $movement->items->map(fn ($item) => [
                 'id' => $item->id, 'product' => $item->product?->product_name,
                 'model_number' => $item->product?->model_number, 'brand' => $item->product?->brand?->name,
-                'godown' => $item->godown?->name, 'quantity' => (float) $item->quantity, 'packages' => (int) $item->packages,
+                'style' => $item->style ?: null, 'godown' => $item->godown?->name,
+                'quantity' => (float) $item->quantity, 'packages' => (int) $item->packages,
             ])->values(),
         ])->values();
         return $this->ok('Inventory movements fetched successfully', $rows, ['pagination' => ApiResponse::paginationMeta($paginator)]);

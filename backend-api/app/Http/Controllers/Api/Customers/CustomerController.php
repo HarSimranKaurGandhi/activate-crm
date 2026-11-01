@@ -93,6 +93,19 @@ class CustomerController extends ApiController
         ]);
     }
 
+    public function generateRequirement(Request $request, int|string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'requirement' => ['required', 'string', 'max:10000', 'regex:/\\S/'],
+            'assigned_to' => ['required', 'integer', \Illuminate\Validation\Rule::exists('users', 'id')->where('is_active', true)],
+        ]);
+        $lead = app(\App\Services\LeadService::class)->generateCustomerRequirement(
+            $this->customers->find($id), $data, $request->user(), $request->ip()
+        );
+
+        return $this->ok('Requirement generated successfully', new \App\Http\Resources\LeadResource($lead));
+    }
+
     public function addOwnedProduct(Request $request, int|string $id): JsonResponse
     {
         $validated = $request->validate([
@@ -100,9 +113,20 @@ class CustomerController extends ApiController
             'product_description' => ['nullable', 'string', 'max:2000', 'required_without:product_id'],
             'quantity' => ['required', 'numeric', 'gt:0'],
             'purchase_date' => ['required', 'date', 'before_or_equal:today'],
+            'serial_number' => ['nullable','string','max:100'],
+            'reference_image' => ['nullable','image','mimes:jpg,jpeg,png,webp','extensions:jpg,jpeg,png,webp','max:5120'],
         ]);
 
-        $this->customers->addOwnedProduct($this->customers->find($id), $validated, $request->user());
+        $customer=$this->customers->find($id);
+        $path=null;
+        unset($validated['reference_image']);
+        try {
+            if ($request->hasFile('reference_image')) $validated['reference_image_path']=$path=\App\Support\PublicAsset::store($request->file('reference_image'),'uploads/customer-product-references');
+            $this->customers->addOwnedProduct($customer, $validated, $request->user());
+        } catch (\Throwable $error) {
+            if ($path) \App\Support\PublicAsset::delete($path);
+            throw $error;
+        }
 
         return $this->ok('Customer product added successfully');
     }

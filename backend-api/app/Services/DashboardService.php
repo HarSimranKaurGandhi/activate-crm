@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Lead;
-use App\Models\Quotation;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,152 +12,131 @@ class DashboardService
 {
     private const CLOSED_LEAD_STATUSES = ['closed_success', 'closed_fail'];
 
-    public function quotationSummary(Request $request): array
+    public function summary(Request $request): array
     {
         $user = $request->user();
         $scope = $request->string('scope')->toString() === 'all' ? 'all' : 'mine';
-        $canViewAll = $user instanceof User && $user->hasAnyRole(['admin']) && $scope === 'all';
+        $canViewAll = $scope === 'all'
+            && $user instanceof User
+            && $user->hasAnyRole(['admin']);
+        $selectedUserId = $canViewAll && $request->filled('user_id') ? $request->integer('user_id') : null;
+        $today = now()->toDateString();
 
-        $quotationQuery = Quotation::query()
-            ->when($request->filled('from_date'), fn (Builder $query) => $query->whereDate('quote_date', '>=', $request->date('from_date')))
-            ->when($request->filled('to_date'), fn (Builder $query) => $query->whereDate('quote_date', '<=', $request->date('to_date')));
+        $taskRows = Task::query()
+            ->leftJoin('users as task_assignees', 'task_assignees.id', '=', 'tasks.assigned_to')
+            ->whereJsonContains('task_assignees.departments', 'sales')
+            ->when($selectedUserId, fn (Builder $query) => $query->where('tasks.assigned_to', $selectedUserId))
+            ->where('tasks.due_date', '<=', $today)
+            ->where(function (Builder $query) use ($today): void {
+                $query
+                    ->where('tasks.due_date', $today)
+                    ->orWhere('tasks.status', '!=', 'completed');
+            })
+            ->when(
+                $user instanceof User && ! $canViewAll,
+                fn (Builder $query) => $query->where('tasks.assigned_to', $user->getKey())
+            )
+            ->orderBy('tasks.due_date')
+            ->orderByDesc('tasks.id')
+            ->get([
+                'tasks.id',
+                'tasks.name',
+                'tasks.description',
+                'tasks.status',
+                'tasks.due_date',
+                'tasks.assigned_to',
+                'task_assignees.id as assigned_user_id',
+                'task_assignees.name as assigned_user_name',
+                'task_assignees.email as assigned_user_email',
+                'task_assignees.phone as assigned_user_phone',
+                'task_assignees.designation as assigned_user_designation',
+            ]);
 
-        if ($user instanceof User) {
-            $user->loadMissing('role');
+        [$tasksDueTodayRows, $overdueTaskRows] = $taskRows->partition(
+            fn (Task $task): bool => optional($task->due_date)?->toDateString() === $today
+        );
 
-            if (! $canViewAll) {
-                $quotationQuery->where('created_by', $user->getKey());
-            }
-        }
-
-        $summary = $quotationQuery
-            ->selectRaw('COUNT(*) as total_quotations')
-            ->first();
-
-        $pendingApprovalCount = 0;
-
-        if ($user instanceof User) {
-            $pendingQuery = Quotation::query()->where('status', 'pending_approval');
-
-            if (! $canViewAll) {
-                $pendingQuery->where('created_by', $user->getKey());
-            }
-
-            $pendingApprovalCount = (int) $pendingQuery->count();
-        }
-
-        $taskQuery = Task::query()
-            ->with('assignedUser')
-            ->whereDate('due_date', now()->toDateString())
-            ->orderBy('due_date')
-            ->latest('id');
-
-        if ($user instanceof User) {
-            $user->loadMissing('role');
-
-            if (! $canViewAll) {
-                $taskQuery->where('assigned_to', $user->getKey());
-            }
-        }
-
-        $tasksDueToday = $taskQuery->get()->map(fn (Task $task) => [
+        $mapTask = static fn (Task $task): array => [
             'id' => $task->id,
             'name' => $task->name,
             'description' => $task->description,
             'status' => $task->status,
             'due_date' => optional($task->due_date)?->format('Y-m-d'),
             'assigned_to' => $task->assigned_to,
-            'assigned_user' => $task->assignedUser ? [
-                'id' => $task->assignedUser->id,
-                'name' => $task->assignedUser->name,
-                'email' => $task->assignedUser->email,
-                'phone' => $task->assignedUser->phone,
-                'designation' => $task->assignedUser->designation,
+            'assigned_user' => $task->assigned_user_id ? [
+                'id' => $task->assigned_user_id,
+                'name' => $task->assigned_user_name,
+                'email' => $task->assigned_user_email,
+                'phone' => $task->assigned_user_phone,
+                'designation' => $task->assigned_user_designation,
             ] : null,
-        ])->values()->all();
+        ];
 
-        $overdueTaskQuery = Task::query()
-            ->with('assignedUser')
-            ->whereDate('due_date', '<', now()->toDateString())
-            ->where('status', '!=', 'completed')
-            ->orderBy('due_date')
-            ->latest('id');
+        $tasksDueToday = $tasksDueTodayRows->map($mapTask)->values()->all();
+        $overdueTasks = $overdueTaskRows->map($mapTask)->values()->all();
 
-        if ($user instanceof User) {
-            $user->loadMissing('role');
+        $leadRows = Lead::query()
+            ->with('influencer:id,name,phone')
+            ->leftJoin('users as lead_assignees', 'lead_assignees.id', '=', 'leads.assigned_to')
+            ->whereJsonContains('lead_assignees.departments', 'sales')
+            ->when($selectedUserId, fn (Builder $query) => $query->where('leads.assigned_to', $selectedUserId))
+            ->whereNotIn('leads.status', self::CLOSED_LEAD_STATUSES)
+            ->where('leads.follow_up_date', '<=', $today)
+            ->when(
+                $user instanceof User && ! $canViewAll,
+                fn (Builder $query) => $query->where('leads.assigned_to', $user->getKey())
+            )
+            ->orderBy('leads.follow_up_date')
+            ->orderByDesc('leads.id')
+            ->get([
+                'leads.id',
+                'leads.influencer_id',
+                'leads.name',
+                'leads.phone',
+                'leads.email',
+                'leads.city',
+                'leads.status',
+                'leads.requirement',
+                'leads.follow_up_date',
+                'leads.assigned_to',
+                'lead_assignees.id as assigned_user_id',
+                'lead_assignees.name as assigned_user_name',
+                'lead_assignees.email as assigned_user_email',
+                'lead_assignees.phone as assigned_user_phone',
+                'lead_assignees.designation as assigned_user_designation',
+            ]);
 
-            if (! $canViewAll) {
-                $overdueTaskQuery->where('assigned_to', $user->getKey());
-            }
-        }
+        [$followUpsDueTodayRows, $overdueFollowUpRows] = $leadRows->partition(
+            fn (Lead $lead): bool => optional($lead->follow_up_date)?->toDateString() === $today
+        );
 
-        $overdueTasks = $overdueTaskQuery->get()->map(fn (Task $task) => [
-            'id' => $task->id,
-            'name' => $task->name,
-            'description' => $task->description,
-            'status' => $task->status,
-            'due_date' => optional($task->due_date)?->format('Y-m-d'),
-            'assigned_to' => $task->assigned_to,
-            'assigned_user' => $task->assignedUser ? [
-                'id' => $task->assignedUser->id,
-                'name' => $task->assignedUser->name,
-                'email' => $task->assignedUser->email,
-                'phone' => $task->assignedUser->phone,
-                'designation' => $task->assignedUser->designation,
-            ] : null,
-        ])->values()->all();
-
-        $leadFollowUpBaseQuery = Lead::query()
-            ->with('assignedUser')
-            ->whereNotIn('status', self::CLOSED_LEAD_STATUSES)
-            ->orderBy('follow_up_date')
-            ->latest('id');
-
-        if ($user instanceof User) {
-            $user->loadMissing('role');
-
-            if (! $canViewAll) {
-                $leadFollowUpBaseQuery->where('assigned_to', $user->getKey());
-            }
-        }
-
-        $mapLead = fn (Lead $lead) => [
+        $mapLead = static fn (Lead $lead): array => [
             'id' => $lead->id,
             'name' => $lead->name,
             'phone' => $lead->phone,
+            'influencer' => $lead->influencer ? [
+                'name' => $lead->influencer->name,
+                'phone' => $lead->influencer->phone,
+            ] : null,
             'email' => $lead->email,
             'city' => $lead->city,
             'status' => $lead->status,
             'requirement' => $lead->requirement,
             'follow_up_date' => optional($lead->follow_up_date)?->format('Y-m-d'),
             'assigned_to' => $lead->assigned_to,
-            'assigned_user' => $lead->assignedUser ? [
-                'id' => $lead->assignedUser->id,
-                'name' => $lead->assignedUser->name,
-                'email' => $lead->assignedUser->email,
-                'phone' => $lead->assignedUser->phone,
-                'designation' => $lead->assignedUser->designation,
+            'assigned_user' => $lead->assigned_user_id ? [
+                'id' => $lead->assigned_user_id,
+                'name' => $lead->assigned_user_name,
+                'email' => $lead->assigned_user_email,
+                'phone' => $lead->assigned_user_phone,
+                'designation' => $lead->assigned_user_designation,
             ] : null,
         ];
 
-        $today = now()->toDateString();
-        $followUpsDueToday = (clone $leadFollowUpBaseQuery)
-            ->whereDate('follow_up_date', $today)
-            ->get()
-            ->map($mapLead)
-            ->values()
-            ->all();
-
-        $overdueFollowUps = (clone $leadFollowUpBaseQuery)
-            ->whereDate('follow_up_date', '<', $today)
-            ->get()
-            ->map($mapLead)
-            ->values()
-            ->all();
+        $followUpsDueToday = $followUpsDueTodayRows->map($mapLead)->values()->all();
+        $overdueFollowUps = $overdueFollowUpRows->map($mapLead)->values()->all();
 
         return [
-            'total_quotations' => (int) ($summary->total_quotations ?? 0),
-            'pending_for_approval' => $pendingApprovalCount,
             'tasks_due_today_count' => count($tasksDueToday),
             'tasks_due_today' => $tasksDueToday,
             'overdue_tasks_count' => count($overdueTasks),

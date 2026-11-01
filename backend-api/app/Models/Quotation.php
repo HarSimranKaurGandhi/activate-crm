@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Quotation extends Model
 {
@@ -31,7 +32,7 @@ class Quotation extends Model
             'round_off_net_amount_to_customer' => 'boolean',
             'show_uom_to_customer' => 'boolean',
             'show_brand_banner_to_customer' => 'boolean',
-            'default_discount_percent' => 'decimal:2',
+            'default_discount_percent' => 'decimal:3',
             'default_discount_amount' => 'decimal:2',
             'subtotal_before_discount' => 'decimal:2',
             'total_line_discount' => 'decimal:2',
@@ -41,6 +42,11 @@ class Quotation extends Model
             'grand_total' => 'decimal:2',
             'approved_at' => 'datetime',
         ];
+    }
+
+    public function sharedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'quotation_user_shares')->withTimestamps();
     }
 
     public function customer(): BelongsTo
@@ -71,6 +77,19 @@ class Quotation extends Model
     public function items(): HasMany
     {
         return $this->hasMany(QuotationItem::class);
+    }
+
+    public function stockProgressPercent(): float
+    {
+        $this->loadMissing('items.fulfillment');
+        $total = $this->items->count();
+        $ready = $this->items->filter(fn ($item) => in_array(
+            $item->fulfillment?->stock_status,
+            OrderFulfillment::READY_STATUSES,
+            true,
+        ))->count();
+
+        return $total ? round($ready / $total * 100, 1) : 0;
     }
 
     public function adjustments(): HasMany

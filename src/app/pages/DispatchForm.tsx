@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Plus, Search, Trash2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { customerService } from '../../services/customerService';
 import { dispatchService } from '../../services/dispatchService';
@@ -18,6 +18,7 @@ const emptyItem = () => ({ requirement: '', product_id: '', product: '', model_n
 export const DispatchForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const invoiceMode = useLocation().pathname === '/billing/invoices/new';
   const [customerId, setCustomerId] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
@@ -86,6 +87,7 @@ export const DispatchForm = () => {
     const price = Number(product.usual_selling_price ?? product.mrp ?? 0);
     setItems((current) => current.map((item, index) => index === selectingProduct ? {
       ...item,
+      requirement: item.requirement?.trim() ? item.requirement : product.product_name,
       product_id: String(product.id),
       product: product.product_name,
       model_number: product.model_number,
@@ -140,7 +142,7 @@ export const DispatchForm = () => {
       let dispatch = id ? await dispatchService.update(id, payload) : await dispatchService.create(payload);
       if (invoiceFile) dispatch = await dispatchService.uploadInvoice(String(dispatch.id), invoiceFile);
       toast.success(invoiceFile ? 'Dispatch saved and marked as invoiced' : id ? 'Dispatch updated' : 'Dispatch created');
-      navigate(`/dispatches/${dispatch.id}`);
+      navigate(invoiceMode ? `/billing/dispatches/${dispatch.id}/convert` : `/dispatches/${dispatch.id}`);
     } catch (error: any) {
       toast.error(Object.values(error?.errors || {}).flat()[0] as string || 'Unable to save dispatch');
     } finally {
@@ -151,7 +153,7 @@ export const DispatchForm = () => {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <form onSubmit={submit} className="mx-auto max-w-7xl space-y-6">
-        <div className="flex items-center gap-3"><button type="button" onClick={() => navigate('/dispatches')} className="p-2"><ArrowLeft /></button><h2 className="text-2xl font-semibold">{id ? 'Edit' : 'New'} Dispatch</h2></div>
+        <div className="flex items-center gap-3"><button type="button" onClick={() => navigate(invoiceMode ? '/billing' : '/dispatches')} className="p-2"><ArrowLeft /></button><h2 className="text-2xl font-semibold">{invoiceMode ? 'Create Tax Invoice' : `${id ? 'Edit' : 'New'} Dispatch`}</h2></div>
         <div className="grid gap-5 rounded-2xl border bg-white p-6 md:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="mb-2 block text-sm font-medium">Customer *</label>
@@ -162,7 +164,7 @@ export const DispatchForm = () => {
           </div>
           <div><label className="mb-2 block text-sm font-medium">Voucher Date</label><input readOnly value={today} className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-gray-600" /></div>
           <div><label className="mb-2 block text-sm font-medium">Planned Dispatch Date *</label><input required type="date" min={tomorrow} value={plannedDate} onChange={(event) => setPlannedDate(event.target.value)} className="w-full rounded-xl border px-4 py-3" /></div>
-          <div><label className="mb-2 block text-sm font-medium">Invoice PDF (Optional)</label><input type="file" accept=".pdf,application/pdf" onChange={(event) => setInvoiceFile(event.target.files?.[0] || null)} className="w-full rounded-xl border px-3 py-2.5" /><p className="mt-1 text-xs text-gray-500">Uploading the invoice PDF changes the stage to INVOICED.</p></div>
+          {!invoiceMode && <div><label className="mb-2 block text-sm font-medium">Invoice PDF (Optional)</label><input type="file" accept=".pdf,application/pdf" onChange={(event) => setInvoiceFile(event.target.files?.[0] || null)} className="w-full rounded-xl border px-3 py-2.5" /><p className="mt-1 text-xs text-gray-500">Uploading the invoice PDF changes the stage to INVOICED.</p></div>}
         </div>
 
         <div className="overflow-hidden rounded-2xl border bg-white">
@@ -182,7 +184,7 @@ export const DispatchForm = () => {
             </table>
           </div>
         </div>
-        <div className="flex justify-end gap-3"><button type="button" onClick={() => navigate('/dispatches')} className="rounded-xl border px-6 py-3">Cancel</button><button disabled={saving} className="rounded-xl bg-blue-600 px-6 py-3 text-white">{saving ? 'Saving...' : 'Save Dispatch'}</button></div>
+        <div className="flex justify-end gap-3"><button type="button" onClick={() => navigate(invoiceMode ? '/billing' : '/dispatches')} className="rounded-xl border px-6 py-3">Cancel</button><button disabled={saving} className="rounded-xl bg-blue-600 px-6 py-3 text-white">{saving ? 'Saving...' : invoiceMode ? 'Continue to Invoice' : 'Save Dispatch'}</button></div>
 
         {customerOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6"><div className="mb-4 flex items-center justify-between gap-4"><h3 className="text-xl font-semibold">Select Customer</h3><div className="flex items-center gap-2"><button type="button" onClick={() => setAddCustomerOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white"><Plus className="h-4 w-4"/>Add Customer</button><button type="button" onClick={() => setCustomerOpen(false)}>✕</button></div></div><div className="relative mb-4"><Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" /><input autoFocus value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} placeholder="Search name, company, phone or email" className="w-full rounded-xl border py-3 pl-10 pr-4" /></div><div className="space-y-2">{customers.map((customer) => <button type="button" key={customer.id} onClick={() => selectCustomer(customer)} className="w-full rounded-xl border p-4 text-left hover:border-blue-500 hover:bg-blue-50"><div className="font-medium">{customer.company_name || customer.primary_name}</div><div className="text-sm text-gray-500">{customer.primary_name} • {customer.phone} • {customer.email}</div></button>)}</div></div></div>}
         <AddCustomerDialog open={addCustomerOpen} onOpenChange={setAddCustomerOpen} onCreated={selectCustomer}/>

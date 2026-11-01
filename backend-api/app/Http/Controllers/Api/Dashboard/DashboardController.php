@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\Dashboard;
 
 use App\Http\Controllers\Api\ApiController;
-use App\Http\Requests\Dashboard\QuotationSummaryRequest;
+use App\Http\Requests\Dashboard\DashboardSummaryRequest;
 use App\Services\DashboardService;
 use App\Services\LeaderboardService;
 use Illuminate\Http\JsonResponse;
@@ -18,11 +18,11 @@ class DashboardController extends ApiController
     {
     }
 
-    public function quotationSummary(QuotationSummaryRequest $request): JsonResponse
+    public function summary(DashboardSummaryRequest $request): JsonResponse
     {
         return $this->ok(
-            'Quotation summary fetched successfully',
-            $this->dashboard->quotationSummary($request)
+            'Dashboard summary fetched successfully',
+            $this->dashboard->summary($request)
         );
     }
 
@@ -34,7 +34,7 @@ class DashboardController extends ApiController
 
         return $this->ok(
             'Leaderboard fetched successfully',
-            $this->leaderboard->current($validated['period'] ?? 'today')
+            $this->leaderboard->current($validated['period'] ?? 'today', true)
         );
     }
 }

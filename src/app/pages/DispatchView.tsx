@@ -16,6 +16,7 @@ export const DispatchView = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase() === 'admin';
+  const canCreateInvoice = isAdmin || user?.module_permissions?.some((p: any) => p.module === 'billing' && p.can_view && p.can_edit);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const slipRef = useRef<HTMLDivElement>(null);
@@ -100,7 +101,8 @@ export const DispatchView = () => {
             <div><h2 className="text-2xl font-semibold">{data.dispatch_number}</h2><p className="text-sm text-gray-500">Dispatch Slip</p></div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {data.status === 'invoiced' ? (
+            {canCreateInvoice && data.status === 'new' && !data.tax_invoice && !data.invoice_url && <button onClick={()=>navigate(`/billing/dispatches/${id}/convert`)} className="rounded-xl bg-blue-600 px-4 py-2.5 font-medium text-white">Convert to Tax Invoice</button>}
+            {data.status === 'invoiced' && !data.tax_invoice ? (
               <select value={data.status} onChange={(event) => void statusChanged(event.target.value)} className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700">
                 <option value="invoiced">INVOICED</option>
                 <option value="new">NEW</option>
@@ -115,7 +117,7 @@ export const DispatchView = () => {
               }`}>{data.status.toUpperCase()}</span>
             )}
             {data.status === 'new' && <button onClick={() => navigate(`/dispatches/${id}/edit`)} className="flex items-center gap-2 rounded-xl border px-4 py-2.5"><Edit className="h-4 w-4" />Edit</button>}
-            {['new', 'invoiced'].includes(data.status) && (
+            {['new', 'invoiced'].includes(data.status) && !data.tax_invoice && (
               <button onClick={() => void cancelDispatch()} className="flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-rose-700 hover:bg-rose-50">
                 <Ban className="h-4 w-4" />Cancel Dispatch
               </button>
@@ -126,6 +128,7 @@ export const DispatchView = () => {
               </button>
             )}
             {data.invoice_url && <a href={data.invoice_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border px-4 py-2.5"><FileDown className="h-4 w-4" />Download Invoice</a>}
+            {data.tax_invoice && <button onClick={() => navigate(`/billing/invoices/${data.tax_invoice.id}`)} className="flex items-center gap-2 rounded-xl border px-4 py-2.5"><FileDown className="h-4 w-4" />View Tax Invoice</button>}
             <button onClick={() => void download()} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-white"><Download className="h-4 w-4" />Download Slip</button>
           </div>
         </div>

@@ -23,15 +23,29 @@ class CustomerService extends CrudService
 {
     protected string $modelClass = Customer::class;
 
-    protected array $searchColumns = ['primary_name', 'company_name', 'phone', 'email'];
+    protected array $searchColumns = ['primary_name', 'company_name', 'gst_number', 'phone', 'email'];
 
     protected array $relations = ['fieldValues.definition'];
 
     public function paginate(Request $request): LengthAwarePaginator
     {
-        return $this->query($request)
-            ->latest('id')
-            ->paginate((int) $request->integer('per_page', 15));
+        $query = $this->query($request);
+        if ($request->filled('name')) {
+            $name = '%'.trim($request->input('name')).'%';
+            $query->where(fn (Builder $q) => $q->where('primary_name','like',$name)->orWhere('company_name','like',$name));
+        }
+        foreach (['email','phone','city'] as $field) {
+            if ($request->filled($field)) $query->where($field,'like','%'.trim($request->input($field)).'%');
+        }
+        if ($request->filled('rating')) $query->where('rating',(int)$request->input('rating'));
+        $direction = $request->input('sort_direction') === 'desc' ? 'desc' : 'asc';
+        switch ($request->input('sort_by')) {
+            case 'name': $query->orderBy('primary_name',$direction); break;
+            case 'phone': $query->orderBy('phone',$direction); break;
+            case 'location': $query->orderBy('city',$direction)->orderBy('state',$direction); break;
+            case 'rating': $query->orderBy('rating',$direction); break;
+        }
+        return $query->orderByDesc('id')->paginate(min(100,max(1,$request->integer('per_page',15))));
     }
 
     public function create(array $data): Customer
@@ -96,13 +110,14 @@ class CustomerService extends CrudService
 
     public function overview(Customer $customer, ?User $viewer = null): array
     {
-        $ownedProducts = $customer->ownedProducts()
+        $ownedProducts = $customer->ownedProducts()->with('references')
             ->with(['product.brand:id,name', 'product.measurementUnit', 'sourceDispatch:id,dispatch_number'])
             ->latest('last_purchased_at')
             ->get()
             ->map(fn (CustomerOwnedProduct $owned): array => [
                 'id' => $owned->id,
                 'product_id' => $owned->product_id,
+                'references' => $owned->references->map(fn ($ref) => ['id'=>$ref->id,'serial_number'=>$ref->serial_number,'image_url'=>$ref->image_path ? url($ref->image_path) : null,'purchase_date'=>$ref->purchase_date,'quantity'=>$ref->quantity])->values(),
                 'product_name' => $owned->product?->product_name ?: $owned->product_description,
                 'product_description' => $owned->product_description,
                 'model_number' => $owned->product?->model_number,
@@ -240,6 +255,9 @@ class CustomerService extends CrudService
             }
             $owned->created_by ??= $actor?->id;
             $owned->save();
+            if (filled($data['serial_number'] ?? null) || filled($data['reference_image_path'] ?? null)) {
+                $owned->references()->create(['serial_number'=>filled($data['serial_number'] ?? null) ? trim($data['serial_number']) : null, 'image_path'=>$data['reference_image_path'] ?? null, 'purchase_date'=>$data['purchase_date'], 'quantity'=>$data['quantity']]);
+            }
 
             return $owned;
         });
@@ -247,7 +265,16 @@ class CustomerService extends CrudService
 
     public function removeOwnedProduct(Customer $customer, int|string $ownedProductId): void
     {
-        $customer->ownedProducts()->whereKey($ownedProductId)->firstOrFail()->delete();
+        DB::transaction(function () use ($customer, $ownedProductId): void {
+            $product = $customer->ownedProducts()->whereKey($ownedProductId)->lockForUpdate()->firstOrFail();
+            if ($product->customer_invoice_id !== null) {
+                throw ValidationException::withMessages(['product' => 'This product is linked to an invoice and cannot be removed.']);
+            }
+            $paths=$product->references()->pluck('image_path')->filter()->all();
+            $product->references()->delete();
+            $product->delete();
+            DB::afterCommit(function () use ($paths) { foreach ($paths as $path) \App\Support\PublicAsset::delete($path); });
+        });
     }
 
     /** @return Collection<int, int> */

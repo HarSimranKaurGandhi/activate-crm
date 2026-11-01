@@ -15,17 +15,20 @@ class QuotationResource extends JsonResource
         $totalAdjustments = (float) ($this->total_adjustments ?? 0);
         $totalTax = (float) ($this->total_tax ?? 0);
         $taxableTotal = $this->pricing_mode === 'inclusive_gst'
-            ? max((float) ($this->grand_total ?? 0) - $totalTax - $totalAdjustments, 0)
-            : $subtotalAfterDiscount;
+            ? max((float) ($this->grand_total ?? 0) - $totalTax, 0)
+            : max($subtotalAfterDiscount + $totalAdjustments, 0);
 
         return [
             'id' => $this->id,
+            'can_manage_sharing' => $request->user()?->can('manageSharing', $this->resource) ?? false,
+            'crm_purchase_date' => $this->crm_purchase_date,
             'quotation_number' => $this->quotation_number,
             'customer_id' => $this->customer_id,
             'customer' => new CustomerResource($this->whenLoaded('customer')),
             'lead_id' => $this->lead_id,
             'lead' => $this->whenLoaded('lead', fn () => $this->lead ? [
                 'id' => $this->lead->id,
+                'status' => $this->lead->status,
                 'name' => $this->lead->name,
                 'phone' => $this->lead->phone,
                 'email' => $this->lead->email,
@@ -46,7 +49,7 @@ class QuotationResource extends JsonResource
             'show_mrp_to_customer' => $this->show_mrp_to_customer === null ? true : (bool) $this->show_mrp_to_customer,
             'show_item_wise_gst_to_customer' => $this->show_item_wise_gst_to_customer === null ? false : (bool) $this->show_item_wise_gst_to_customer,
             'round_off_net_amount_to_customer' => $this->round_off_net_amount_to_customer === null ? false : (bool) $this->round_off_net_amount_to_customer,
-            'show_uom_to_customer' => $this->show_uom_to_customer === null ? false : (bool) $this->show_uom_to_customer,
+            'show_uom_to_customer' => $this->show_uom_to_customer === null ? true : (bool) $this->show_uom_to_customer,
             'show_brand_banner_to_customer' => $this->show_brand_banner_to_customer === null ? false : (bool) $this->show_brand_banner_to_customer,
             'brand_banner_id' => $this->brand_banner_id,
             'brand_banner' => $this->brandBanner ? new BrandResource($this->brandBanner) : null,
@@ -56,6 +59,8 @@ class QuotationResource extends JsonResource
             'remarks' => $this->remarks,
             'internal_notes' => $this->internal_notes,
             'status' => $this->status,
+            'stock_progress_percent' => $this->status === 'locked' && ! $request->user()?->hasAnyRole(['influencer'])
+                ? $this->resource->stockProgressPercent() : null,
             'subtotal_before_discount' => $subtotalBeforeDiscount,
             'total_line_discount' => $totalLineDiscount,
             'subtotal_after_discount' => $subtotalAfterDiscount,
@@ -67,7 +72,7 @@ class QuotationResource extends JsonResource
             'tax_total' => $totalTax,
             'adjustment_total' => $totalAdjustments,
             'grand_total' => $this->grand_total,
-            'requires_watermark' => ! in_array($this->status, ['approved', 'shared_with_client'], true),
+            'requires_watermark' => ! in_array($this->status, ['approved', 'locked', 'executed'], true),
             'items' => QuotationItemResource::collection($this->whenLoaded('items')),
             'adjustments' => QuotationAdjustmentResource::collection($this->whenLoaded('adjustments')),
             'terms' => QuotationTermResource::collection($this->whenLoaded('terms')),

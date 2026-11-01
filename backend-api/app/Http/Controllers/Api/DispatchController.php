@@ -8,12 +8,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Support\PublicAsset;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 class DispatchController extends ApiController
 {
     public function __construct(private DispatchService $dispatches){}
     private function data(Dispatch $dispatch):array{return [
         'id'=>$dispatch->id,'dispatch_number'=>$dispatch->dispatch_number,'dispatch_date'=>optional($dispatch->dispatch_date)->format('Y-m-d'),'planned_dispatch_date'=>optional($dispatch->planned_dispatch_date)->format('Y-m-d'),'status'=>$dispatch->status,
         'invoice_url'=>$dispatch->invoice_path?request()->getSchemeAndHttpHost().'/'.ltrim($dispatch->invoice_path,'/'):null,
+        'tax_invoice'=>$dispatch->relationLoaded('taxInvoice')?$dispatch->taxInvoice?->only(['id','invoice_number']):null,
         'customer'=>$dispatch->customer?->only(['id','primary_name','company_name','phone','email','address_line_1','address_line_2','city','state','pincode','country']),
         'created_by'=>$dispatch->creator?->only(['id','name','email']),'created_at'=>$dispatch->created_at?->toISOString(),
         'items'=>$dispatch->relationLoaded('items')?$dispatch->items->map(fn($item)=>['id'=>$item->id,'requirement'=>$item->requirement,'product_id'=>$item->product_id,'product'=>$item->product?->product_name,'model_number'=>$item->product?->model_number,'brand'=>$item->product?->brand?->name,'quantity'=>(float)$item->quantity,'hsn_code'=>$item->hsn_code,'gst_percent'=>(float)$item->gst_percent,'price'=>(float)$item->price,'discount_percent'=>(float)$item->discount_percent,'discounted_price'=>(float)$item->discounted_price])->values():[],
@@ -24,20 +26,26 @@ class DispatchController extends ApiController
     public function update(DispatchRequest $request,int|string $id):JsonResponse{$dispatch=$this->dispatches->find($id);return $this->ok('Dispatch updated successfully',$this->data($this->dispatches->update($dispatch,$request->validated())));}
     public function uploadInvoice(DispatchInvoiceRequest $request,int|string $id):JsonResponse
     {
-        $dispatch=$this->dispatches->find($id);
+        return DB::transaction(function()use($request,$id):JsonResponse{
+        $dispatch=Dispatch::query()->lockForUpdate()->findOrFail($id);
+        $this->dispatches->ensureNoTaxInvoice($dispatch);
         if(in_array($dispatch->status,['dispatched','cancelled'],true)||$dispatch->invoice_path)throw ValidationException::withMessages(['invoice'=>['An invoice cannot be uploaded or replaced after the dispatch is cancelled, invoiced, or dispatched.']]);
         PublicAsset::delete($dispatch->invoice_path);
         $dispatch->update(['invoice_path'=>PublicAsset::store($request->file('invoice'),'uploads/dispatches/invoices'),'status'=>'invoiced']);
         return $this->ok('Invoice uploaded and dispatch marked as invoiced',$this->data($this->dispatches->find($id)));
+        });
     }
 
     public function reopen(int|string $id):JsonResponse
     {
-        $dispatch=$this->dispatches->find($id);
+        return DB::transaction(function()use($id):JsonResponse{
+        $dispatch=Dispatch::query()->lockForUpdate()->findOrFail($id);
+        $this->dispatches->ensureNoTaxInvoice($dispatch);
         if($dispatch->status!=='invoiced')throw ValidationException::withMessages(['status'=>['Only an invoiced dispatch can be changed back to NEW.']]);
         PublicAsset::delete($dispatch->invoice_path);
         $dispatch->update(['status'=>'new','invoice_path'=>null]);
         return $this->ok('Dispatch changed back to NEW',$this->data($this->dispatches->find($id)));
+        });
     }
 
     public function cancel(int|string $id):JsonResponse

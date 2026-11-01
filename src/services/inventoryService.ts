@@ -8,6 +8,13 @@ export const godownService = {
 };
 
 export const inventoryService = {
+  async thresholds(params: Record<string, unknown>) { return unwrapEnvelope<any[]>(await apiClient.get('/inventory/thresholds', { params })); },
+  async saveThreshold(id: string, style: string, quantity: string | null) {
+    return unwrap<any>(await apiClient.put(`/inventory/products/${id}/threshold`, { style, quantity }));
+  },
+  async updateStyle(id: string, currentStyle: string, style: string) {
+    return unwrap<any>(await apiClient.patch(`/inventory/products/${id}/style`, { current_style: currentStyle, style }));
+  },
   async overview(params: Record<string, unknown>) { return unwrapEnvelope<any>(await apiClient.get('/inventory', { params })); },
   async selectableProducts(params: Record<string, unknown>) { return unwrapEnvelope<any[]>(await apiClient.get('/inventory/selectable-products', { params })); },
   async productStock(id: string) { return unwrap<any>(await apiClient.get(`/inventory/products/${id}/stock`)); },

@@ -1,6 +1,8 @@
+import { useAuth } from '../auth/AuthContext';
+import { QuotationShareDialog } from '../components/quotations/QuotationShareDialog';
 import { useNavigate } from 'react-router';
 import { useData } from '../context/DataContext';
-import { Plus, Search, Calendar, Eye, Edit, Trash2, Filter, ChevronDown, Copy } from 'lucide-react';
+import { Plus, Search, Calendar, Eye, Edit, Trash2, Filter, ChevronDown, Copy, Share2, CheckCircle2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { LoadingState } from '../components/common/AsyncState';
 import { quotationStatusClass, quotationStatusLabel } from '../components/common/status';
@@ -8,12 +10,31 @@ import { PaginationControls, usePagination } from '../components/common/Paginati
 import { toast } from 'sonner';
 import { SortableHeader, type SortDirection } from '../components/common/SortableHeader';
 import { sortItems } from '../utils/sort';
+import { readStoredQuotationPageSize, readStoredQuotationTab, storeQuotationPageSize, storeQuotationTab } from '../utils/quotationListTab';
 
-export const QuotationList = () => {
+export const OrderFulfillment = () => <QuotationList fulfillmentOnly />;
+
+export const QuotationList = ({ fulfillmentOnly = false }: { fulfillmentOnly?: boolean }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isInfluencer = user?.role?.code === 'influencer';
   const { quotations, loading, deleteQuotation, duplicateQuotation } = useData();
+  const [sharingQuotation, setSharingQuotation] = useState<(typeof quotations)[number] | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('draft');
+  const [selectedStatus, setSelectedStatus] = useState<string>(() => (
+    fulfillmentOnly ? 'locked' : readStoredQuotationTab()
+  ));
+
+  const setStatusFilter = (value: string) => {
+    setSelectedStatus(value);
+    if (fulfillmentOnly) {
+      return;
+    }
+
+    storeQuotationTab(value);
+  };
+  const statusFilter = fulfillmentOnly ? 'locked' : selectedStatus;
+  const showStockProgress = statusFilter === 'locked' && !isInfluencer;
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sort, setSort] = useState<{ key: 'number' | 'date' | 'customer' | 'items' | 'grandTotal' | 'status'; direction: SortDirection }>({
@@ -21,16 +42,13 @@ export const QuotationList = () => {
     direction: 'desc',
   });
 
-  const filteredQuotations = useMemo(() => quotations.filter(q => {
+  const matchingQuotations = useMemo(() => quotations.filter(q => {
     const search = searchTerm.trim().toLowerCase();
     const matchesSearch = !search || [
       q.number,
       q.customer?.name,
       q.customer?.company,
     ].some((value) => String(value || '').toLowerCase().includes(search));
-    const matchesStatus = statusFilter === 'draft'
-      ? ['draft', 'rejected', 'revised'].includes(q.status)
-      : q.status === statusFilter;
 
     let matchesDate = true;
     if (dateRange.start || dateRange.end) {
@@ -40,8 +58,14 @@ export const QuotationList = () => {
       matchesDate = startsAfter && endsBefore;
     }
 
-    return matchesSearch && matchesStatus && matchesDate;
-  }), [quotations, searchTerm, statusFilter, dateRange]);
+    return matchesSearch && matchesDate;
+  }), [quotations, searchTerm, dateRange]);
+
+  const filteredQuotations = useMemo(() => matchingQuotations.filter((quotation) => (
+    statusFilter === 'draft'
+      ? ['draft', 'rejected', 'revised'].includes(quotation.status)
+      : quotation.status === statusFilter
+  )), [matchingQuotations, statusFilter]);
 
   const sortedQuotations = useMemo(
     () =>
@@ -61,7 +85,14 @@ export const QuotationList = () => {
       ),
     [filteredQuotations, sort],
   );
-  const pagination = usePagination(sortedQuotations, 10);
+  const pagination = usePagination(sortedQuotations, fulfillmentOnly ? 10 : readStoredQuotationPageSize());
+
+  const handlePageSizeChange = (pageSize: number) => {
+    pagination.setPageSize(pageSize);
+    if (!fulfillmentOnly) {
+      storeQuotationPageSize(pageSize);
+    }
+  };
 
   const handleDelete = async (quotationId: string) => {
     if (!confirm('Are you sure you want to delete this quotation? This action cannot be undone.')) {
@@ -94,13 +125,11 @@ export const QuotationList = () => {
   };
 
   const activeFilterCount = [
-    searchTerm.trim() ? 1 : 0,
     dateRange.start ? 1 : 0,
     dateRange.end ? 1 : 0,
   ].reduce((sum, count) => sum + count, 0);
 
   const clearFilters = () => {
-    setSearchTerm('');
     setDateRange({ start: '', end: '' });
   };
 
@@ -109,14 +138,27 @@ export const QuotationList = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Quotations</h2>
-          <button
+          <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">{fulfillmentOnly ? 'Order Fulfillment' : 'Quotations'}</h2>
+          {!fulfillmentOnly && <button
             onClick={() => navigate('/quotations/new')}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:from-blue-700 hover:to-blue-800 sm:w-auto"
           >
             <Plus className="w-5 h-5" />
             Create Quotation
-          </button>
+          </button>}
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search quotation, client, or company..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
 
         <div className="flex overflow-x-auto rounded-2xl border border-gray-200 bg-white p-1.5">
@@ -124,9 +166,10 @@ export const QuotationList = () => {
             { value: 'draft', label: 'Drafts' },
             { value: 'pending', label: 'Pending Approval' },
             { value: 'approved', label: 'Approved' },
-            { value: 'shared_with_client', label: 'Shared with Client' },
-          ].map((tab) => {
-            const count = quotations.filter((quotation) => tab.value === 'draft'
+            { value: 'locked', label: 'Locked' },
+            { value: 'executed', label: 'Executed' },
+          ].filter((tab) => !fulfillmentOnly || tab.value === 'locked').map((tab) => {
+            const count = matchingQuotations.filter((quotation) => tab.value === 'draft'
               ? ['draft', 'rejected', 'revised'].includes(quotation.status)
               : quotation.status === tab.value).length;
 
@@ -174,22 +217,9 @@ export const QuotationList = () => {
           </div>
 
           <div className={`${showMobileFilters ? 'grid' : 'hidden'} grid-cols-1 gap-4 md:hidden`}>
-            {/* Search */}
-            <div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search quotation, client, or company..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
             {/* Date Range - Start */}
             <div>
+              <label className="mb-2 block text-sm text-gray-600">Start Date</label>
               <input
                 type="date"
                 value={dateRange.start}
@@ -211,39 +241,28 @@ export const QuotationList = () => {
             </div>
           </div>
 
-          <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search quotation, client, or company..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
+          <div className="hidden gap-4 md:grid md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm text-gray-600">Start Date</label>
               <input
                 type="date"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-          </div>
-
-          <div className="hidden md:flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-            <Calendar className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-600">Date Range:</span>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-              className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <div>
+              <label className="mb-2 flex items-center gap-2 text-sm text-gray-600">
+                <Calendar className="h-4 w-4 text-gray-400" />
+                End Date
+              </label>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
         </div>
 
@@ -272,8 +291,11 @@ export const QuotationList = () => {
                     <SortableHeader label="Status" sortKey="status" currentKey={sort.key} direction={sort.direction} onToggle={toggleSort} />
                   </th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Actions
+                    {showStockProgress ? 'Stock Progress %' : 'Actions'}
                   </th>
+                  {showStockProgress && <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Actions
+                  </th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -301,7 +323,18 @@ export const QuotationList = () => {
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${quotationStatusClass(quotation.status)}`}>
                         {quotationStatusLabel(quotation.status)}
                       </span>
+                      {!isInfluencer && quotation.crmPurchaseDate && (
+                        <div className="mt-2">
+                          <span title={`Customer and order products added to CRM. Purchase date: ${quotation.crmPurchaseDate}`} className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> Added to CRM
+                          </span>
+                        </div>
+                      )}
                     </td>
+                    {showStockProgress && <td className="px-6 py-4 text-right font-semibold text-blue-700">
+                      {quotation.stockProgressPercent || 0}%
+                      <progress aria-label={`Stock progress for ${quotation.number}`} max={100} value={quotation.stockProgressPercent || 0} className="mt-1 block h-2 w-full accent-blue-600" />
+                    </td>}
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -311,41 +344,48 @@ export const QuotationList = () => {
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button
+                        {!isInfluencer && !['locked', 'executed'].includes(quotation.status) && <button
                           onClick={() => navigate(`/quotations/${quotation.id}/edit`)}
                           className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
-                        </button>
-                        <button
+                        </button>}
+                        {!isInfluencer && <button
                           onClick={() => void handleDuplicate(quotation.id)}
                           className="p-2 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
                           title="Duplicate"
                         >
                           <Copy className="w-4 h-4" />
-                        </button>
-                        <button
+                        </button>}
+                        {quotation.canManageSharing && <button
+                          onClick={() => setSharingQuotation(quotation)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Share quotation" aria-label={`Share quotation ${quotation.number}`}
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>}
+                        {quotation.canManageSharing && <button
                           onClick={() => void handleDelete(quotation.id)}
                           className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>
                 ))}
                 {loading && (
                   <tr>
-                    <td colSpan={7}>
+                    <td colSpan={showStockProgress ? 8 : 7}>
                       <LoadingState label="Loading quotations..." />
                     </td>
                   </tr>
                 )}
                 {!loading && sortedQuotations.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={showStockProgress ? 8 : 7} className="px-6 py-12 text-center text-gray-500">
                       No quotations found. Create your first quotation to get started.
                     </td>
                   </tr>
@@ -359,10 +399,11 @@ export const QuotationList = () => {
             totalItems={pagination.totalItems}
             totalPages={pagination.totalPages}
             onPageChange={pagination.setPage}
-            onPageSizeChange={pagination.setPageSize}
+            onPageSizeChange={handlePageSizeChange}
           />
         </div>
       </div>
+      {sharingQuotation && <QuotationShareDialog key={sharingQuotation.id} quotation={sharingQuotation} onClose={() => setSharingQuotation(null)} />}
     </div>
   );
 };

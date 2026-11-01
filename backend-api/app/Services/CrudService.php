@@ -5,7 +5,6 @@ namespace App\Services;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 abstract class CrudService
 {
@@ -62,11 +61,46 @@ abstract class CrudService
 
     public function reorder(array $items): void
     {
-        DB::transaction(function () use ($items): void {
-            foreach ($items as $item) {
-                ($this->modelClass)::whereKey($item['id'])->update(['display_order' => $item['display_order']]);
-            }
-        });
+        $orders = [];
+
+        foreach ($items as $item) {
+            $orders[(int) $item['id']] = (int) $item['display_order'];
+        }
+
+        if ($orders === []) {
+            return;
+        }
+
+        $model = new $this->modelClass();
+        $connection = $model->getConnection();
+        $grammar = $connection->getQueryGrammar();
+        $table = $grammar->wrapTable($model->getTable());
+        $key = $grammar->wrap($model->getKeyName());
+        $displayOrder = $grammar->wrap('display_order');
+        $cases = [];
+        $bindings = [];
+
+        foreach ($orders as $id => $order) {
+            $cases[] = 'WHEN ? THEN ?';
+            $bindings[] = $id;
+            $bindings[] = $order;
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($orders), '?'));
+        $timestampAssignment = '';
+
+        if ($model->usesTimestamps()) {
+            $updatedAt = $grammar->wrap($model->getUpdatedAtColumn());
+            $timestampAssignment = ", {$updatedAt} = ?";
+            $bindings[] = $model->freshTimestampString();
+        }
+
+        $bindings = [...$bindings, ...array_keys($orders)];
+
+        $connection->update(
+            "UPDATE {$table} SET {$displayOrder} = CASE {$key} ".implode(' ', $cases)." ELSE {$displayOrder} END{$timestampAssignment} WHERE {$key} IN ({$placeholders})",
+            $bindings
+        );
     }
 
     protected function query(Request $request): Builder

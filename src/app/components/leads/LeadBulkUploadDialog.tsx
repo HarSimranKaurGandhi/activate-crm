@@ -114,7 +114,7 @@ export const LeadBulkUploadDialog = ({
                       <b> 10 days, 20 days, 30 days, 90 days</b>.
                     </li>
                     <li>
-                      Status values: <b>new, enquiry, in_progress, on_hold, closed_success, closed_fail</b>.
+                      Status values: <b>new, enquiry, in_progress, on_hold, order_confirmed, closed_success, closed_fail</b>.
                       For <b>closed_fail</b>, include a valid <b>failure_reason</b>; when the reason is
                       <b> other</b>, also provide <b>failure_reason_details</b>.
                     </li>

@@ -7,6 +7,12 @@ export const userService = {
   async dropdown() {
     return cachedDropdown<any[]>('/users/dropdown');
   },
+  async salesDropdown() {
+    return cachedDropdown<any[]>('/users/dropdown', { sales_only: 1 });
+  },
+  async salesDepartmentDropdown() {
+    return cachedDropdown<any[]>('/users/dropdown', { sales_department_only: 1 });
+  },
   async get(id: string) {
     return unwrap<any>(await apiClient.get(`/users/${id}`));
   },

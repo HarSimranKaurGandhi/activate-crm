@@ -1,9 +1,11 @@
+import { normalizeIndianPhone } from '../../../utils/phone';
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight, FileText, LoaderCircle, MessageSquareText, Save } from 'lucide-react';
+import { ChevronRight, FileText, Plus, LoaderCircle, MessageSquareText, Save } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { leadPayload, mapLead } from '../../../services/mappers';
 import { leadService } from '../../../services/leadService';
+import { influencerService } from '../../../services/influencerService';
 import { LoadingState } from '../common/AsyncState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -26,9 +28,11 @@ const LEAD_STATUS_OPTIONS = [
   { value: 'new', label: 'New (Requirement Confirmed)' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'on_hold', label: 'On Hold' },
+  { value: 'order_confirmed', label: 'Order Confirmed' },
   { value: 'closed_success', label: 'Closed - Success' },
   { value: 'closed_fail', label: 'Closed - Fail' },
 ];
+const CLOSED_LEAD_STATUSES = ['closed_success', 'closed_fail'];
 
 const LEAD_TAG_OPTIONS = [
   { value: 'hot', label: 'Hot' },
@@ -58,6 +62,7 @@ const statusBadgeClass: Record<string, string> = {
   enquiry: 'bg-indigo-50 text-indigo-700',
   in_progress: 'bg-amber-50 text-amber-700',
   on_hold: 'bg-slate-100 text-slate-700',
+  order_confirmed: 'bg-indigo-50 text-indigo-700',
   closed_success: 'bg-emerald-50 text-emerald-700',
   closed_fail: 'bg-rose-50 text-rose-700',
 };
@@ -73,7 +78,11 @@ const sourceLabel = (source: string) =>
 const statusLabel = (status: string) =>
   LEAD_STATUS_OPTIONS.find((option) => option.value === status)?.label || 'New (Requirement Confirmed)';
 
-const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
+const formatDateInput = (date: Date) => [
+  date.getFullYear(),
+  String(date.getMonth() + 1).padStart(2, '0'),
+  String(date.getDate()).padStart(2, '0'),
+].join('-');
 const today = formatDateInput(new Date());
 
 const formatAddress = (lead: any) =>
@@ -101,6 +110,7 @@ const formatDisplayDateTime = (date?: string) => {
   if (Number.isNaN(parsed.getTime())) return date;
 
   return parsed.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -152,6 +162,8 @@ const leadTimelineFieldLabel = (field: string) => {
       return 'Lead Expected Order Value';
     case 'expected_closure':
       return 'Expected Closure';
+    case 'closure_hot_level':
+      return 'Closure Hot Level';
     case 'status':
       return 'Status';
     case 'tags':
@@ -164,6 +176,8 @@ const leadTimelineFieldLabel = (field: string) => {
       return 'Follow Up Date';
     case 'assigned_to':
       return 'Assigned To';
+    case 'influencer_id':
+      return 'Influencer';
     default:
       return field;
   }
@@ -201,6 +215,7 @@ const createEmptyFormData = () => ({
   requirement: '',
   expectedOrderValue: '',
   expectedClosure: '',
+  closureHotLevel: 1,
   status: 'new',
   failureReason: '',
   failureReasonDetails: '',
@@ -209,6 +224,7 @@ const createEmptyFormData = () => ({
   customerCategory: '',
   followUpDate: '',
   assignedTo: '',
+  influencerId: '',
 });
 
 interface LeadDetailsDialogProps {
@@ -244,6 +260,35 @@ export const LeadDetailsDialog = ({
   const [formData, setFormData] = useState(createEmptyFormData);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [failureDialogOpen, setFailureDialogOpen] = useState(false);
+  const [influencerSearch, setInfluencerSearch] = useState('');
+  const [influencers, setInfluencers] = useState<any[]>([]);
+  const [influencersLoading, setInfluencersLoading] = useState(false);
+  const [selectedInfluencer, setSelectedInfluencer] = useState<any | null>(null);
+
+  useEffect(() => {
+    setInfluencerSearch('');
+    setSelectedInfluencer(null);
+    setInfluencers([]);
+  }, [leadId, open]);
+
+  useEffect(() => {
+    if (!open || activeTab !== 'edit') return;
+    let cancelled = false;
+    setInfluencersLoading(true);
+    const timer = window.setTimeout(() => {
+      influencerService.dropdown(influencerSearch.trim())
+        .then((result) => { if (!cancelled) setInfluencers(Array.isArray(result) ? result : []); })
+        .catch(() => {
+          if (!cancelled) {
+            setInfluencers([]);
+            toast.error('Unable to load influencers');
+          }
+        })
+        .finally(() => { if (!cancelled) setInfluencersLoading(false); });
+    }, 200);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [open, activeTab, influencerSearch, leadId]);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const quotationRequestRef = useRef(0);
 
@@ -327,6 +372,7 @@ export const LeadDetailsDialog = ({
           requirement: mapped.requirement,
           expectedOrderValue: mapped.expectedOrderValue,
           expectedClosure: mapped.expectedClosure,
+          closureHotLevel: mapped.closureHotLevel,
           status: mapped.status,
           failureReason: mapped.failureReason,
           failureReasonDetails: mapped.failureReasonDetails,
@@ -335,6 +381,7 @@ export const LeadDetailsDialog = ({
           customerCategory: mapped.customerCategory,
           followUpDate: mapped.followUpDate,
           assignedTo: mapped.assignedTo,
+          influencerId: mapped.influencerId,
         });
       } catch {
         if (cancelled) return;
@@ -377,9 +424,9 @@ export const LeadDetailsDialog = ({
 
     const validationErrors: Record<string, string[]> = {};
 
-    if (!formData.phone.trim() && !formData.email.trim()) {
-      validationErrors.phone = ['Either phone number or email is required.'];
-      validationErrors.email = ['Either phone number or email is required.'];
+    if (!formData.phone.trim() && !formData.email.trim() && !formData.influencerId) {
+      validationErrors.phone = ['At least one of phone number, email, or influencer is required.'];
+      validationErrors.email = ['At least one of phone number, email, or influencer is required.'];
     }
 
     if (!formData.requirement.trim()) {
@@ -433,6 +480,7 @@ export const LeadDetailsDialog = ({
         requirement: mapped.requirement,
         expectedOrderValue: mapped.expectedOrderValue,
         expectedClosure: mapped.expectedClosure,
+        closureHotLevel: mapped.closureHotLevel,
         status: mapped.status,
         failureReason: mapped.failureReason,
         failureReasonDetails: mapped.failureReasonDetails,
@@ -441,12 +489,14 @@ export const LeadDetailsDialog = ({
         customerCategory: mapped.customerCategory,
         followUpDate: mapped.followUpDate,
         assignedTo: mapped.assignedTo,
+        influencerId: mapped.influencerId,
       });
       onSaved(mapped);
       toast.success('Lead updated successfully');
 
       const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
-      const canStillViewLead = role === 'admin' || String(mapped.assignedTo || '') === String(user?.id || '');
+      const canStillViewLead = ['admin', 'sales_manager'].includes(role)
+        || String(mapped.assignedTo || '') === String(user?.id || '');
 
       if (!canStillViewLead) {
         onOpenChange(false);
@@ -552,7 +602,9 @@ export const LeadDetailsDialog = ({
                     <LeadPhoneAction
                       leadId={String(lead.id)}
                       phone={lead.phone}
+                      influencer={lead.influencer}
                       followUpDate={lead.followUpDate}
+                      followUpDateLocked={CLOSED_LEAD_STATUSES.includes(lead.status)}
                       onActivitySaved={mergeActivity}
                       onFollowUpDateChanged={(date) => {
                         setLead((current: any) => current ? { ...current, followUpDate: date } : current);
@@ -577,7 +629,9 @@ export const LeadDetailsDialog = ({
                   </div>
 
                   <div>
-                    <div className="mb-1 text-sm font-medium text-gray-500">Follow Up Date</div>
+                    <div className="mb-1 text-sm font-medium text-gray-500">
+                      {CLOSED_LEAD_STATUSES.includes(lead.status) ? 'Closure Date' : 'Follow Up Date'}
+                    </div>
                     <div className="text-gray-900">{formatDisplayDate(lead.followUpDate)}</div>
                   </div>
 
@@ -592,9 +646,20 @@ export const LeadDetailsDialog = ({
                   </div>
 
                   <div>
+                    <div className="mb-1 text-sm font-medium text-gray-500">Closure Hot Level</div>
+                    <div className={`inline-flex rounded-full px-3 py-1 text-sm font-bold ${lead.closureHotLevel > 8 ? 'bg-red-100 text-red-700' : lead.closureHotLevel > 5 ? 'bg-orange-100 text-orange-700' : 'bg-lime-100 text-lime-700'}`}>{lead.closureHotLevel} / 10</div>
+                  </div>
+
+                  <div>
                     <div className="mb-1 text-sm font-medium text-gray-500">Assigned To</div>
                     <div className="text-gray-900">{lead.assignedUser?.name || '-'}</div>
                     {lead.assignedUser?.email && <div className="mt-1 text-sm text-gray-500">{lead.assignedUser.email}</div>}
+                  </div>
+
+                  <div>
+                    <div className="mb-1 text-sm font-medium text-gray-500">Influencer</div>
+                    <div className="text-gray-900">{lead.influencer?.name || '-'}</div>
+                    {lead.influencer?.companyName && <div className="mt-1 text-sm text-gray-500">{lead.influencer.companyName}</div>}
                   </div>
 
                   <div>
@@ -751,6 +816,9 @@ export const LeadDetailsDialog = ({
                           setFormData((current) => ({
                             ...current,
                             status,
+                            followUpDate: CLOSED_LEAD_STATUSES.includes(status) && !CLOSED_LEAD_STATUSES.includes(current.status)
+                              ? today
+                              : current.followUpDate,
                             failureReason: '',
                             failureReasonDetails: '',
                           }));
@@ -787,11 +855,11 @@ export const LeadDetailsDialog = ({
                           type="tel"
                           inputMode="numeric"
                           pattern="[0-9]{10}"
-                          maxLength={10}
+                          maxLength={30}
                           value={formData.phone}
                           onChange={(event) => setFormData((current) => ({
                             ...current,
-                            phone: event.target.value.replace(/\D/g, '').slice(0, 10),
+                            phone: normalizeIndianPhone(event.target.value),
                           }))}
                           className={`${fieldClassName(Boolean(errors.phone?.[0]))} rounded-l-none`}
                         />
@@ -807,7 +875,7 @@ export const LeadDetailsDialog = ({
                         onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))}
                         className={fieldClassName(Boolean(errors.email?.[0]))}
                       />
-                      <p className="mt-1 text-xs text-gray-500">Either email or phone number is required.</p>
+                      <p className="mt-1 text-xs text-gray-500">At least one of phone number, email, or influencer is required.</p>
                       {errors.email?.[0] && <p className="mt-1 text-sm text-red-600">{errors.email[0]}</p>}
                     </div>
                   </div>
@@ -856,6 +924,51 @@ export const LeadDetailsDialog = ({
                         </option>)}
                       </select>
                       {errors.assigned_to?.[0] && <p className="mt-1 text-sm text-red-600">{errors.assigned_to[0]}</p>}
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-lead-influencer" className="mb-2 block text-sm font-medium text-gray-700">Influencer</label>
+                      <input
+                        type="search"
+                        aria-label="Search influencers"
+                        placeholder="Search by name, phone, email, company or city"
+                        value={influencerSearch}
+                        onChange={(event) => setInfluencerSearch(event.target.value)}
+                        className="mb-2 w-full rounded-xl border border-gray-200 px-4 py-2 text-sm"
+                      />
+                      <select
+                        id="edit-lead-influencer"
+                        value={formData.influencerId}
+                        onChange={(event) => {
+                          const influencerId = event.target.value;
+                          setSelectedInfluencer(influencers.find((item) => String(item.id) === influencerId) || null);
+                          setFormData((current) => ({ ...current, influencerId }));
+                          setErrors((current) => { const next = { ...current }; delete next.influencer_id; return next; });
+                        }}
+                        className={fieldClassName(Boolean(errors.influencer_id?.[0]))}
+                      >
+                        <option value="">No influencer</option>
+                        {formData.influencerId && !influencers.some((item) => String(item.id) === formData.influencerId) && (
+                          <option value={formData.influencerId}>{selectedInfluencer?.name || lead?.influencer?.name || 'Selected influencer'}</option>
+                        )}
+                        {influencers.map((item) => (
+                          <option key={item.id} value={String(item.id)}>
+                            {[item.name, item.company_name, item.phone].filter(Boolean).join(' — ')}
+                          </option>
+                        ))}
+                      </select>
+                      {influencersLoading && <p className="mt-1 text-xs text-gray-500">Searching influencers...</p>}
+                      {!influencersLoading && influencers.length === 0 && <p className="mt-1 text-xs text-gray-500">No active influencers found.</p>}
+                      {errors.influencer_id?.[0] && <p className="mt-1 text-sm text-red-600">{errors.influencer_id[0]}</p>}
+                    </div>
+
+                    <div className="md:col-span-2 rounded-xl border border-orange-200 bg-orange-50/50 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <label htmlFor="dialog-closure-hot-level" className="text-sm font-semibold text-gray-800">Closure Hot Level</label>
+                        <span className={`rounded-full px-3 py-1 text-sm font-bold ${formData.closureHotLevel > 8 ? 'bg-red-100 text-red-700' : formData.closureHotLevel > 5 ? 'bg-orange-100 text-orange-700' : 'bg-lime-100 text-lime-700'}`}>{formData.closureHotLevel}</span>
+                      </div>
+                      <input id="dialog-closure-hot-level" type="range" min="1" max="10" step="1" value={formData.closureHotLevel} onChange={(event) => setFormData((current) => ({ ...current, closureHotLevel: Number(event.target.value) }))} className="closure-hot-range block w-full" />
+                      <div className="mt-2 flex justify-between text-[11px] text-gray-500"><span>1 · Low</span><span>5 · Warm</span><span>10 · Very Hot</span></div>
                     </div>
 
                     <div>
@@ -965,15 +1078,21 @@ export const LeadDetailsDialog = ({
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">Follow Up Date *</label>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        {CLOSED_LEAD_STATUSES.includes(formData.status) ? 'Closure Date *' : 'Follow Up Date *'}
+                      </label>
                       <input
                         type="date"
                         required
                         min={today}
+                        disabled={CLOSED_LEAD_STATUSES.includes(formData.status)}
                         value={formData.followUpDate}
                         onChange={(event) => setFormData((current) => ({ ...current, followUpDate: event.target.value }))}
-                        className={fieldClassName(Boolean(errors.follow_up_date?.[0]))}
+                        className={`${fieldClassName(Boolean(errors.follow_up_date?.[0]))} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`}
                       />
+                      {CLOSED_LEAD_STATUSES.includes(formData.status) && (
+                        <p className="mt-1 text-xs text-gray-500">Automatically set when the lead is closed.</p>
+                      )}
                       {errors.follow_up_date?.[0] && <p className="mt-1 text-sm text-red-600">{errors.follow_up_date[0]}</p>}
                     </div>
 
@@ -1011,12 +1130,21 @@ export const LeadDetailsDialog = ({
 
               <TabsContent value="quotations">
                 <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                  <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-4 sm:px-5">
+                  <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-4 sm:px-5">
                     <FileText className="h-5 w-5 text-blue-600" />
                     <div>
                       <h3 className="font-semibold text-gray-900">Lead Quotations</h3>
                       <p className="text-sm text-gray-500">Quotations created directly for this Lead.</p>
                     </div>
+                    <button
+                      type="button"
+                      disabled={!lead?.id}
+                      onClick={() => { onOpenChange(false); navigate(`/quotations/new?lead_id=${encodeURIComponent(String(lead.id))}`); }}
+                      className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create Quotation
+                    </button>
                   </div>
                   {quotationsLoading ? (
                     <LoadingState label="Loading quotations..." />
@@ -1069,6 +1197,7 @@ export const LeadDetailsDialog = ({
           setFormData((current) => ({
             ...current,
             status: 'closed_fail',
+            followUpDate: CLOSED_LEAD_STATUSES.includes(current.status) ? current.followUpDate : today,
             failureReason: reason,
             failureReasonDetails: details,
           }));

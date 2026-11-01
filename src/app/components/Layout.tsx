@@ -1,18 +1,22 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { LayoutDashboard, FileText, Users, Package, Warehouse, Truck, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X, Phone, Wrench } from 'lucide-react';
-import { useState } from 'react';
+import { LayoutDashboard, FileText, Users, Package, Warehouse, Truck, Database, BarChart3, Settings, LogOut, ClipboardCheck, ListChecks, Menu, X, Phone, Wrench, UserRoundSearch, Receipt } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from './BrandLogo';
+import { clearStoredQuotationTab, isQuotationListFlow } from '../utils/quotationListTab';
 
 const baseNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, module: 'dashboard' },
   { name: 'Quotations', href: '/quotations', icon: FileText, module: 'quotations' },
+  { name: 'Order Fulfillment', href: '/order-fulfillment', icon: ClipboardCheck, module: 'quotations' },
   { name: 'Tasks', href: '/tasks', icon: ListChecks, module: 'tasks' },
   { name: 'Leads', href: '/leads', icon: Phone, module: 'leads' },
+  { name: 'Influencers', href: '/influencers', icon: UserRoundSearch, module: 'influencers' },
   { name: 'Customers', href: '/customers', icon: Users, module: 'customers' },
   { name: 'Products', href: '/products', icon: Package, module: 'products' },
   { name: 'Inventory', href: '/inventory', icon: Warehouse, module: 'inventory' },
   { name: 'Dispatches', href: '/dispatches', icon: Truck, module: 'dispatches' },
+  { name: 'Billing and Payments', href: '/billing', icon: Receipt, module: 'billing' },
   { name: 'Service', href: '/services', icon: Wrench, module: 'services' },
   {
     name: 'Masters',
@@ -20,8 +24,12 @@ const baseNavigation = [
     icon: Database,
     children: [
       { name: 'Categories', href: '/masters/categories' },
+      { name: 'Tags', href: '/masters/tags' },
+      { name: 'Quick Replies', href: '/masters/quick-replies' },
+      { name: 'Influencer Types', href: '/masters/influencer-types' },
       { name: 'Users', href: '/masters/users' },
       { name: 'Brands', href: '/masters/brands' },
+      { name: 'OEMs', href: '/masters/oems' },
       { name: 'Godowns', href: '/masters/godowns' },
       { name: 'Adjustments', href: '/masters/adjustments' },
       { name: 'Terms & Conditions', href: '/masters/terms' },
@@ -35,6 +43,12 @@ const baseNavigation = [
 export const Layout = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
+
+  useEffect(() => {
+    if (!isQuotationListFlow(location.pathname)) {
+      clearStoredQuotationTab();
+    }
+  }, [location.pathname]);
   const [mastersOpen, setMastersOpen] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
@@ -46,10 +60,17 @@ export const Layout = () => {
           .map((permission: any) => typeof permission === 'string' ? permission : permission.module)
       : baseNavigation.map((item) => item.module),
   );
-  const canManageApprovals = ['admin', 'operations'].includes(role)
-    && (role === 'admin' || viewPermissions.has('quotations'));
-  const visibleBaseNavigation = baseNavigation
-    .filter((item) => role === 'admin' || viewPermissions.has(item.module))
+  const hasQuotationAccess = ['admin', 'sales_manager'].includes(role)
+    || viewPermissions.has('quotations');
+  const canManageApprovals = ['admin', 'operations', 'sales_manager'].includes(role)
+    && hasQuotationAccess;
+  const visibleBaseNavigation = (role === 'influencer' ? [
+    { name: 'My Leads', href: '/influencer/leads', icon: Phone, module: 'leads' },
+    { name: 'My Quotations', href: '/quotations', icon: FileText, module: 'quotations' },
+  ] : baseNavigation)
+    .filter((item) => role === 'influencer' || role === 'admin'
+      || (role === 'sales_manager' && item.module === 'quotations')
+      || viewPermissions.has(item.module))
     .map((item) => {
       if (!item.children) {
         return item;
@@ -60,7 +81,7 @@ export const Layout = () => {
         children: role === 'admin'
           ? item.children
           : item.children.filter((child) =>
-              !['/masters/users', '/masters/adjustments', '/masters/custom-fields'].includes(child.href)
+              !['/masters/users', '/masters/adjustments', '/masters/custom-fields', '/masters/oems'].includes(child.href)
             ),
       };
     });

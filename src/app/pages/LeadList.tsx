@@ -36,16 +36,51 @@ const LEAD_STATUS_OPTIONS = [
   { value: 'new', label: 'New (Requirement Confirmed)' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'on_hold', label: 'On Hold' },
+  { value: 'order_confirmed', label: 'Order Confirmed' },
   { value: 'closed_success', label: 'Closed - Success' },
   { value: 'closed_fail', label: 'Closed - Fail' },
 ];
 const CLOSED_LEAD_STATUS_OPTIONS = ['closed_success', 'closed_fail'];
+
+type FollowUpPeriod = 'all' | 'today' | 'last_3_days' | 'last_7_days' | 'last_30_days';
+type FilterOperator = 'is' | 'is_not';
+
+const FOLLOW_UP_PERIOD_OPTIONS: Array<{ value: FollowUpPeriod; label: string; days?: number }> = [
+  { value: 'all', label: 'All Follow Up Dates' },
+  { value: 'today', label: 'Today', days: 1 },
+  { value: 'last_3_days', label: 'Last 3 Days', days: 3 },
+  { value: 'last_7_days', label: 'Last 7 Days', days: 7 },
+  { value: 'last_30_days', label: 'Last 30 Days', days: 30 },
+];
+
+const formatDateForApi = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const followUpDateRange = (period: FollowUpPeriod) => {
+  const option = FOLLOW_UP_PERIOD_OPTIONS.find((item) => item.value === period);
+  if (!option?.days) return null;
+
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  const start = new Date(end);
+  start.setDate(start.getDate() - (option.days - 1));
+
+  return {
+    from: formatDateForApi(start),
+    to: formatDateForApi(end),
+  };
+};
 
 const statusBadgeClass: Record<string, string> = {
   new: 'bg-sky-50 text-sky-700',
   enquiry: 'bg-indigo-50 text-indigo-700',
   in_progress: 'bg-amber-50 text-amber-700',
   on_hold: 'bg-slate-100 text-slate-700',
+  order_confirmed: 'bg-indigo-50 text-indigo-700',
   closed_success: 'bg-emerald-50 text-emerald-700',
   closed_fail: 'bg-rose-50 text-rose-700',
 };
@@ -80,6 +115,7 @@ const formatDisplayDateTime = (date?: string) => {
   if (Number.isNaN(parsed.getTime())) return date;
 
   return parsed.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -102,22 +138,99 @@ const isPastDate = (date?: string) => {
 const phoneHref = (phone?: string) => `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
 const toggleFilterValue = (values: string[], value: string) =>
   values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
-const filterTriggerLabel = (label: string, selected: string[], options: Array<{ value: string; label: string }>) => {
+const filterTriggerLabel = (
+  label: string,
+  selected: string[],
+  options: Array<{ value: string; label: string }>,
+  operator: FilterOperator = 'is',
+) => {
   if (selected.length === 0) return label;
-  if (selected.length === 1) {
-    return options.find((option) => option.value === selected[0])?.label || label;
-  }
 
-  return `${label} (${selected.length})`;
+  const selectedLabel = selected.length === 1
+    ? options.find((option) => option.value === selected[0])?.label || label
+    : `${label} (${selected.length})`;
+
+  return operator === 'is_not' ? `${label} is not ${selected.length === 1 ? selectedLabel : `(${selected.length})`}` : selectedLabel;
 };
+
+const MultiSelectFilter = ({
+  label,
+  menuLabel,
+  selected,
+  options,
+  operator,
+  onToggle,
+  onOperatorChange,
+}: {
+  label: string;
+  menuLabel: string;
+  selected: string[];
+  options: Array<{ value: string; label: string }>;
+  operator: FilterOperator;
+  onToggle: (value: string) => void;
+  onOperatorChange: (operator: FilterOperator) => void;
+}) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <button
+        type="button"
+        className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-sm ${
+          selected.length > 0 && operator === 'is_not'
+            ? 'border-rose-200 text-rose-700'
+            : 'border-gray-200 text-gray-700'
+        }`}
+      >
+        <span className="truncate">{filterTriggerLabel(label, selected, options, operator)}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+      </button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent className="w-64">
+      <DropdownMenuLabel>{menuLabel}</DropdownMenuLabel>
+      <div className="mb-1 grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1">
+        {([
+          { value: 'is', label: 'Is' },
+          { value: 'is_not', label: 'Is not' },
+        ] as const).map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onPointerDown={(event) => event.preventDefault()}
+            onClick={() => onOperatorChange(option.value)}
+            className={`rounded-md px-2 py-1 text-xs font-medium ${
+              operator === option.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <DropdownMenuSeparator />
+      {options.map((option) => (
+        <DropdownMenuCheckboxItem
+          key={option.value}
+          checked={selected.includes(option.value)}
+          onCheckedChange={() => onToggle(option.value)}
+          onSelect={(event) => event.preventDefault()}
+        >
+          {option.label}
+        </DropdownMenuCheckboxItem>
+      ))}
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
 
 export const LeadList = () => {
   const { user } = useAuth();
-  const isAdmin = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase() === 'admin';
+  const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
+  const isAdmin = role === 'admin';
+  const canViewAllLeads = ['admin', 'sales_manager'].includes(role);
+  const isSalesDepartmentUser = Array.isArray(user?.departments)
+    && user.departments.some((department: unknown) => String(department).trim().toLowerCase() === 'sales');
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [favouriteUsers, setFavouriteUsers] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
@@ -136,15 +249,32 @@ export const LeadList = () => {
   const [filters, setFilters] = useState(() => ({
     search: '',
     leadSources: [] as string[],
+    leadSourceOperator: 'is' as FilterOperator,
     statuses: [] as string[],
-    assignedTo: isAdmin && user?.id ? [String(user.id)] : [] as string[],
+    statusOperator: 'is' as FilterOperator,
+    assignedTo: canViewAllLeads && isSalesDepartmentUser && user?.id ? [String(user.id)] : [] as string[],
+    assignedToOperator: 'is' as FilterOperator,
+    followUpPeriod: 'all' as FollowUpPeriod,
     showClosed: false,
     favouritesOnly: false,
+    favouriteUserId: user?.id ? String(user.id) : '',
   }));
   const [sort, setSort] = useState<{ key: 'name' | 'leadSource' | 'assignedTo' | 'followUpDate' | 'createdAt' | 'status'; direction: 'asc' | 'desc' }>({
     key: 'followUpDate',
     direction: 'asc',
   });
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    setFilters((current) => current.favouriteUserId
+      ? current
+      : {
+          ...current,
+          favouriteUserId: String(user.id),
+          assignedTo: canViewAllLeads && isSalesDepartmentUser ? [String(user.id)] : current.assignedTo,
+        });
+  }, [canViewAllLeads, isSalesDepartmentUser, user?.id]);
 
   const openLeadDialog = (leadId: string) => {
     setSelectedLeadId(leadId);
@@ -152,8 +282,7 @@ export const LeadList = () => {
   };
 
   const updateLeadInList = (updatedLead: any) => {
-    const role = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase();
-    const remainsVisible = role === 'admin' || String(updatedLead.assignedTo || '') === String(user?.id || '');
+    const remainsVisible = canViewAllLeads || String(updatedLead.assignedTo || '') === String(user?.id || '');
 
     setLeads((current) => remainsVisible
       ? current.map((lead) => (lead.id === updatedLead.id ? updatedLead : lead))
@@ -185,15 +314,8 @@ export const LeadList = () => {
     setFavouriteUpdating((current) => [...current, lead.id]);
 
     try {
-      await leadService.favourite(lead.id, nextFavourite);
-      if (filters.favouritesOnly && !nextFavourite) {
-        setLeads((current) => current.filter((item) => item.id !== lead.id));
-        setTotalItems((current) => Math.max(0, current - 1));
-      } else {
-        setLeads((current) => current.map((item) =>
-          item.id === lead.id ? { ...item, isFavourite: nextFavourite } : item
-        ));
-      }
+      await leadService.favourite(lead.id, nextFavourite, isAdmin ? filters.favouriteUserId : undefined);
+      setReloadKey(value => value + 1);
       toast.success(nextFavourite ? 'Lead added to favourites' : 'Lead removed from favourites');
     } catch {
       toast.error('Unable to update favourite lead');
@@ -205,29 +327,50 @@ export const LeadList = () => {
   useEffect(() => {
     const loadUsers = async () => {
       try {
-        const userResult = await userService.dropdown();
-        setUsers(Array.isArray(userResult) ? userResult : []);
+        const [salesUserResult, favouriteUserResult] = await Promise.all([
+          userService.salesDepartmentDropdown(),
+          isAdmin ? userService.dropdown() : Promise.resolve([]),
+        ]);
+        setUsers(Array.isArray(salesUserResult) ? salesUserResult : []);
+        setFavouriteUsers(Array.isArray(favouriteUserResult) ? favouriteUserResult : []);
       } catch {
         toast.error('Unable to load lead users');
       }
     };
 
     void loadUsers();
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     const loadLeads = async () => {
       setLoading(true);
       try {
+        const followUpRange = followUpDateRange(filters.followUpPeriod);
         const result = await leadService.list({
           page,
           per_page: pageSize,
           include_closed: filters.showClosed ? 1 : 0,
           favourites_only: filters.favouritesOnly ? 1 : 0,
+          ...(isAdmin && filters.favouriteUserId
+            ? { favourite_user_id: filters.favouriteUserId }
+            : {}),
           ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
-          ...(filters.leadSources.length > 0 ? { lead_source: filters.leadSources } : {}),
-          ...(filters.statuses.length > 0 ? { status: filters.statuses } : {}),
-          ...(filters.assignedTo.length > 0 ? { assigned_to: filters.assignedTo } : {}),
+          ...(filters.leadSources.length > 0 ? {
+            lead_source: filters.leadSources,
+            lead_source_operator: filters.leadSourceOperator,
+          } : {}),
+          ...(filters.statuses.length > 0 ? {
+            status: filters.statuses,
+            status_operator: filters.statusOperator,
+          } : {}),
+          ...(filters.assignedTo.length > 0 ? {
+            assigned_to: filters.assignedTo,
+            assigned_to_operator: filters.assignedToOperator,
+          } : {}),
+          ...(followUpRange ? {
+            follow_up_from: followUpRange.from,
+            follow_up_to: followUpRange.to,
+          } : {}),
           sort_by: {
             leadSource: 'lead_source',
             assignedTo: 'assigned_to',
@@ -272,11 +415,11 @@ export const LeadList = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [filters.search, filters.leadSources, filters.statuses, filters.assignedTo, filters.showClosed, filters.favouritesOnly, sort.key, sort.direction]);
+  }, [filters.search, filters.leadSources, filters.leadSourceOperator, filters.statuses, filters.statusOperator, filters.assignedTo, filters.assignedToOperator, filters.followUpPeriod, filters.showClosed, filters.favouritesOnly, filters.favouriteUserId, sort.key, sort.direction]);
 
   useEffect(() => {
     setSelectedLeadIds([]);
-  }, [filters.search, filters.leadSources, filters.statuses, filters.assignedTo, filters.showClosed, filters.favouritesOnly, sort.key, sort.direction, pageSize]);
+  }, [filters.search, filters.leadSources, filters.leadSourceOperator, filters.statuses, filters.statusOperator, filters.assignedTo, filters.assignedToOperator, filters.followUpPeriod, filters.showClosed, filters.favouritesOnly, filters.favouriteUserId, sort.key, sort.direction, pageSize]);
 
   useEffect(() => {
     if (filters.showClosed) {
@@ -382,9 +525,19 @@ export const LeadList = () => {
     filters.leadSources.length > 0 ? 1 : 0,
     filters.statuses.length > 0 ? 1 : 0,
     filters.assignedTo.length > 0 ? 1 : 0,
+    filters.followUpPeriod !== 'all' ? 1 : 0,
     filters.favouritesOnly ? 1 : 0,
   ].reduce((sum, count) => sum + count, 0);
   const assigneeOptions = users.map((user) => ({ value: String(user.id), label: user.name }));
+  const favouriteOwnerOptions = [
+    ...(user?.id ? [{ value: String(user.id), label: 'My favourites' }] : []),
+    ...favouriteUsers
+      .filter((favouriteUser) => String(favouriteUser.id) !== String(user?.id || ''))
+      .map((favouriteUser) => ({
+        value: String(favouriteUser.id),
+        label: `${favouriteUser.name}${favouriteUser.email ? ` (${favouriteUser.email})` : ''}`,
+      })),
+  ];
   const visibleStatusOptions = filters.showClosed
     ? LEAD_STATUS_OPTIONS
     : LEAD_STATUS_OPTIONS.filter((option) => !CLOSED_LEAD_STATUS_OPTIONS.includes(option.value));
@@ -395,25 +548,44 @@ export const LeadList = () => {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">Leads</h2>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium ${
-              filters.favouritesOnly
-                ? 'border-amber-300 bg-amber-50 text-amber-800'
-                : 'border-gray-200 bg-white text-gray-700'
-            }`}>
-              <input
-                type="checkbox"
-                checked={filters.favouritesOnly}
-                onChange={(event) =>
-                  setFilters((current) => ({
+            <div className="flex items-stretch">
+              <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium ${
+                filters.favouritesOnly
+                  ? 'border-amber-300 bg-amber-50 text-amber-800'
+                  : 'border-gray-200 bg-white text-gray-700'
+              } ${isAdmin ? 'rounded-r-none' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={filters.favouritesOnly}
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      favouritesOnly: event.target.checked,
+                    }))
+                  }
+                  className="sr-only"
+                />
+                <Star className={`h-4 w-4 ${filters.favouritesOnly ? 'fill-amber-400 text-amber-500' : 'text-gray-400'}`} />
+                My Favourite Leads
+              </label>
+              {isAdmin && (
+                <select
+                  aria-label="Favourite lead owner"
+                  value={filters.favouriteUserId}
+                  onChange={(event) => setFilters((current) => ({
                     ...current,
-                    favouritesOnly: event.target.checked,
-                  }))
-                }
-                className="sr-only"
-              />
-              <Star className={`h-4 w-4 ${filters.favouritesOnly ? 'fill-amber-400 text-amber-500' : 'text-gray-400'}`} />
-              My Favourite Leads
-            </label>
+                    favouriteUserId: event.target.value,
+                    favouritesOnly: true,
+                    assignedTo: [],
+                  }))}
+                  className="min-w-40 max-w-56 rounded-r-xl border border-l-0 border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                >
+                  {favouriteOwnerOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              )}
+            </div>
             <label className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700">
               <input
                 type="checkbox"
@@ -469,10 +641,15 @@ export const LeadList = () => {
                   setFilters({
                     search: '',
                     leadSources: [],
+                    leadSourceOperator: 'is',
                     statuses: [],
+                    statusOperator: 'is',
                     assignedTo: [],
+                    assignedToOperator: 'is',
+                    followUpPeriod: 'all',
                     showClosed: filters.showClosed,
                     favouritesOnly: filters.favouritesOnly,
+                    favouriteUserId: filters.favouriteUserId,
                   })
                 }
                 className="text-sm font-medium text-blue-600 hover:underline"
@@ -493,93 +670,58 @@ export const LeadList = () => {
                 className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700"
-                >
-                  <span>{filterTriggerLabel('Source', filters.leadSources, LEAD_SOURCE_OPTIONS)}</span>
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-64">
-                <DropdownMenuLabel>Lead Sources</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {LEAD_SOURCE_OPTIONS.map((option) => (
-                  <DropdownMenuCheckboxItem
-                    key={option.value}
-                    checked={filters.leadSources.includes(option.value)}
-                    onCheckedChange={() => setFilters((current) => ({
-                      ...current,
-                      leadSources: toggleFilterValue(current.leadSources, option.value),
-                    }))}
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    {option.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700"
-                >
-                  <span>{filterTriggerLabel('Status', filters.statuses, LEAD_STATUS_OPTIONS)}</span>
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-64">
-                <DropdownMenuLabel>Lead Status</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {visibleStatusOptions.map((option) => (
-                  <DropdownMenuCheckboxItem
-                    key={option.value}
-                    checked={filters.statuses.includes(option.value)}
-                    onCheckedChange={() => setFilters((current) => ({
-                      ...current,
-                      statuses: toggleFilterValue(current.statuses, option.value),
-                    }))}
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    {option.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700"
-                >
-                  <span>{filterTriggerLabel('Assignee', filters.assignedTo, assigneeOptions)}</span>
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-64">
-                <DropdownMenuLabel>Assigned To</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {assigneeOptions.map((option) => (
-                  <DropdownMenuCheckboxItem
-                    key={option.value}
-                    checked={filters.assignedTo.includes(option.value)}
-                    onCheckedChange={() => setFilters((current) => ({
-                      ...current,
-                      assignedTo: toggleFilterValue(current.assignedTo, option.value),
-                    }))}
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    {option.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <MultiSelectFilter
+              label="Source"
+              menuLabel="Lead Sources"
+              selected={filters.leadSources}
+              options={LEAD_SOURCE_OPTIONS}
+              operator={filters.leadSourceOperator}
+              onToggle={(value) => setFilters((current) => ({
+                ...current,
+                leadSources: toggleFilterValue(current.leadSources, value),
+              }))}
+              onOperatorChange={(leadSourceOperator) => setFilters((current) => ({ ...current, leadSourceOperator }))}
+            />
+            <MultiSelectFilter
+              label="Status"
+              menuLabel="Lead Status"
+              selected={filters.statuses}
+              options={visibleStatusOptions}
+              operator={filters.statusOperator}
+              onToggle={(value) => setFilters((current) => ({
+                ...current,
+                statuses: toggleFilterValue(current.statuses, value),
+              }))}
+              onOperatorChange={(statusOperator) => setFilters((current) => ({ ...current, statusOperator }))}
+            />
+            <MultiSelectFilter
+              label="Assignee"
+              menuLabel="Assigned To"
+              selected={filters.assignedTo}
+              options={assigneeOptions}
+              operator={filters.assignedToOperator}
+              onToggle={(value) => setFilters((current) => ({
+                ...current,
+                assignedTo: toggleFilterValue(current.assignedTo, value),
+              }))}
+              onOperatorChange={(assignedToOperator) => setFilters((current) => ({ ...current, assignedToOperator }))}
+            />
+            <select
+              aria-label="Follow up date"
+              value={filters.followUpPeriod}
+              onChange={(event) => setFilters((current) => ({
+                ...current,
+                followUpPeriod: event.target.value as FollowUpPeriod,
+              }))}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {FOLLOW_UP_PERIOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </div>
 
-          <div className="mb-4 hidden grid-cols-1 gap-3 lg:grid lg:grid-cols-4">
+          <div className="mb-4 hidden grid-cols-1 gap-3 lg:grid lg:grid-cols-5">
             <div className="relative lg:col-span-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
@@ -674,6 +816,19 @@ export const LeadList = () => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            <select
+              aria-label="Follow up date"
+              value={filters.followUpPeriod}
+              onChange={(event) => setFilters((current) => ({
+                ...current,
+                followUpPeriod: event.target.value as FollowUpPeriod,
+              }))}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {FOLLOW_UP_PERIOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </div>
 
           {selectedLeadIds.length > 0 && (
@@ -725,8 +880,10 @@ export const LeadList = () => {
                       openLeadDialog(lead.id);
                     }
                   }}
-                  className={`space-y-4 p-4 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${
-                    selectedLeadIds.includes(String(lead.id)) ? 'bg-blue-50/60' : 'hover:bg-slate-50'
+                  className={`space-y-4 border-l-4 p-4 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${
+                    Number(lead.closureHotLevel) > 8
+                      ? 'border-l-red-500 bg-red-50/70 hover:bg-red-100/70'
+                      : `border-l-transparent ${selectedLeadIds.includes(String(lead.id)) ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -745,7 +902,9 @@ export const LeadList = () => {
                         <LeadPhoneAction
                           leadId={String(lead.id)}
                           phone={lead.phone}
+                          influencer={lead.influencer}
                           followUpDate={lead.followUpDate}
+                          followUpDateLocked={CLOSED_LEAD_STATUS_OPTIONS.includes(lead.status)}
                           onFollowUpDateChanged={(date) => setLeads((current) => current.map((item) =>
                             item.id === lead.id ? { ...item, followUpDate: date } : item
                           ))}
@@ -769,6 +928,7 @@ export const LeadList = () => {
                       <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[lead.status] || statusBadgeClass.new}`}>
                         {statusLabel(lead.status)}
                       </span>
+                      {Number(lead.closureHotLevel) > 8 && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-bold text-white">Hot {lead.closureHotLevel}</span>}
                     </div>
                   </div>
 
@@ -847,9 +1007,9 @@ export const LeadList = () => {
                     <tr
                       key={lead.id}
                       onClick={() => openLeadDialog(lead.id)}
-                      className={`cursor-pointer ${selectedLeadIds.includes(String(lead.id)) ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}
+                      className={`cursor-pointer ${Number(lead.closureHotLevel) > 8 ? 'bg-red-50/70 hover:bg-red-100/70' : selectedLeadIds.includes(String(lead.id)) ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}
                     >
-                      <td className="px-4 py-4 align-top">
+                      <td className={`border-l-4 px-4 py-4 align-top ${Number(lead.closureHotLevel) > 8 ? 'border-l-red-500' : 'border-l-transparent'}`}>
                         <input
                           type="checkbox"
                           aria-label={`Select ${lead.name || 'lead'}`}
@@ -865,7 +1025,9 @@ export const LeadList = () => {
                           <LeadPhoneAction
                             leadId={String(lead.id)}
                             phone={lead.phone}
+                            influencer={lead.influencer}
                             followUpDate={lead.followUpDate}
+                            followUpDateLocked={CLOSED_LEAD_STATUS_OPTIONS.includes(lead.status)}
                             onFollowUpDateChanged={(date) => setLeads((current) => current.map((item) =>
                               item.id === lead.id ? { ...item, followUpDate: date } : item
                             ))}
@@ -885,6 +1047,7 @@ export const LeadList = () => {
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass[lead.status] || statusBadgeClass.new}`}>
                           {statusLabel(lead.status)}
                         </span>
+                        {Number(lead.closureHotLevel) > 8 && <div className="mt-1 text-xs font-bold text-red-700">Hot Level {lead.closureHotLevel}</div>}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">

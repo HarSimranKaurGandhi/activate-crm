@@ -159,12 +159,15 @@ class LeadController extends ApiController
 
     public function favourite(Request $request, int|string $id): JsonResponse
     {
-        $data = $request->validate(['favourite' => ['required', 'boolean']]);
+        $data = $request->validate(['favourite' => ['required', 'boolean'], 'favourite_user_id' => ['nullable','integer','exists:users,id']]);
+        $targetId = (int) ($data['favourite_user_id'] ?? $request->user()->id);
+        abort_unless($targetId === (int) $request->user()->id || $request->user()->hasAnyRole(['admin']), 403, 'Only admins can change another user’s favourites.');
+        $target = \App\Models\User::findOrFail($targetId);
         $lead = $this->leads->find($id);
 
         return $this->ok(
             $data['favourite'] ? 'Lead added to favourites' : 'Lead removed from favourites',
-            ['is_favourite' => $this->leads->setFavourite($lead, $request->user(), (bool) $data['favourite'])],
+            ['is_favourite' => $this->leads->setFavourite($lead, $target, (bool) $data['favourite'])],
         );
     }
 

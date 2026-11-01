@@ -1,5 +1,15 @@
-import { apiClient, unwrap, unwrapEnvelope } from './apiClient';
+import { apiClient, cachedDropdown, invalidateDropdownCache, unwrap, unwrapEnvelope } from './apiClient';
+
+const HELP_BOOK_PATH = '/dispatches/help-book';
+const HELP_BOOK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export const dispatchService={
+  async helpBook(){return cachedDropdown<any[]>(HELP_BOOK_PATH,{},HELP_BOOK_CACHE_TTL_MS);},
+  async createHelpBookEntry(payload:{name:string;value:string}){
+    const entry=unwrap<any>(await apiClient.post(HELP_BOOK_PATH,payload));
+    invalidateDropdownCache(HELP_BOOK_PATH);
+    return entry;
+  },
   async list(params:Record<string,unknown>={}){return unwrapEnvelope<any[]>(await apiClient.get('/dispatches',{params}));},
   async get(id:string){return unwrap<any>(await apiClient.get(`/dispatches/${id}`));},
   async create(payload:any){return unwrap<any>(await apiClient.post('/dispatches',payload));},

@@ -17,7 +17,7 @@ class User extends Authenticatable
     protected $table = 'users';
 
     protected $fillable = [
-        'name', 'email', 'password', 'phone', 'designation', 'role_id', 'is_active',
+        'name', 'email', 'password', 'phone', 'designation', 'departments', 'role_id', 'is_active',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -28,6 +28,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'departments' => 'array',
         ];
     }
 

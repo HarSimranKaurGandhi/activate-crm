@@ -186,12 +186,12 @@ class QuotationPdfService
                 : '30 Days from Date of Issue',
             'status_key' => $this->statusKey($quotation->status),
             'status_label' => $this->statusLabel($quotation->status),
-            'requires_watermark' => ! in_array($quotation->status, ['approved', 'shared_with_client'], true),
+            'requires_watermark' => ! in_array($quotation->status, ['approved', 'locked', 'executed'], true),
             'show_discount' => (bool) $quotation->show_discount_to_customer,
             'show_mrp' => $quotation->show_mrp_to_customer === null ? true : (bool) $quotation->show_mrp_to_customer,
             'show_item_wise_gst' => $quotation->show_item_wise_gst_to_customer === null ? false : (bool) $quotation->show_item_wise_gst_to_customer,
             'round_off_net_amount' => $roundOffNetAmount,
-            'show_uom' => $quotation->show_uom_to_customer === null ? false : (bool) $quotation->show_uom_to_customer,
+            'show_uom' => $quotation->show_uom_to_customer === null ? true : (bool) $quotation->show_uom_to_customer,
             'show_brand_banner' => $quotation->show_brand_banner_to_customer === null ? false : (bool) $quotation->show_brand_banner_to_customer,
             'gst_inclusive' => $gstInclusive,
             'tax_amount' => (float) $quotation->total_tax,
@@ -224,6 +224,11 @@ class QuotationPdfService
             ],
             'items' => $items->map(function ($item) use ($roundOffNetAmount) {
                 $unitLabel = trim((string) ($item->product?->measurementUnit?->name ?: $item->unit ?: ''));
+                $basePrice = (float) ($item->mrp ?? $item->base_price ?? $item->edited_price);
+                $discountedPrice = (float) $item->price_after_discount;
+                $discountPercent = $basePrice > 0
+                    ? min(100, max(0, (($basePrice - $discountedPrice) / $basePrice) * 100))
+                    : 0;
                 return [
                     'product_name' => $item->product_name,
                     'additional_information' => $item->additional_information,
@@ -240,7 +245,7 @@ class QuotationPdfService
                     ),
                     'quantity_label' => $this->number($item->quantity),
                     'unit_label' => $unitLabel,
-                    'discount_percent_label' => (float) $item->discount_percent > 0 ? $this->number($item->discount_percent).'%' : '-',
+                    'discount_percent_label' => $discountPercent > 0 ? $this->number($discountPercent, 3).'%' : '-',
                     'gst_percent_label' => $this->number($item->gst_percent).'%',
                     'tax_amount_label' => $this->money(
                         $roundOffNetAmount ? round((float) $item->tax_amount) : (float) $item->tax_amount,
@@ -360,9 +365,9 @@ class QuotationPdfService
         return $html;
     }
 
-    private function number(mixed $value): string
+    private function number(mixed $value, int $precision = 2): string
     {
-        return rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
+        return rtrim(rtrim(number_format((float) $value, $precision, '.', ''), '0'), '.');
     }
 
     private function statusLabel(?string $status): string
@@ -370,7 +375,8 @@ class QuotationPdfService
         return match ($status) {
             'pending_approval' => 'Pending',
             'approved' => 'Approved',
-            'shared_with_client' => 'Shared with Client',
+            'locked' => 'Locked',
+            'executed' => 'Executed',
             'rejected' => 'Rejected',
             'revised' => 'Revised',
             default => 'Draft',
@@ -382,7 +388,7 @@ class QuotationPdfService
         return match ($status) {
             'pending_approval' => 'pending',
             'approved' => 'approved',
-            'shared_with_client' => 'approved',
+            'locked', 'executed' => 'approved',
             'rejected' => 'rejected',
             'revised' => 'revised',
             default => 'draft',

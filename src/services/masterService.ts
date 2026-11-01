@@ -38,6 +38,9 @@ export const categoryService = {
   },
 };
 
+export const tagService = crud('tags');
+export const influencerTypeService = crud('influencer-types');
+
 export const brandService = {
   ...crud('brands'),
   async create(payload: FormData | Record<string, unknown>) {
@@ -95,3 +98,5 @@ export const customerFieldService = {
     return unwrap<any>(await apiClient.post('/customer-fields/reorder', { items }));
   },
 };
+
+export { quickReplyService } from './quickReplyService';

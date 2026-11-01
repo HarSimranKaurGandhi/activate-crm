@@ -23,7 +23,7 @@ class ProductService extends CrudService
 
     protected array $searchColumns = [];
 
-    protected array $relations = ['category', 'brand', 'images'];
+    protected array $relations = ['category', 'brand', 'images', 'measurementUnit', 'tags'];
 
     public function paginate(Request $request): LengthAwarePaginator
     {
@@ -48,7 +48,8 @@ class ProductService extends CrudService
     public function selectable(Request $request): LengthAwarePaginator
     {
         return Product::query()
-            ->with(['brand', 'measurementUnit'])
+            ->with(['brand', 'measurementUnit', 'tags'])
+            ->whereHas('brand', fn (Builder $brandQuery) => $brandQuery->where('is_active', true))
             ->when($request->filled('search'), function (Builder $query) use ($request): void {
                 $search = $request->string('search')->toString();
                 $query->where(function (Builder $builder) use ($search): void {
@@ -59,6 +60,7 @@ class ProductService extends CrudService
                 });
             })
             ->when($request->filled('category_id'), fn (Builder $q) => $q->where('category_id', $request->integer('category_id')))
+            ->when($request->filled('tag_id'), fn (Builder $q) => $q->whereHas('tags', fn (Builder $tags) => $tags->whereKey($request->integer('tag_id'))))
             ->when($request->filled('brand_id'), fn (Builder $q) => $q->where('brand_id', $request->integer('brand_id')))
             ->when($request->filled('brand_ids'), fn (Builder $q) => $q->whereIn('brand_id', $request->input('brand_ids', [])))
             ->when($request->filled('gst_percent'), fn (Builder $q) => $q->where('gst_percent', $request->input('gst_percent')))
@@ -89,6 +91,8 @@ class ProductService extends CrudService
     public function create(array $data): Product
     {
         return DB::transaction(function () use ($data): Product {
+            $tagIds = $data['tag_ids'] ?? [];
+            unset($data['tag_ids']);
             $imageFiles = $data['product_images'] ?? [];
             $primaryToken = $data['primary_image_token'] ?? null;
             unset($data['product_images'], $data['primary_image_token'], $data['keep_existing_image_ids']);
@@ -98,6 +102,7 @@ class ProductService extends CrudService
             $data['unit'] = $this->normalizeMeasurementUnitCode($data['unit'] ?? 'NOS');
 
             $product = Product::create($data);
+            $product->tags()->sync($tagIds);
             $this->syncImages($product, $this->normalizeUploadFiles($imageFiles), $primaryToken);
 
             return $product->load($this->relations);
@@ -107,6 +112,8 @@ class ProductService extends CrudService
     public function update($model, array $data): Product
     {
         return DB::transaction(function () use ($model, $data): Product {
+            $tagIds = $data['tag_ids'] ?? null;
+            unset($data['tag_ids']);
             $imageFiles = $data['product_images'] ?? [];
             $primaryToken = $data['primary_image_token'] ?? null;
             $keepExistingImageIds = collect($data['keep_existing_image_ids'] ?? [])
@@ -121,6 +128,9 @@ class ProductService extends CrudService
                 $data['unit'] = $this->normalizeMeasurementUnitCode($data['unit']);
             }
             $model->update($data);
+            if ($tagIds !== null) {
+                $model->tags()->sync($tagIds);
+            }
             $this->syncImages($model, $this->normalizeUploadFiles($imageFiles), $primaryToken, $keepExistingImageIds);
 
             return $model->refresh()->load($this->relations);
@@ -154,6 +164,7 @@ class ProductService extends CrudService
             ->select('products.*')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
             ->leftJoin('brands', 'brands.id', '=', 'products.brand_id')
+            ->where('brands.is_active', true)
             ->when($request->filled('search'), function (Builder $q) use ($request): void {
                 $search = $request->string('search')->toString();
                 $q->where(function (Builder $builder) use ($search): void {
@@ -236,6 +247,7 @@ class ProductService extends CrudService
                     ->first();
 
                 $brand = Brand::query()
+                    ->where('is_active', true)
                     ->whereRaw('LOWER(TRIM(name)) = ?', [strtolower($brandName)])
                     ->first();
 
@@ -247,7 +259,7 @@ class ProductService extends CrudService
 
                 if (! $brand) {
                     throw ValidationException::withMessages([
-                        'file' => ["Brand '{$brandName}' not found on row {$rowNumber}."],
+                        'file' => ["Active brand '{$brandName}' not found on row {$rowNumber}."],
                     ]);
                 }
 
@@ -328,13 +340,14 @@ class ProductService extends CrudService
         }
 
         $createdImages = collect();
+        $nextDisplayOrder = ((int) $product->images()->max('display_order')) + 1;
 
         foreach ($imageFiles as $index => $imageFile) {
             $storedPath = PublicAsset::store($imageFile, 'uploads/products/images');
             $createdImages->push($product->images()->create([
                 'image_path' => $storedPath,
                 'is_primary' => false,
-                'display_order' => $product->images()->count() + $index,
+                'display_order' => $nextDisplayOrder + $index,
             ]));
         }
 
@@ -347,17 +360,19 @@ class ProductService extends CrudService
 
         $primaryImage = $this->resolvePrimaryImage($allImages, $createdImages, $primaryToken) ?? $allImages->first();
 
-        ProductImage::query()
-            ->where('product_id', $product->getKey())
-            ->update(['is_primary' => false]);
-
-        $primaryImage->update(['is_primary' => true]);
-        $allImages->values()->each(function (ProductImage $image, int $index) use ($primaryImage): void {
-            $image->update([
-                'display_order' => $index,
-                'is_primary' => $image->is($primaryImage),
-            ]);
-        });
+        ProductImage::query()->upsert(
+            $allImages->values()->map(
+                fn (ProductImage $image, int $index): array => [
+                    'id' => $image->id,
+                    'product_id' => $product->getKey(),
+                    'image_path' => $image->image_path,
+                    'display_order' => $index,
+                    'is_primary' => $image->is($primaryImage),
+                ]
+            )->all(),
+            ['id'],
+            ['display_order', 'is_primary']
+        );
         $product->update(['image_path' => $primaryImage->image_path]);
     }
 

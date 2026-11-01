@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 use App\Support\PublicAsset;
 class DispatchService
 {
-    private array $relations=['customer','creator:id,name,email','items.product.brand'];
+    private array $relations=['customer','creator:id,name,email','items.product.brand','taxInvoice:id,dispatch_id,invoice_number'];
     public function paginate(Request $request):LengthAwarePaginator{return Dispatch::query()->with(['customer','creator:id,name,email'])->when($request->filled('status'),fn($q)=>$request->string('status')->toString()==='active'?$q->whereIn('status',['new','invoiced']):$q->where('status',$request->string('status')->toString()))->latest('dispatch_date')->latest('id')->paginate((int)$request->integer('per_page',15));}
     public function find(int|string $id):Dispatch{return Dispatch::with($this->relations)->findOrFail($id);}
     public function create(array $data,?User $user):Dispatch{return DB::transaction(function()use($data,$user){$items=$this->withTaxSnapshots($data['items']);unset($data['items']);$data['dispatch_date']=today()->format('Y-m-d');$data['status']='new';$data['created_by']=$user?->id;$data['dispatch_number']=$this->nextNumber();$dispatch=Dispatch::create($data);$dispatch->items()->createMany($items);return $this->find($dispatch->id);});}
@@ -20,12 +20,13 @@ class DispatchService
             throw ValidationException::withMessages(['status' => ['Only a NEW dispatch can be edited.']]);
         }
 
-        return DB::transaction(function()use($dispatch,$data){$items=$this->withTaxSnapshots($data['items']);unset($data['items']);$data['dispatch_date']=today()->format('Y-m-d');$dispatch->update($data);$dispatch->items()->delete();$dispatch->items()->createMany($items);return $this->find($dispatch->id);});
+        return DB::transaction(function()use($dispatch,$data){$dispatch=Dispatch::query()->lockForUpdate()->findOrFail($dispatch->id);$this->ensureNoTaxInvoice($dispatch);if($dispatch->status!=='new')throw ValidationException::withMessages(['status'=>'Only a NEW dispatch can be edited.']);$items=$this->withTaxSnapshots($data['items']);unset($data['items']);$data['dispatch_date']=today()->format('Y-m-d');$dispatch->update($data);$dispatch->items()->delete();$dispatch->items()->createMany($items);return $this->find($dispatch->id);});
     }
     public function cancel(Dispatch $dispatch):Dispatch
     {
         DB::transaction(function () use ($dispatch):void {
             $lockedDispatch = Dispatch::query()->lockForUpdate()->findOrFail($dispatch->id);
+            $this->ensureNoTaxInvoice($lockedDispatch);
 
             if ($lockedDispatch->status === 'dispatched') {
                 throw ValidationException::withMessages(['status' => ['A dispatched slip cannot be cancelled because Stock Out has already happened.']]);
@@ -51,5 +52,9 @@ class DispatchService
         });
     }
     private function withTaxSnapshots(array $items):array{$products=Product::whereIn('id',collect($items)->pluck('product_id')->filter())->get(['id','hsn_code','gst_percent'])->keyBy('id');return array_map(function(array $item)use($products):array{$product=isset($item['product_id'])?$products->get($item['product_id']):null;$item['product_id']=$item['product_id']??null;$item['hsn_code']=$product?->hsn_code;$item['gst_percent']=(float)($product?->gst_percent??0);return $item;},$items);}
+    public function ensureNoTaxInvoice(Dispatch $dispatch):void
+    {
+        if($dispatch->taxInvoice()->exists())throw ValidationException::withMessages(['status'=>'This dispatch has an issued tax invoice and cannot be edited, reopened or cancelled.']);
+    }
     private function nextNumber():string{$year=now()->format('Y');$last=Dispatch::where('dispatch_number','like',"DSP-{$year}-%")->lockForUpdate()->max('dispatch_number');$sequence=$last?(int)substr($last,-5)+1:1;return sprintf('DSP-%s-%05d',$year,$sequence);}
 }

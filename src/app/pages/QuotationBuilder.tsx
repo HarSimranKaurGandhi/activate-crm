@@ -1,10 +1,11 @@
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useData } from '../context/DataContext';
-import { ArrowLeft, Plus, Search, GripVertical, Trash2, ChevronDown, Save, Lock, LockOpen, Check } from 'lucide-react';
-import { useCallback, useState, useEffect } from 'react';
+import { ArrowLeft, Plus, Search, GripVertical, Trash2, ChevronDown, Save, Lock, LockOpen } from 'lucide-react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { toast } from 'sonner';
 import { productService } from '../../services/productService';
+import { tagService } from '../../services/masterService';
 import type { PaginationMeta } from '../../services/productService';
 import { userService } from '../../services/userService';
 import { leadService } from '../../services/leadService';
@@ -13,6 +14,14 @@ import { mapProduct, mapQuotation } from '../../services/mappers';
 import { useAuth } from '../auth/AuthContext';
 import { LoadingState } from '../components/common/AsyncState';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 
 const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const maskPhone = (value?: string) => {
@@ -23,7 +32,7 @@ const maskPhone = (value?: string) => {
 };
 
 const getQuotationBasePrice = (product: any) => Number(product?.mrp ?? product?.sellingPrice ?? product?.usualSellingPrice ?? 0);
-const normalizeDiscount = (value: number) => Math.min(100, Math.max(0, Number(value.toFixed(2))));
+const normalizeDiscount = (value: number) => Math.min(100, Math.max(0, Number(value.toFixed(3))));
 const normalizeAmount = (value: number) => Math.max(0, Number.isFinite(value) ? value : 0);
 const limitWords = (value: string, maximum: number) => {
   const words = Array.from(value.matchAll(/\S+/g));
@@ -43,6 +52,14 @@ const getDiscountedUnitPrice = (item: Pick<QuotationItem, 'price' | 'discount' |
 const emptyProductPagination: PaginationMeta = {
   current_page: 1,
   per_page: 10,
+  total: 0,
+  last_page: 1,
+  from: null,
+  to: null,
+};
+const emptyLeadPagination: PaginationMeta = {
+  current_page: 1,
+  per_page: 8,
   total: 0,
   last_page: 1,
   from: null,
@@ -79,6 +96,43 @@ interface CustomAdjustment {
   amount: number;
 }
 
+const DiscountInput = ({ value, onChange, className }: { value: number; onChange: (value: number) => void; className: string }) => {
+  const [inputValue, setInputValue] = useState(() => String(normalizeDiscount(value)));
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setInputValue(String(normalizeDiscount(value)));
+  }, [editing, value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={inputValue}
+      onFocus={() => setEditing(true)}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        if (nextValue !== '' && !/^\d*\.?\d{0,3}$/.test(nextValue)) return;
+
+        setInputValue(nextValue);
+        if (nextValue === '' || nextValue.endsWith('.')) {
+          if (nextValue === '') onChange(0);
+          return;
+        }
+
+        onChange(normalizeDiscount(Number.parseFloat(nextValue) || 0));
+      }}
+      onBlur={() => {
+        const normalized = normalizeDiscount(Number.parseFloat(inputValue) || 0);
+        setEditing(false);
+        setInputValue(String(normalized));
+        onChange(normalized);
+      }}
+      className={className}
+    />
+  );
+};
+
 const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }: any) => {
   const [, drag] = useDrag({
     type: 'row',
@@ -99,10 +153,16 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
   const discountedUnitPrice = getDiscountedUnitPrice(item);
   const { gstAmount, lineTotal } = calculateItemAmounts(item, gstInclusive);
   const [discountedPriceInput, setDiscountedPriceInput] = useState(() => String(discountedUnitPrice || ''));
+  const [editingDiscountedPrice, setEditingDiscountedPrice] = useState(false);
+  const calculatedDiscount = item.price > 0
+    ? normalizeDiscount(((item.price - discountedUnitPrice) / item.price) * 100)
+    : 0;
 
   useEffect(() => {
-    setDiscountedPriceInput(String(Number(discountedUnitPrice.toFixed(2))));
-  }, [discountedUnitPrice]);
+    if (!editingDiscountedPrice) {
+      setDiscountedPriceInput(String(Number(discountedUnitPrice.toFixed(2))));
+    }
+  }, [discountedUnitPrice, editingDiscountedPrice]);
 
   return (
     <tr ref={(node) => { drag(drop(node)); }} className="border-b border-gray-200 last:border-0 hover:bg-gray-50">
@@ -156,6 +216,7 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
             type="text"
             inputMode="decimal"
             value={discountedPriceInput}
+            onFocus={() => setEditingDiscountedPrice(true)}
             onChange={(e) => {
               const nextValue = e.target.value;
               if (nextValue !== '' && !/^\d*\.?\d{0,2}$/.test(nextValue)) {
@@ -171,14 +232,8 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
             }}
             onBlur={() => {
               const enteredPrice = normalizeAmount(parseFloat(discountedPriceInput));
-              const calculatedDiscount = item.price > 0
-                ? ((item.price - enteredPrice) / item.price) * 100
-                : 0;
-
-              onUpdate(item.id, {
-                discount: normalizeDiscount(calculatedDiscount),
-                discountedPrice: enteredPrice,
-              });
+              setEditingDiscountedPrice(false);
+              onUpdate(item.id, { discountedPrice: enteredPrice });
               setDiscountedPriceInput(String(Number(enteredPrice.toFixed(2))));
             }}
             className="w-28 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-right"
@@ -192,23 +247,15 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
         ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
       </td>
       <td className="px-2 py-3 align-middle text-center">
-        <input
-          type="text"
-          inputMode="decimal"
-          value={item.discount}
-          onChange={(e) => {
-            const nextValue = e.target.value;
-            if (nextValue !== '' && !/^\d*\.?\d{0,2}$/.test(nextValue)) {
-              return;
-            }
-
-            const newDiscount = parseFloat(nextValue) || 0;
+        <DiscountInput
+          value={calculatedDiscount}
+          onChange={(newDiscount) => {
+            const normalizedDiscount = normalizeDiscount(newDiscount);
             onUpdate(item.id, {
-              discount: normalizeDiscount(newDiscount),
-              discountedPrice: Math.max(item.price - (item.price * normalizeDiscount(newDiscount)) / 100, 0),
+              discountedPrice: Math.max(item.price - (item.price * normalizedDiscount) / 100, 0),
             });
           }}
-          className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-center"
+          className="w-20 rounded-md border border-gray-200 px-2 py-1.5 text-center text-sm"
         />
       </td>
       <td className="px-2 py-3 align-middle text-right font-semibold text-sm text-gray-900 whitespace-nowrap">
@@ -229,10 +276,19 @@ const DraggableRow = ({ item, index, moveRow, onUpdate, onDelete, gstInclusive }
 export const QuotationBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { brands, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
+  const { brands, categories, addQuotation, updateQuotation, terms: masterTerms, settings, loading } = useData();
   const { user } = useAuth();
+  const isInfluencer = user?.role?.code === 'influencer';
+  const [searchParams] = useSearchParams();
+  const initialLeadId = searchParams.get('lead_id');
 
   const [selectedLead, setSelectedLead] = useState<any>(null);
+  useEffect(() => {
+    if (id || !initialLeadId) return;
+    let cancelled = false;
+    leadService.show(initialLeadId).then(lead => { if (!cancelled) setSelectedLead({ ...lead, id: String(lead.id), sourceType: 'lead', company: '', address: [lead.address_line_1, lead.city].filter(Boolean).join(', ') }); }).catch(() => toast.error('Unable to load this lead'));
+    return () => { cancelled = true; };
+  }, [id, initialLeadId]);
   const [salesperson, setSalesperson] = useState({
     name: '',
     phone: '',
@@ -248,35 +304,72 @@ export const QuotationBuilder = () => {
   const [showMrp, setShowMrp] = useState(false);
   const [showItemWiseGst, setShowItemWiseGst] = useState(false);
   const [roundOffNetAmount, setRoundOffNetAmount] = useState(false);
-  const [showUom, setShowUom] = useState(false);
+  const [showUom, setShowUom] = useState(true);
   const [showBrandBanner, setShowBrandBanner] = useState(false);
   const [brandBannerId, setBrandBannerId] = useState('');
   const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
   const [customTermEnabled, setCustomTermEnabled] = useState(false);
   const [customTermText, setCustomTermText] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [leadSearch, setLeadSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
-  const [brandSearch, setBrandSearch] = useState('');
+  const [brandFilterSearch, setBrandFilterSearch] = useState('');
   const [selectedProductBrandIds, setSelectedProductBrandIds] = useState<string[]>([]);
+  const [selectedProductCategoryId, setSelectedProductCategoryId] = useState('');
+  const [selectedProductTagId, setSelectedProductTagId] = useState('');
+  const [productTags, setProductTags] = useState<Array<{ id: string; name: string }>>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [tagsError, setTagsError] = useState(false);
+  const [tagLoadAttempt, setTagLoadAttempt] = useState(0);
+  const productRequestRef = useRef(0);
   const [brandFilterLocked, setBrandFilterLocked] = useState(false);
   const [debouncedProductSearch, setDebouncedProductSearch] = useState('');
   const [selectableProducts, setSelectableProducts] = useState<any[]>([]);
   const [productPagination, setProductPagination] = useState(emptyProductPagination);
   const [productsLoading, setProductsLoading] = useState(false);
   const [inProgressLeads, setInProgressLeads] = useState<any[]>([]);
+  const [debouncedLeadSearch, setDebouncedLeadSearch] = useState<string | null>('');
+  const [leadPagination, setLeadPagination] = useState(emptyLeadPagination);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const leadRequestRef = useRef(0);
   const [saving, setSaving] = useState(false);
   const [editingQuotation, setEditingQuotation] = useState<any>(null);
   const [quotationLoading, setQuotationLoading] = useState(Boolean(id));
 
+  useEffect(() => {
+    if (!showProductModal) return;
+    let cancelled = false;
+    setTagsLoading(true);
+    setTagsError(false);
+    tagService.list().then(result => {
+      if (!cancelled) setProductTags(result.data.map(tag => ({ id: String(tag.id), name: tag.name })));
+    }).catch(() => {
+      if (!cancelled) setTagsError(true);
+    }).finally(() => {
+      if (!cancelled) setTagsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [showProductModal, tagLoadAttempt]);
+
   const brandBannerOptions = brands.filter(
     (brand) => brand.status === 'active' && String(brand.logoPath || '').trim() !== '',
   );
-  const selectedBrandBanner = brandBannerOptions.find((brand) => brand.id === brandBannerId) || null;
+  const activeProductBrands = brands.filter((brand) => brand.status === 'active');
+  const filteredProductBrands = activeProductBrands.filter((brand) =>
+    brand.name.toLowerCase().includes(brandFilterSearch.trim().toLowerCase()),
+  );
+  const selectedProductBrandNames = activeProductBrands
+    .filter((brand) => selectedProductBrandIds.includes(String(brand.id)))
+    .map((brand) => brand.name);
+  const productBrandFilterLabel = selectedProductBrandNames.length === 0
+    ? 'All Brands'
+    : selectedProductBrandNames.length <= 2
+      ? selectedProductBrandNames.join(', ')
+      : `${selectedProductBrandNames.length} brands selected`;
 
   useEffect(() => {
-    setBrandSearch('');
     setSelectedProductBrandIds([]);
     setBrandFilterLocked(false);
   }, [id]);
@@ -292,7 +385,13 @@ export const QuotationBuilder = () => {
     setQuotationLoading(true);
     quotationService.get(id)
       .then((quotation) => {
-        if (!cancelled) setEditingQuotation(mapQuotation(quotation));
+        if (cancelled) return;
+        if (['locked', 'executed'].includes(quotation.status)) {
+          toast.error('Locked or executed quotations cannot be edited.');
+          navigate(`/quotations/${id}/preview`, { replace: true });
+          return;
+        }
+        setEditingQuotation(mapQuotation(quotation));
       })
       .catch(() => {
         if (!cancelled) {
@@ -330,7 +429,7 @@ export const QuotationBuilder = () => {
         setShowMrp(quotation.showMrp ?? true);
         setShowItemWiseGst(quotation.showItemWiseGst ?? false);
         setRoundOffNetAmount(quotation.roundOffNetAmount ?? false);
-        setShowUom(quotation.showUom ?? false);
+        setShowUom(quotation.showUom ?? true);
         setShowBrandBanner(quotation.showBrandBanner ?? false);
         setBrandBannerId(quotation.brandBannerId || '');
         setSelectedTerms(quotation.terms);
@@ -342,7 +441,7 @@ export const QuotationBuilder = () => {
       setShowMrp(false);
       setShowItemWiseGst(false);
       setRoundOffNetAmount(false);
-      setShowUom(false);
+      setShowUom(true);
       setShowBrandBanner(false);
       setBrandBannerId('');
       setCustomTermEnabled(false);
@@ -408,6 +507,7 @@ export const QuotationBuilder = () => {
   const fetchSelectableProducts = useCallback(async (page: number, perPage: number) => {
     if (!showProductModal) return;
 
+    const requestId = ++productRequestRef.current;
     setProductsLoading(true);
     try {
       const result = await productService.selectable({
@@ -416,7 +516,10 @@ export const QuotationBuilder = () => {
         per_page: perPage,
         ...(debouncedProductSearch ? { search: debouncedProductSearch } : {}),
         ...(selectedProductBrandIds.length > 0 ? { brand_ids: selectedProductBrandIds.map(Number) } : {}),
+        ...(selectedProductCategoryId ? { category_id: Number(selectedProductCategoryId) } : {}),
+        ...(selectedProductTagId ? { tag_id: Number(selectedProductTagId) } : {}),
       });
+      if (requestId !== productRequestRef.current) return;
       const data = Array.isArray(result.data) ? result.data : [];
       setSelectableProducts(data.map(mapProduct));
       setProductPagination({
@@ -424,12 +527,13 @@ export const QuotationBuilder = () => {
         ...(result.meta?.pagination || {}),
       });
     } catch {
+      if (requestId !== productRequestRef.current) return;
       setSelectableProducts([]);
       setProductPagination(emptyProductPagination);
     } finally {
-      setProductsLoading(false);
+      if (requestId === productRequestRef.current) setProductsLoading(false);
     }
-  }, [debouncedProductSearch, selectedProductBrandIds, showProductModal]);
+  }, [debouncedProductSearch, selectedProductBrandIds, selectedProductCategoryId, selectedProductTagId, showProductModal]);
 
   useEffect(() => {
     if (!showProductModal) {
@@ -440,15 +544,58 @@ export const QuotationBuilder = () => {
   }, [debouncedProductSearch, fetchSelectableProducts, productPagination.per_page, showProductModal]);
 
   useEffect(() => {
-    if (!showLeadModal) return;
+    const search = leadSearch.trim();
 
-    leadService
-      .list({ status: ['in_progress'], page: 1, per_page: 100 })
-      .then((result) => {
-        setInProgressLeads(Array.isArray(result.data) ? result.data : []);
-      })
-      .catch(() => setInProgressLeads([]));
-  }, [showLeadModal]);
+    if (search.length > 0 && search.length < 3) {
+      leadRequestRef.current += 1;
+      setDebouncedLeadSearch(null);
+      setInProgressLeads([]);
+      setLeadPagination(emptyLeadPagination);
+      setLeadsLoading(false);
+      return;
+    }
+
+    if (search.length === 0) {
+      setDebouncedLeadSearch('');
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setDebouncedLeadSearch(search), 300);
+    return () => window.clearTimeout(timeout);
+  }, [leadSearch]);
+
+  const fetchSelectableLeads = useCallback(async (page: number, perPage: number) => {
+    if (!showLeadModal || debouncedLeadSearch === null) return;
+
+    const requestId = ++leadRequestRef.current;
+    setLeadsLoading(true);
+    try {
+      const result = await leadService.list({
+        ...(isInfluencer ? {} : { status: ['in_progress'] }),
+        page,
+        per_page: perPage,
+        ...(debouncedLeadSearch ? { search: debouncedLeadSearch } : {}),
+      });
+
+      if (requestId !== leadRequestRef.current) return;
+      setInProgressLeads(Array.isArray(result.data) ? result.data : []);
+      setLeadPagination({
+        ...emptyLeadPagination,
+        ...(result.meta?.pagination || {}),
+      });
+    } catch {
+      if (requestId !== leadRequestRef.current) return;
+      setInProgressLeads([]);
+      setLeadPagination(emptyLeadPagination);
+    } finally {
+      if (requestId === leadRequestRef.current) setLeadsLoading(false);
+    }
+  }, [debouncedLeadSearch, showLeadModal, isInfluencer]);
+
+  useEffect(() => {
+    if (!showLeadModal || debouncedLeadSearch === null) return;
+    void fetchSelectableLeads(1, leadPagination.per_page);
+  }, [debouncedLeadSearch, fetchSelectableLeads, leadPagination.per_page, showLeadModal]);
 
   const moveRow = (fromIndex: number, toIndex: number) => {
     const newItems = [...items];
@@ -457,9 +604,10 @@ export const QuotationBuilder = () => {
     setItems(newItems);
   };
 
-  const addProduct = (product: any) => {
-    const newItem: QuotationItem = {
-      id: Date.now().toString(),
+  const addProducts = (products: any[]) => {
+    if (products.length === 0) return;
+    const newItems: QuotationItem[] = products.map((product) => ({
+      id: crypto.randomUUID(),
       product,
       quantity: 1,
       price: getQuotationBasePrice(product),
@@ -467,25 +615,28 @@ export const QuotationBuilder = () => {
       discountedPrice: getQuotationBasePrice(product),
       specifications: product.specifications,
       additionalInfo: '',
-    };
-    setItems([...items, newItem]);
-    setProductSearch('');
-    setSelectableProducts([]);
-    setProductPagination(emptyProductPagination);
-    if (!brandFilterLocked) {
-      setSelectedProductBrandIds([]);
-      setBrandSearch('');
-    }
-    setShowProductModal(false);
+    }));
+    setItems((current) => [...current, ...newItems]);
+    closeProductModal();
+  };
+
+  const toggleProductSelection = (product: any) => {
+    setSelectedProducts((current) => current.some((item) => String(item.id) === String(product.id))
+      ? current.filter((item) => String(item.id) !== String(product.id))
+      : [...current, product]);
   };
 
   const closeProductModal = () => {
+    productRequestRef.current++;
+    setProductsLoading(false);
+    setSelectedProducts([]);
+    setSelectedProductCategoryId('');
+    setSelectedProductTagId('');
     setProductSearch('');
     setSelectableProducts([]);
     setProductPagination(emptyProductPagination);
     if (!brandFilterLocked) {
       setSelectedProductBrandIds([]);
-      setBrandSearch('');
     }
     setShowProductModal(false);
   };
@@ -533,7 +684,6 @@ export const QuotationBuilder = () => {
     setItems((currentItems) =>
       currentItems.map((item) => ({
         ...item,
-        discount: normalizedValue,
         discountedPrice: Math.max(item.price - (item.price * normalizedValue) / 100, 0),
       })),
     );
@@ -545,45 +695,26 @@ export const QuotationBuilder = () => {
       subtotal += item.discountedPrice * item.quantity;
     });
 
-    let taxBeforeDeduction = 0;
+    let taxBeforeAdjustments = 0;
     if (!gstInclusive) {
       items.forEach(item => {
-        taxBeforeDeduction += (item.discountedPrice * item.quantity) * (item.product.gstPercent / 100);
+        taxBeforeAdjustments += (item.discountedPrice * item.quantity) * (item.product.gstPercent / 100);
       });
     }
 
     const adjustmentTotal = customAdjustments.reduce((sum, adjustment) => sum + (Number(adjustment.amount) || 0), 0);
-    const deductionTotal = customAdjustments.reduce(
-      (sum, adjustment) => sum + Math.min(Number(adjustment.amount) || 0, 0),
-      0,
-    );
-    const taxableSubtotal = Math.max(subtotal + deductionTotal, 0);
+    const total = subtotal + adjustmentTotal;
+    const taxableTotal = Math.max(total, 0);
     const taxAmount = subtotal > 0
-      ? taxBeforeDeduction * (taxableSubtotal / subtotal)
+      ? taxBeforeAdjustments * (taxableTotal / subtotal)
       : 0;
-    const grandTotal = subtotal + taxAmount + adjustmentTotal;
+    const grandTotal = total + taxAmount;
 
-    return { subtotal, taxAmount, adjustmentTotal, grandTotal };
+    return { subtotal, total, taxAmount, adjustmentTotal, grandTotal };
   };
 
   const totals = calculateTotals();
   const itemPagination = usePagination(items, 10);
-  const filteredLeads = inProgressLeads.filter((lead) => {
-    const search = leadSearch.trim().toLowerCase();
-
-    if (!search) {
-      return true;
-    }
-
-    return (
-      String(lead.name || '').toLowerCase().includes(search) ||
-      String(lead.phone || '').toLowerCase().includes(search) ||
-      String(lead.email || '').toLowerCase().includes(search) ||
-      String(lead.city || '').toLowerCase().includes(search) ||
-      String(lead.requirement || '').toLowerCase().includes(search)
-    );
-  });
-  const leadPagination = usePagination(filteredLeads, 8);
 
   if ((loading || quotationLoading) && id) {
     return (
@@ -640,11 +771,12 @@ export const QuotationBuilder = () => {
       if (id) {
         await updateQuotation(id, quotationData);
         toast.success('Quotation updated successfully');
+        navigate(`/quotations/${id}/preview`);
       } else {
-        await addQuotation(quotationData);
+        const created = await addQuotation(quotationData);
         toast.success('Quotation created successfully');
+        navigate(`/quotations/${created.id}/preview`);
       }
-      navigate('/quotations');
     } finally {
       setSaving(false);
     }
@@ -827,24 +959,34 @@ export const QuotationBuilder = () => {
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <h3 className="font-semibold text-gray-900 mb-3">Global Discount</h3>
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  inputMode="decimal"
+                <DiscountInput
                   value={globalDiscount}
-                  onChange={(e) => {
-                    const nextValue = e.target.value;
-                    if (nextValue !== '' && !/^\d*\.?\d{0,2}$/.test(nextValue)) {
-                      return;
-                    }
-
-                    handleGlobalDiscountChange(parseFloat(nextValue) || 0);
-                  }}
+                  onChange={handleGlobalDiscountChange}
                   className="min-w-0 flex-1 px-3 py-2 border border-gray-200 rounded-lg"
-                  placeholder="0"
                 />
                 <span className="text-gray-600">%</span>
               </div>
               <p className="text-xs text-gray-500 mt-2">Overrides individual product discounts</p>
+            </div>
+
+            {/* Brand Logo */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <h3 className="mb-3 font-semibold text-gray-900">Brand Logo</h3>
+              <select
+                value={showBrandBanner ? brandBannerId : ''}
+                onChange={(event) => {
+                  const selectedBrandId = event.target.value;
+                  setBrandBannerId(selectedBrandId);
+                  setShowBrandBanner(Boolean(selectedBrandId));
+                }}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="">No brand logo</option>
+                {brandBannerOptions.map((brand) => (
+                  <option key={brand.id} value={brand.id}>{brand.name}</option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-gray-500">The selected logo will appear below the quotation letterhead.</p>
             </div>
 
             {/* Settings */}
@@ -1010,10 +1152,10 @@ export const QuotationBuilder = () => {
                     </div>
                   ))}
                   {customAdjustments.length > 0 && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Custom adjustment total</span>
-                      <span className={`font-medium ${totals.adjustmentTotal < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                        {totals.adjustmentTotal >= 0 ? '+' : '-'}₹{Math.abs(totals.adjustmentTotal).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    <div className="flex items-center justify-between border-t border-blue-100 pt-3 text-sm">
+                      <span className="font-semibold text-gray-900">Total</span>
+                      <span className="font-semibold text-gray-900">
+                        ₹{totals.total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   )}
@@ -1049,71 +1191,133 @@ export const QuotationBuilder = () => {
                 ✕
               </button>
             </div>
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                placeholder="Search by product name, model number, or brand"
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="min-w-0">
+              <div className="mb-2 flex h-7 items-center justify-between gap-2">
                 <div>
                   <p className="text-sm font-medium text-gray-800">Brand Filter</p>
-                  <p className="text-xs text-gray-500">Select multiple brands. Lock to reuse during this quotation.</p>
                 </div>
                 <button
                   type="button"
                   disabled={!brandFilterLocked && selectedProductBrandIds.length === 0}
                   onClick={() => setBrandFilterLocked((current) => !current)}
-                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${brandFilterLocked ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white text-gray-600'}`}
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${brandFilterLocked ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white text-gray-600'}`}
                   title={brandFilterLocked ? 'Unlock brand filter' : 'Lock brand filter for repeated product additions'}
                 >
                   {brandFilterLocked ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
                   {brandFilterLocked ? 'Locked' : 'Unlocked'}
                 </button>
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={brandSearch}
-                  disabled={brandFilterLocked}
-                  onChange={(event) => setBrandSearch(event.target.value)}
-                  placeholder="Search brands separately..."
-                  className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm disabled:bg-gray-100"
-                />
+              <DropdownMenu onOpenChange={(open) => {
+                if (!open) setBrandFilterSearch('');
+              }}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={brandFilterLocked}
+                    className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-left text-sm text-gray-700 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                  >
+                    <span className="truncate">{productBrandFilterLabel}</span>
+                    <ChevronDown className="ml-3 h-4 w-4 shrink-0 text-gray-400" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="max-h-[60vh] w-[var(--radix-dropdown-menu-trigger-width)] overflow-hidden"
+                  align="start"
+                >
+                  <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+                    <DropdownMenuLabel className="p-0">Select Brands</DropdownMenuLabel>
+                    {selectedProductBrandIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProductBrandIds([])}
+                        className="text-xs font-medium text-red-600 hover:underline"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <DropdownMenuSeparator />
+                  <div className="relative m-2">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      autoFocus
+                      type="text"
+                      value={brandFilterSearch}
+                      onChange={(event) => setBrandFilterSearch(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      placeholder="Search brands"
+                      className="w-full rounded-lg border border-gray-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <DropdownMenuSeparator />
+                  <div className="grid max-h-[45vh] grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-1 overflow-y-auto p-1">
+                    {filteredProductBrands.map((brand) => (
+                      <DropdownMenuCheckboxItem
+                        key={brand.id}
+                        checked={selectedProductBrandIds.includes(String(brand.id))}
+                        onCheckedChange={() => toggleProductBrand(String(brand.id))}
+                        onSelect={(event) => event.preventDefault()}
+                      >
+                        {brand.name}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    {filteredProductBrands.length === 0 && (
+                      <p className="col-span-full px-2 py-6 text-center text-sm text-gray-500">
+                        {activeProductBrands.length === 0 ? 'No active brands available.' : 'No matching brands found.'}
+                      </p>
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+              <label className="min-w-0 text-sm font-medium text-gray-700"><span className="flex h-7 items-center">Category Filter</span>
+                <select value={selectedProductCategoryId} onChange={event => setSelectedProductCategoryId(event.target.value)} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+                  <option value="">All Categories</option>
+                  {categories.filter(category => category.status === 'active').map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </label>
+              <div className="min-w-0">
+                <label className="text-sm font-medium text-gray-700"><span className="flex h-7 items-center">Tag Filter</span>
+                  <select value={selectedProductTagId} disabled={tagsLoading || tagsError} onChange={event => setSelectedProductTagId(event.target.value)} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 disabled:bg-gray-100">
+                    <option value="">{tagsLoading ? 'Loading tags…' : 'All Tags'}</option>
+                    {productTags.map(tag => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+                  </select>
+                </label>
+                {tagsError && <p className="mt-1 text-xs text-red-600">Unable to load tags. <button type="button" className="underline" onClick={() => setTagLoadAttempt(current => current + 1)}>Retry</button></p>}
               </div>
-              <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto">
-                {brands
-                  .filter((brand) => brand.status === 'active' && brand.name.toLowerCase().includes(brandSearch.trim().toLowerCase()))
-                  .map((brand) => {
-                    const selected = selectedProductBrandIds.includes(String(brand.id));
-                    return <button
-                      key={brand.id}
-                      type="button"
-                      disabled={brandFilterLocked}
-                      onClick={() => toggleProductBrand(String(brand.id))}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed ${selected ? 'border-blue-500 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
-                    >
-                      {selected && <Check className="h-3.5 w-3.5" />}{brand.name}
-                    </button>;
-                  })}
-                {!brandFilterLocked && selectedProductBrandIds.length > 0 && <button type="button" onClick={() => setSelectedProductBrandIds([])} className="px-2 py-1 text-xs font-medium text-red-600 hover:underline">Clear all</button>}
               </div>
+              <p className="mt-2 text-xs text-gray-500">Select multiple brands. Lock the brand filter to reuse it during this quotation.</p>
+            </div>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search by product name or model number"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {selectableProducts.map(product => (
                 <div
                   key={product.id}
                   onClick={() => {
-                    addProduct(product);
+                    if (selectedProducts.length > 0) toggleProductSelection(product);
+                    else addProducts([product]);
                   }}
-                  className="flex gap-4 p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
+                  className={`relative flex gap-4 p-4 pr-10 border rounded-xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all ${selectedProducts.some((item) => String(item.id) === String(product.id)) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
                 >
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${product.name} (${product.modelNumber || product.id})`}
+                    checked={selectedProducts.some((item) => String(item.id) === String(product.id))}
+                    onClick={(event) => event.stopPropagation()}
+                    onChange={() => toggleProductSelection(product)}
+                    className="absolute right-3 top-3 h-4 w-4 rounded border-gray-300 accent-blue-600"
+                  />
                   <img src={product.image} alt="" className="w-20 h-20 object-cover rounded-lg" />
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{product.name}</p>
@@ -1145,6 +1349,20 @@ export const QuotationBuilder = () => {
                 />
               </div>
             )}
+            <div className="sticky bottom-0 mt-4 flex items-center justify-between gap-3 border-t border-gray-200 bg-white py-3">
+              <span className="text-sm text-gray-600" aria-live="polite">{selectedProducts.length} products selected</span>
+              <div className="flex items-center gap-3">
+                {selectedProducts.length > 0 && <button type="button" onClick={() => setSelectedProducts([])} className="text-sm text-gray-600 hover:underline">Clear selection</button>}
+                <button
+                  type="button"
+                  disabled={selectedProducts.length === 0}
+                  onClick={() => addProducts(selectedProducts)}
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Add Selected ({selectedProducts.length})
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1171,6 +1389,9 @@ export const QuotationBuilder = () => {
                 placeholder="Search by name, phone, email, city, or requirement"
                 className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              {leadSearch.trim().length > 0 && leadSearch.trim().length < 3 && (
+                <p className="mt-2 text-xs text-gray-500">Enter at least 3 characters to search.</p>
+              )}
             </div>
             <div className="overflow-hidden rounded-xl border border-gray-200">
               <div className="max-h-[52vh] overflow-auto">
@@ -1185,7 +1406,7 @@ export const QuotationBuilder = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {leadPagination.pageItems.map((lead) => (
+                    {inProgressLeads.map((lead) => (
                       <tr
                         key={lead.id}
                         onClick={() => {
@@ -1215,22 +1436,28 @@ export const QuotationBuilder = () => {
                     ))}
                   </tbody>
                 </table>
-                {filteredLeads.length === 0 && (
+                {leadsLoading && <LoadingState label="Searching leads..." />}
+                {!leadsLoading && debouncedLeadSearch !== null && inProgressLeads.length === 0 && (
                   <div className="py-10 text-center text-sm text-gray-500">
                     No in-progress leads matched your search.
                   </div>
                 )}
+                {!leadsLoading && debouncedLeadSearch === null && (
+                  <div className="py-10 text-center text-sm text-gray-500">
+                    Enter at least 3 characters to search for a lead.
+                  </div>
+                )}
               </div>
             </div>
-            {filteredLeads.length > 0 && (
+            {!leadsLoading && leadPagination.total > 0 && (
               <div className="mt-4">
                 <PaginationControls
-                  page={leadPagination.page}
-                  pageSize={leadPagination.pageSize}
-                  totalItems={leadPagination.totalItems}
-                  totalPages={leadPagination.totalPages}
-                  onPageChange={leadPagination.setPage}
-                  onPageSizeChange={leadPagination.setPageSize}
+                  page={leadPagination.current_page}
+                  pageSize={leadPagination.per_page}
+                  totalItems={leadPagination.total}
+                  totalPages={leadPagination.last_page}
+                  onPageChange={(nextPage) => fetchSelectableLeads(nextPage, leadPagination.per_page)}
+                  onPageSizeChange={(nextPageSize) => fetchSelectableLeads(1, nextPageSize)}
                 />
               </div>
             )}

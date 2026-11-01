@@ -1,3 +1,31 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+input.closure-hot-range {
+  appearance: none;
+  height: 14px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #58c91a 0%, #a8dc18 22%, #ffe128 42%, #ffad24 62%, #ff6429 80%, #ef1010 100%);
+  outline: none;
+}
+
+input.closure-hot-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border: 4px solid #ffffff;
+  border-radius: 9999px;
+  background: #111827;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 35%);
+  cursor: grab;
+}
+
+input.closure-hot-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 4px solid #ffffff;
+  border-radius: 9999px;
+  background: #111827;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 35%);
+  cursor: grab;
+}

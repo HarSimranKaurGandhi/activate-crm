@@ -17,8 +17,8 @@ class LeadRequest extends FormRequest
         return [
             'lead_source' => ['required', Rule::in(['walk_in', 'reference', 'india_mart', 'website', 'johnson', 'hercules', 'affiliate'])],
             'name' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'phone' => ['nullable', 'digits:10', 'required_without:email'],
-            'email' => ['nullable', 'email', 'max:255', 'required_without:phone'],
+            'phone' => ['nullable', 'digits:10', 'required_without_all:email,influencer_id'],
+            'email' => ['nullable', 'email', 'max:255', 'required_without_all:phone,influencer_id'],
             'address_line_1' => ['sometimes', 'nullable', 'string', 'max:255'],
             'address_line_2' => ['sometimes', 'nullable', 'string', 'max:255'],
             'city' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -28,7 +28,8 @@ class LeadRequest extends FormRequest
             'requirement' => ['required', 'string'],
             'expected_order_value' => ['nullable', 'string', Rule::in(['Less Than 1L', '1L-5L', '5L-10L', '10L-30L', '30L+']), 'required_if:status,in_progress'],
             'expected_closure' => ['nullable', 'string', Rule::in(['10 days', '20 days', '30 days', '90 days']), 'required_if:status,in_progress'],
-            'status' => ['required', Rule::in(['new', 'enquiry', 'in_progress', 'on_hold', 'closed_success', 'closed_fail'])],
+            'closure_hot_level' => ['sometimes', 'integer', 'min:1', 'max:10'],
+            'status' => ['required', Rule::in(['new', 'enquiry', 'in_progress', 'on_hold', 'order_confirmed', 'closed_success', 'closed_fail'])],
             'failure_reason' => [
                 'nullable',
                 Rule::in(['lost_to_competitor', 'no_enquiry_made', 'lost_interest', 'no_response', 'didnt_like_product', 'product_not_available', 'other']),
@@ -41,6 +42,7 @@ class LeadRequest extends FormRequest
             'customer_category' => ['nullable', 'string', Rule::in(['GYM OWNER', 'GOVT OFFICIAL', 'BUILDER', 'CORPORATE', 'DEALER'])],
             'follow_up_date' => ['required', 'date', 'after_or_equal:today'],
             'assigned_to' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'influencer_id' => ['nullable', 'required_without_all:phone,email', 'integer', 'exists:influencers,id'],
         ];
     }
 
@@ -55,6 +57,7 @@ class LeadRequest extends FormRequest
         };
 
         $this->merge([
+            'phone' => \App\Support\PhoneNumber::normalizeIndian($this->input('phone')),
             'expected_closure' => $expectedClosure,
             'customer_importance' => filled($this->input('customer_importance'))
                 ? strtoupper(trim((string) $this->input('customer_importance')))
@@ -66,12 +69,18 @@ class LeadRequest extends FormRequest
             'failure_reason_details' => $this->input('status') === 'closed_fail' && $this->input('failure_reason') === 'other'
                 ? $this->input('failure_reason_details')
                 : null,
+            'follow_up_date' => in_array($this->input('status'), ['closed_success', 'closed_fail'], true)
+                ? now()->toDateString()
+                : $this->input('follow_up_date'),
         ]);
     }
 
     public function messages(): array
     {
         return [
+            'phone.required_without_all' => 'At least one of phone number, email, or influencer is required.',
+            'email.required_without_all' => 'At least one of phone number, email, or influencer is required.',
+            'influencer_id.required_without_all' => 'At least one of phone number, email, or influencer is required.',
             'phone.digits' => 'Phone number must contain exactly 10 digits.',
         ];
     }

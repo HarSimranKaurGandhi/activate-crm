@@ -1,14 +1,15 @@
 import { useNavigate } from 'react-router';
-import { AlertTriangle, Clock, FileText, ListChecks, PhoneCall, Search, Trophy } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, ListChecks, PhoneCall, Search, Trophy } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dashboardService } from '../../services/dashboardService';
+import { userService } from '../../services/userService';
 import { EmptyState, LoadingState } from '../components/common/AsyncState';
 import { useAuth } from '../auth/AuthContext';
 import { PaginationControls, usePagination } from '../components/common/Pagination';
+import { LeadDetailsDialog } from '../components/leads/LeadDetailsDialog';
+import { LeadPhoneAction } from '../components/leads/LeadPhoneAction';
 
 const emptySummary = {
-  total_quotations: 0,
-  pending_for_approval: 0,
   tasks_due_today_count: 0,
   tasks_due_today: [] as any[],
   overdue_tasks_count: 0,
@@ -27,6 +28,9 @@ export const Dashboard = () => {
   const [leaderboardPeriod, setLeaderboardPeriod] = useState<'today' | 'week' | 'month'>('today');
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
     overdueTasks: '',
     todayFollowUps: '',
@@ -35,16 +39,42 @@ export const Dashboard = () => {
   });
   const isAdmin = String(user?.role?.code || user?.role?.name || '').trim().toLowerCase() === 'admin';
   const [viewScope, setViewScope] = useState<'all' | 'mine'>('mine');
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const summaryRequestId = useRef(0);
+  const selectedUser = users.find((entry) => String(entry.id) === selectedUserId);
   const isAdminView = isAdmin && viewScope === 'all';
 
-  useEffect(() => {
+  const dashboardOwner = isAdminView ? (selectedUser ? `${selectedUser.name}'s` : 'Sales Team’s') : 'My';
+
+  const loadSummary = useCallback(() => {
+    const requestId = ++summaryRequestId.current;
     setSummaryLoading(true);
-    dashboardService
-      .quotationSummary(isAdmin ? { scope: viewScope } : {})
-      .then(setSummary)
-      .catch(() => setSummary(emptySummary))
-      .finally(() => setSummaryLoading(false));
-  }, [isAdmin, viewScope]);
+    setSummary(emptySummary);
+    return dashboardService
+      .summary(isAdmin ? { scope: viewScope, ...(viewScope === 'all' && selectedUserId ? { user_id: selectedUserId } : {}) } : {})
+      .then((result) => { if (requestId === summaryRequestId.current) setSummary(result); })
+      .catch(() => { if (requestId === summaryRequestId.current) setSummary(emptySummary); })
+      .finally(() => { if (requestId === summaryRequestId.current) setSummaryLoading(false); });
+  }, [isAdmin, viewScope, selectedUserId]);
+
+  useEffect(() => {
+    void loadSummary();
+  }, [loadSummary]);
+
+  useEffect(() => {
+    userService.salesDepartmentDropdown()
+      .then((result) => setUsers(Array.isArray(result) ? result : []))
+      .catch(() => setUsers([]));
+  }, []);
+
+  const openLeadDialog = (leadId: string | number) => {
+    setSelectedLeadId(String(leadId));
+    setIsLeadDialogOpen(true);
+  };
+
+  const refreshAfterLeadChange = () => {
+    void loadSummary();
+  };
 
   useEffect(() => {
     setLeaderboardLoading(true);
@@ -137,11 +167,11 @@ export const Dashboard = () => {
         <div className="flex flex-col gap-2">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">
-              {isAdminView ? 'Admin Dashboard' : 'My Dashboard'}
+              {isAdminView && selectedUser ? `${selectedUser.name}'s Dashboard` : isAdminView ? 'Admin Dashboard' : 'My Dashboard'}
             </h2>
             <p className="text-gray-600 mt-1">
               {isAdminView
-                ? 'Here is the organization-wide view of approvals, tasks, and follow ups.'
+                ? selectedUser ? `Tasks and follow ups for ${selectedUser.name}.` : 'Tasks and follow ups across the Sales department.'
                 : 'Here is what needs your attention in your own work today.'}
             </p>
           </div>
@@ -154,7 +184,7 @@ export const Dashboard = () => {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => setViewScope(option.value)}
+                  onClick={() => { setViewScope(option.value); setSelectedUserId(''); }}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
                     viewScope === option.value
                       ? 'bg-blue-600 text-white'
@@ -164,42 +194,22 @@ export const Dashboard = () => {
                   {option.label}
                 </button>
               ))}
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                Sales user
+                <select
+                  value={selectedUserId}
+                  onChange={(event) => { setSelectedUserId(event.target.value); setViewScope('all'); }}
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">{isAdminView ? 'All Sales users' : 'Select Sales user'}</option>
+                  {users.map((entry) => <option key={entry.id} value={String(entry.id)}>{entry.name}</option>)}
+                </select>
+              </label>
             </div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-9">
-          {isAdminView ? (
-            <button
-              type="button"
-              onClick={() => navigate('/quotations/approvals')}
-              className="w-full rounded-2xl border border-gray-200 bg-white p-6 text-left transition-all hover:shadow-lg xl:col-span-2"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Pending for Approval</p>
-                  <p className="mt-2 text-4xl font-bold text-gray-900">{isLoading ? '...' : summary.pending_for_approval}</p>
-                  <p className="mt-2 text-sm text-gray-500">Awaiting review</p>
-                </div>
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50">
-                  <Clock className="h-7 w-7 text-amber-600" />
-                </div>
-              </div>
-            </button>
-          ) : (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg xl:col-span-2">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">My Quotations Awaiting Approval</p>
-                  <p className="mt-2 text-4xl font-bold text-gray-900">{isLoading ? '...' : summary.pending_for_approval}</p>
-                  <p className="mt-2 text-sm text-gray-500">Pending on review</p>
-                </div>
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50">
-                  <FileText className="h-7 w-7 text-sky-600" />
-                </div>
-              </div>
-            </div>
-          )}
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-7">
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all hover:shadow-lg md:col-span-2 xl:col-span-3">
             <div className="grid h-full grid-cols-2">
               <button
@@ -213,7 +223,7 @@ export const Dashboard = () => {
               >
                 <div>
                   <p className={`whitespace-nowrap text-sm font-medium ${todayTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>
-                    {isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}
+                    {`${dashboardOwner} Tasks Due Today`}
                   </p>
                   <p className={`mt-2 text-3xl font-bold ${todayTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>
                     {isLoading ? '...' : summary.tasks_due_today_count}
@@ -238,7 +248,7 @@ export const Dashboard = () => {
               >
                 <div>
                   <p className={`whitespace-nowrap text-sm font-medium ${overdueTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>
-                    {isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}
+                    {`${dashboardOwner} Past Due Tasks`}
                   </p>
                   <p className={`mt-2 text-3xl font-bold ${overdueTasksResolved ? 'text-emerald-700' : 'text-rose-700'}`}>
                     {isLoading ? '...' : summary.overdue_tasks_count}
@@ -256,9 +266,9 @@ export const Dashboard = () => {
           <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg xl:col-span-2">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">{isAdminView ? `Everyone's Follow Ups Today` : 'My Follow Ups Today'}</p>
+                <p className="text-sm font-medium text-gray-600">{`${dashboardOwner} Follow Ups Today`}</p>
                 <p className="mt-2 text-4xl font-bold text-gray-900">{isLoading ? '...' : summary.follow_ups_due_today_count}</p>
-                <p className="mt-2 text-sm text-gray-500">{isAdminView ? 'Leads needing follow-up across all users' : 'Leads needing my follow-up today'}</p>
+                <p className="mt-2 text-sm text-gray-500">{isAdminView ? (selectedUser ? `Follow-ups for ${selectedUser.name}` : 'Leads needing follow-up across the Sales department') : 'Leads needing my follow-up today'}</p>
               </div>
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
                 <PhoneCall className="h-7 w-7 text-blue-600" />
@@ -272,9 +282,9 @@ export const Dashboard = () => {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className={`text-sm font-medium ${overdueFollowUpsResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</p>
+                <p className={`text-sm font-medium ${overdueFollowUpsResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{`${dashboardOwner} Past Due Follow Ups`}</p>
                 <p className={`mt-2 text-4xl font-bold ${overdueFollowUpsResolved ? 'text-emerald-700' : 'text-rose-700'}`}>{isLoading ? '...' : summary.overdue_follow_ups_count}</p>
-                <p className={`mt-2 text-sm ${overdueFollowUpsResolved ? 'text-emerald-600' : 'text-rose-500'}`}>{isAdminView ? 'Overdue leads across all users' : 'My overdue leads needing attention'}</p>
+                <p className={`mt-2 text-sm ${overdueFollowUpsResolved ? 'text-emerald-600' : 'text-rose-500'}`}>{isAdminView ? (selectedUser ? `Overdue leads for ${selectedUser.name}` : 'Overdue leads across the Sales department') : 'My overdue leads needing attention'}</p>
               </div>
               <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${overdueFollowUpsResolved ? 'bg-emerald-50' : 'bg-rose-50'}`}>
                 <AlertTriangle className={`h-7 w-7 ${overdueFollowUpsResolved ? 'text-emerald-600' : 'text-rose-600'}`} />
@@ -378,7 +388,7 @@ export const Dashboard = () => {
         {!isLoading && summary.overdue_tasks.length > 0 && (
           <div id="past-due-follow-ups" className="scroll-mt-6 overflow-hidden rounded-2xl border border-rose-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="px-4 pt-4 text-lg font-semibold text-rose-700 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Past Due Tasks` : 'My Past Due Tasks'}</h3>
+              <h3 className="px-4 pt-4 text-lg font-semibold text-rose-700 sm:px-6 sm:pt-6">{`${dashboardOwner} Past Due Tasks`}</h3>
               <button
                 onClick={() => navigate('/tasks')}
                 className="px-4 text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:px-6 sm:text-right"
@@ -447,7 +457,7 @@ export const Dashboard = () => {
         {!isLoading && summary.follow_ups_due_today.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="px-4 pt-4 text-lg font-semibold text-gray-900 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Follow Ups Due Today` : 'My Follow Ups Due Today'}</h3>
+              <h3 className="px-4 pt-4 text-lg font-semibold text-gray-900 sm:px-6 sm:pt-6">{`${dashboardOwner} Follow Ups Due Today`}</h3>
               <button
                 onClick={() => navigate('/leads')}
                 className="px-4 text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:px-6 sm:text-right"
@@ -488,10 +498,22 @@ export const Dashboard = () => {
                     {todayFollowUpsPagination.pageItems.map((lead) => (
                       <tr
                         key={lead.id}
-                        onClick={() => navigate(`/leads/${lead.id}`)}
+                        onClick={() => openLeadDialog(lead.id)}
                         className="cursor-pointer hover:bg-gray-50"
                       >
-                        <td className={`${tableCellClassName} font-medium text-gray-900`}>{lead.name || lead.phone || 'Unnamed lead'}</td>
+                        <td className={tableCellClassName}>
+                          <div className="font-medium text-gray-900">{lead.name || 'Unnamed lead'}</div>
+                          <div className="mt-1">
+                            <LeadPhoneAction
+                              leadId={String(lead.id)}
+                              phone={lead.phone}
+                              influencer={lead.influencer}
+                              followUpDate={lead.follow_up_date}
+                              followUpDateLocked={['closed_success', 'closed_fail'].includes(lead.status)}
+                              onFollowUpDateChanged={refreshAfterLeadChange}
+                            />
+                          </div>
+                        </td>
                         <td className={tableCellClassName}>{lead.assigned_user?.name || 'Unassigned'}</td>
                         <td className={`${tableCellClassName} font-medium text-gray-900`}>{formatDate(lead.follow_up_date)}</td>
                         <td className={tableCellClassName}>{lead.requirement || 'No requirement added'}</td>
@@ -516,7 +538,7 @@ export const Dashboard = () => {
         {!isLoading && summary.overdue_follow_ups.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-rose-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="px-4 pt-4 text-lg font-semibold text-rose-700 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Past Due Follow Ups` : 'My Past Due Follow Ups'}</h3>
+              <h3 className="px-4 pt-4 text-lg font-semibold text-rose-700 sm:px-6 sm:pt-6">{`${dashboardOwner} Past Due Follow Ups`}</h3>
               <button
                 onClick={() => navigate('/leads')}
                 className="px-4 text-left text-sm font-medium text-rose-600 hover:text-rose-700 sm:px-6 sm:text-right"
@@ -557,10 +579,22 @@ export const Dashboard = () => {
                     {overdueFollowUpsPagination.pageItems.map((lead) => (
                       <tr
                         key={lead.id}
-                        onClick={() => navigate(`/leads/${lead.id}`)}
+                        onClick={() => openLeadDialog(lead.id)}
                         className="cursor-pointer hover:bg-rose-50"
                       >
-                        <td className={`${tableCellClassName} font-medium text-gray-900`}>{lead.name || lead.phone || 'Unnamed lead'}</td>
+                        <td className={tableCellClassName}>
+                          <div className="font-medium text-gray-900">{lead.name || 'Unnamed lead'}</div>
+                          <div className="mt-1">
+                            <LeadPhoneAction
+                              leadId={String(lead.id)}
+                              phone={lead.phone}
+                              influencer={lead.influencer}
+                              followUpDate={lead.follow_up_date}
+                              followUpDateLocked={['closed_success', 'closed_fail'].includes(lead.status)}
+                              onFollowUpDateChanged={refreshAfterLeadChange}
+                            />
+                          </div>
+                        </td>
                         <td className={tableCellClassName}>{lead.assigned_user?.name || 'Unassigned'}</td>
                         <td className={`${tableCellClassName} font-medium text-rose-700`}>{formatDate(lead.follow_up_date)}</td>
                         <td className={tableCellClassName}>{lead.requirement || 'No requirement added'}</td>
@@ -585,7 +619,7 @@ export const Dashboard = () => {
         {!isLoading && summary.tasks_due_today.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="px-4 pt-4 text-lg font-semibold text-gray-900 sm:px-6 sm:pt-6">{isAdminView ? `Everyone's Tasks Due Today` : 'My Tasks Due Today'}</h3>
+              <h3 className="px-4 pt-4 text-lg font-semibold text-gray-900 sm:px-6 sm:pt-6">{`${dashboardOwner} Tasks Due Today`}</h3>
               <button
                 onClick={() => navigate('/tasks')}
                 className="px-4 text-left text-sm font-medium text-blue-600 hover:text-blue-700 sm:px-6 sm:text-right"
@@ -651,6 +685,17 @@ export const Dashboard = () => {
           </div>
         )}
       </div>
+
+      <LeadDetailsDialog
+        leadId={selectedLeadId}
+        open={isLeadDialogOpen}
+        users={users}
+        onOpenChange={(open) => {
+          setIsLeadDialogOpen(open);
+          if (!open) setSelectedLeadId(null);
+        }}
+        onSaved={refreshAfterLeadChange}
+      />
     </div>
   );
 };

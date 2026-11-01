@@ -6,9 +6,9 @@ use App\Models\Product;
 
 class QuotationCalculator
 {
-    public function buildItemSnapshot(array $item, array $defaults): array
+    public function buildItemSnapshot(array $item, array $defaults, ?Product $product = null): array
     {
-        $product = Product::query()->with(['images', 'brand'])->findOrFail($item['product_id']);
+        $product ??= Product::query()->with(['images', 'brand'])->findOrFail($item['product_id']);
         $quantity = (float) ($item['quantity'] ?? 1);
         $basePrice = (float) ($product->mrp ?? $product->usual_selling_price);
         $editedPrice = (float) ($item['edited_price'] ?? $basePrice);
@@ -16,18 +16,24 @@ class QuotationCalculator
         $discountAmount = (float) ($item['discount_amount'] ?? $defaults['default_discount_amount'] ?? 0);
         $brandName = trim((string) ($product->brand?->name ?? ''));
         $productName = trim((string) $product->product_name);
-        $quotationItemName = $brandName !== '' ? "{$brandName} {$productName}" : $productName;
+        $shouldPrefixBrand = $brandName !== '' && strcasecmp($brandName, 'generic') !== 0;
+        $quotationItemName = $shouldPrefixBrand ? "{$brandName} {$productName}" : $productName;
 
-        if ($discountAmount <= 0 && $discountPercent > 0) {
+        if (array_key_exists('discounted_price', $item) && $item['discounted_price'] !== null) {
+            $priceAfterDiscount = round(max((float) $item['discounted_price'], 0), 2);
+            $editedPrice = $basePrice;
+            $discountPercent = 0;
+            $discountAmount = round(max($editedPrice - $priceAfterDiscount, 0), 2);
+        } elseif ($discountAmount <= 0 && $discountPercent > 0) {
             $discountAmount = round(($editedPrice * $discountPercent) / 100, 2);
-        }
-
-        if ($discountAmount <= 0 && $discountPercent <= 0 && $editedPrice < $basePrice) {
+            $priceAfterDiscount = max($editedPrice - $discountAmount, 0);
+        } elseif ($discountAmount <= 0 && $discountPercent <= 0 && $editedPrice < $basePrice) {
             $discountAmount = round($basePrice - $editedPrice, 2);
-            $discountPercent = $basePrice > 0 ? round(($discountAmount / $basePrice) * 100, 2) : 0;
+            $discountPercent = $basePrice > 0 ? round(($discountAmount / $basePrice) * 100, 3) : 0;
+            $priceAfterDiscount = max($editedPrice - $discountAmount, 0);
+        } else {
+            $priceAfterDiscount = max($editedPrice - $discountAmount, 0);
         }
-
-        $priceAfterDiscount = max($editedPrice - $discountAmount, 0);
         $gstPercent = (float) $product->gst_percent;
 
         if (($defaults['pricing_mode'] ?? 'exclusive_gst') === 'inclusive_gst') {

@@ -6,10 +6,12 @@ use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Services\AmcRequest;
 use App\Http\Resources\AmcResource;
 use App\Http\Resources\AmcVisitResource;
+use App\Services\AmcPdfService;
 use App\Services\AmcService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AmcController extends ApiController
 {
@@ -32,9 +34,35 @@ class AmcController extends ApiController
     {
         return $this->ok('AMC updated successfully',new AmcResource($this->amcs->update($this->amcs->find($id),$request->validated(),$request->user(),$request->ip())));
     }
+    public function destroy(int|string $id): JsonResponse
+    {
+        $this->amcs->delete($this->amcs->find($id));
+
+        return $this->ok('AMC deleted successfully');
+    }
     public function completeVisit(int|string $id): JsonResponse
     {
         return $this->ok('AMC visit marked as done',new AmcResource($this->amcs->completeNextVisit($this->amcs->find($id),request()->user(),request()->ip())));
+    }
+    public function updateVisitStatus(Request $request,int|string $id): JsonResponse
+    {
+        $data=$request->validate([
+            'status'=>['required',Rule::in(['completed','skipped','rescheduled'])],
+            'visit_id'=>['nullable','integer','exists:amc_visits,id'],
+            'reason'=>[Rule::requiredIf($request->input('status')!=='completed'),'nullable','string','max:1000'],
+            'rescheduled_date'=>[Rule::requiredIf($request->input('status')==='rescheduled'),'nullable','date','after_or_equal:today'],
+        ]);
+        return $this->ok('AMC visit status updated successfully',new AmcResource($this->amcs->updateVisitStatus($this->amcs->find($id),$data,$request->user(),$request->ip())));
+    }
+    public function proposalPdf(int|string $id,AmcPdfService $pdf): BinaryFileResponse
+    {
+        $result=$pdf->renderProposal($this->amcs->find($id));
+        return response()->download($result['path'],$result['filename'],['Content-Type'=>'application/pdf'])->deleteFileAfterSend(true);
+    }
+    public function detailsPdf(int|string $id,AmcPdfService $pdf): BinaryFileResponse
+    {
+        $result=$pdf->renderDetails($this->amcs->find($id));
+        return response()->download($result['path'],$result['filename'],['Content-Type'=>'application/pdf'])->deleteFileAfterSend(true);
     }
     public function activity(int|string $id): JsonResponse { return $this->ok('AMC timeline fetched successfully',$this->amcs->activity($this->amcs->find($id))); }
     public function comment(Request $request,int|string $id): JsonResponse { $data=$request->validate(['comment'=>['required','string','max:5000']]);return $this->ok('AMC comment added successfully',$this->amcs->addComment($this->amcs->find($id),$data['comment'],$request->user(),$request->ip()),[],201); }

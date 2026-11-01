@@ -4,7 +4,7 @@ import { ArrowLeft, Bold, ImagePlus, Italic, List, Save, Trash2, Underline } fro
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { LoadingState } from '../components/common/AsyncState';
-import { measurementUnitService } from '../../services/masterService';
+import { measurementUnitService, tagService } from '../../services/masterService';
 import { productService } from '../../services/productService';
 import { mapProduct } from '../../services/mappers';
 
@@ -28,6 +28,19 @@ export const ProductForm = () => {
   const imageDragDepthRef = useRef(0);
   const [measurementUnits, setMeasurementUnits] = useState<Array<{ id: string; code: string; name: string }>>([]);
   const [selectedFontSize, setSelectedFontSize] = useState(FONT_SIZE_OPTIONS[1].value);
+  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
+  const [tagsLoading, setTagsLoading] = useState(true);
+  const [tagsError, setTagsError] = useState(false);
+  const loadTags = async () => {
+    setTagsLoading(true);
+    try {
+      const response = await tagService.list();
+      setTags(response.data.map(tag => ({ id: String(tag.id), name: tag.name })));
+      setTagsError(false);
+    } catch { setTagsError(true); }
+    finally { setTagsLoading(false); }
+  };
+  useEffect(() => { void loadTags(); }, []);
 
   const [formData, setFormData] = useState({
     image: '',
@@ -40,10 +53,11 @@ export const ProductForm = () => {
     categoryId: '',
     brand: '',
     brandId: '',
+    tagIds: [] as string[],
     unit: 'NOS',
     mrp: 0,
-    usualSellingPrice: 0,
-    leastSellingPrice: 0,
+    usualSellingPrice: '' as number | '',
+    leastSellingPrice: '' as number | '',
     specifications: '',
     status: 'active' as 'active' | 'inactive',
   });
@@ -80,6 +94,7 @@ export const ProductForm = () => {
 
       setFormData({
         ...product,
+        tagIds: product.tagIds || [],
         categoryId: product.categoryId || matchingCategory?.id || '',
         images: product.images || [],
         primaryImageToken: product.images?.find((image: any) => image.isPrimary)?.id ? `existing:${product.images.find((image: any) => image.isPrimary)?.id}` : '',
@@ -308,7 +323,13 @@ export const ProductForm = () => {
     e.preventDefault();
     setErrors({});
 
-    if (!formData.name || !formData.modelNumber || (!formData.category && !formData.categoryId) || !formData.brandId || !formData.unit || formData.mrp < 0 || formData.usualSellingPrice < 0 || formData.leastSellingPrice < 0) {
+    const invalidUsualPrice = formData.usualSellingPrice !== '' && Number(formData.usualSellingPrice) < 0;
+    const invalidLeastPrice = formData.leastSellingPrice !== '' && Number(formData.leastSellingPrice) < 0;
+    const invalidPriceOrder = formData.usualSellingPrice !== ''
+      && formData.leastSellingPrice !== ''
+      && Number(formData.leastSellingPrice) > Number(formData.usualSellingPrice);
+
+    if (!formData.name || !formData.modelNumber || (!formData.category && !formData.categoryId) || !formData.brandId || !formData.unit || formData.mrp < 0 || invalidUsualPrice || invalidLeastPrice || invalidPriceOrder) {
       toast.error('Please complete the required product fields');
       return;
     }
@@ -508,6 +529,23 @@ export const ProductForm = () => {
               {errors.brand_id?.[0] && <p className="text-sm text-red-600 mt-1">{errors.brand_id[0]}</p>}
             </div>
 
+            <fieldset className="md:col-span-2">
+              <legend className="mb-2 text-sm font-medium text-gray-700">Tags (optional)</legend>
+              {tagsLoading ? <p className="text-sm text-gray-500">Loading tags…</p> : tagsError ? <p className="text-sm text-red-600">Unable to load tags. <button type="button" onClick={loadTags} className="underline">Retry</button></p> : tags.length ? (
+                <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto rounded-xl border border-gray-200 p-3">
+                  {tags.map(tag => <label key={tag.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${formData.tagIds.includes(tag.id) ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-gray-200 text-gray-700'}`}>
+                    <input type="checkbox" checked={formData.tagIds.includes(tag.id)} onChange={event => {
+                      const checked = event.target.checked;
+                      setFormData(current => ({ ...current, tagIds: checked ? [...current.tagIds, tag.id] : current.tagIds.filter(id => id !== tag.id) }));
+                    }} />
+                    {tag.name}
+                  </label>)}
+                </div>
+              ) : <p className="text-sm text-gray-500">No tags configured. Add tags under Masters → Tags.</p>}
+              <p className="mt-1 text-xs text-gray-500">Select any number of tags, or leave all unselected.</p>
+              {Object.entries(errors).filter(([key]) => key === 'tag_ids' || key.startsWith('tag_ids.')).map(([key, messages]) => <p key={key} className="mt-1 text-sm text-red-600">{messages[0]}</p>)}
+            </fieldset>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Measurement Unit *
@@ -541,26 +579,37 @@ export const ProductForm = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Usual Selling Price (₹) *
+                Usual Selling Price (₹)
               </label>
               <input
                 type="number"
-                required
+                min="0"
+                step="0.01"
+                placeholder="Optional"
                 value={formData.usualSellingPrice}
-                onChange={(e) => setFormData({ ...formData, usualSellingPrice: parseFloat(e.target.value) })}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  usualSellingPrice: e.target.value === '' ? '' : Number(e.target.value),
+                })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              {errors.usual_selling_price?.[0] && <p className="text-sm text-red-600 mt-1">{errors.usual_selling_price[0]}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Least Selling Price (₹) *
+                Least Selling Price (₹)
               </label>
               <input
                 type="number"
-                required
+                min="0"
+                step="0.01"
+                placeholder="Optional"
                 value={formData.leastSellingPrice}
-                onChange={(e) => setFormData({ ...formData, leastSellingPrice: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  leastSellingPrice: e.target.value === '' ? '' : Number(e.target.value),
+                })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {errors.least_selling_price?.[0] && <p className="text-sm text-red-600 mt-1">{errors.least_selling_price[0]}</p>}

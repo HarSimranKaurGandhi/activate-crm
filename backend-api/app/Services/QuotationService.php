@@ -7,7 +7,10 @@ use App\Models\CompanyBankDetail;
 use App\Models\CompanySetting;
 use App\Models\Customer;
 use App\Models\Lead;
+use App\Models\Product;
 use App\Models\Quotation;
+use App\Models\QuotationItem;
+use App\Models\QuotationItemDiscountOverride;
 use App\Models\QuotationNumberSetting;
 use App\Models\TermMaster;
 use App\Models\User;
@@ -62,7 +65,7 @@ class QuotationService extends CrudService
             $data['show_mrp_to_customer'] = $data['show_mrp_to_customer'] ?? true;
             $data['show_item_wise_gst_to_customer'] = $data['show_item_wise_gst_to_customer'] ?? false;
             $data['round_off_net_amount_to_customer'] = $data['round_off_net_amount_to_customer'] ?? false;
-            $data['show_uom_to_customer'] = $data['show_uom_to_customer'] ?? false;
+            $data['show_uom_to_customer'] = $data['show_uom_to_customer'] ?? true;
             $data['show_brand_banner_to_customer'] = $data['show_brand_banner_to_customer'] ?? false;
             $data['brand_banner_id'] = ($data['show_brand_banner_to_customer'] ?? false) ? ($data['brand_banner_id'] ?? null) : null;
             if (! empty($data['created_by'])) {
@@ -80,6 +83,13 @@ class QuotationService extends CrudService
     public function update($model, array $data): Quotation
     {
         return DB::transaction(function () use ($model, $data): Quotation {
+            $model = Quotation::query()->lockForUpdate()->findOrFail($model->getKey());
+            if (in_array($model->status, ['locked', 'executed'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'status' => 'Locked or executed quotations cannot be edited.',
+                ]);
+            }
+
             $items = $data['items'] ?? null;
             $adjustments = $data['adjustments'] ?? null;
             $terms = $data['terms'] ?? null;
@@ -88,7 +98,8 @@ class QuotationService extends CrudService
             $data['show_mrp_to_customer'] = $data['show_mrp_to_customer'] ?? true;
             $data['show_item_wise_gst_to_customer'] = $data['show_item_wise_gst_to_customer'] ?? false;
             $data['round_off_net_amount_to_customer'] = $data['round_off_net_amount_to_customer'] ?? false;
-            $data['show_uom_to_customer'] = $data['show_uom_to_customer'] ?? false;
+            $data['show_uom_to_customer'] = $data['show_uom_to_customer']
+                ?? ($model->show_uom_to_customer ?? true);
             $data['show_brand_banner_to_customer'] = $data['show_brand_banner_to_customer'] ?? false;
             $data['brand_banner_id'] = ($data['show_brand_banner_to_customer'] ?? false) ? ($data['brand_banner_id'] ?? null) : null;
             $data = $this->sanitizeForCurrentSchema($data);
@@ -96,7 +107,11 @@ class QuotationService extends CrudService
             $model->update($data);
 
             if (is_array($items)) {
-                $model->items->each(fn ($item) => $item->discountOverrides()->delete());
+                if (Schema::hasTable('quotation_item_discount_overrides')) {
+                    QuotationItemDiscountOverride::query()
+                        ->whereIn('quotation_item_id', $model->items()->select('id'))
+                        ->delete();
+                }
                 $model->items()->delete();
                 $model->adjustments()->delete();
                 $model->terms()->delete();
@@ -152,7 +167,11 @@ class QuotationService extends CrudService
     public function delete($model): void
     {
         DB::transaction(function () use ($model): void {
-            $model->items->each(fn ($item) => $item->discountOverrides()->delete());
+            if (Schema::hasTable('quotation_item_discount_overrides')) {
+                QuotationItemDiscountOverride::query()
+                    ->whereIn('quotation_item_id', $model->items()->select('id'))
+                    ->delete();
+            }
             $model->items()->delete();
             $model->adjustments()->delete();
             $model->terms()->delete();
@@ -196,7 +215,7 @@ class QuotationService extends CrudService
             'active_adjustments' => AdjustmentMaster::where('is_active', true)->orderBy('display_order')->orderBy('name')->get(),
             'active_terms' => TermMaster::where('is_active', true)->orderBy('display_order')->orderBy('title')->get(),
             'pricing_modes' => ['exclusive_gst', 'inclusive_gst'],
-            'statuses' => ['draft', 'pending_approval', 'approved', 'shared_with_client', 'rejected', 'revised'],
+            'statuses' => ['draft', 'pending_approval', 'approved', 'locked', 'executed', 'rejected', 'revised'],
         ];
     }
 
@@ -234,11 +253,18 @@ class QuotationService extends CrudService
 
         $user->loadMissing('role');
 
-        if ($user->hasAnyRole(['admin', 'operations'])) {
+        if ($user->hasAnyRole(['influencer'])) {
+            return $query->where('created_by', $user->id)->whereHas('lead', fn ($lead) => $lead->whereIn('influencer_id', \App\Models\Influencer::query()->where('user_id', $user->id)->where('is_active', true)->select('id')));
+        }
+
+        if ($user->hasAnyRole(['admin', 'operations', 'sales_manager'])) {
             return $query;
         }
 
-        return $query->where('created_by', $user->getKey());
+        return $query->where(function (Builder $visible) use ($user): void {
+            $visible->where('created_by', $user->getKey())
+                ->orWhereHas('sharedUsers', fn (Builder $shared) => $shared->where('users.id', $user->getKey()));
+        });
     }
 
     private function sanitizeForCurrentSchema(array $data): array
@@ -338,6 +364,19 @@ class QuotationService extends CrudService
 
     private function syncLines(Quotation $quotation, array $items, array $adjustments, array $terms): void
     {
+        $productIds = collect($items)->pluck('product_id')->filter()->unique();
+        $adjustmentMasterIds = collect($adjustments)->pluck('adjustment_master_id')->filter()->unique();
+        $termMasterIds = collect($terms)->pluck('term_master_id')->filter()->unique();
+        $products = $productIds->isEmpty()
+            ? collect()
+            : Product::query()->with(['images', 'brand'])->whereKey($productIds)->get()->keyBy('id');
+        $adjustmentMasters = $adjustmentMasterIds->isEmpty()
+            ? collect()
+            : AdjustmentMaster::query()->whereKey($adjustmentMasterIds)->get()->keyBy('id');
+        $termMasters = $termMasterIds->isEmpty()
+            ? collect()
+            : TermMaster::query()->whereKey($termMasterIds)->get()->keyBy('id');
+
         $totals = [
             'subtotal_before_discount' => 0,
             'total_line_discount' => 0,
@@ -346,9 +385,13 @@ class QuotationService extends CrudService
             'total_tax' => 0,
             'grand_total' => 0,
         ];
+        $taxableAdjustmentTotal = 0.0;
 
         foreach ($items as $item) {
-            $snapshot = $this->calculator->buildItemSnapshot($item, $quotation->toArray());
+            $productId = (int) $item['product_id'];
+            $product = $products->get($productId)
+                ?? Product::query()->with(['images', 'brand'])->findOrFail($productId);
+            $snapshot = $this->calculator->buildItemSnapshot($item, $quotation->toArray(), $product);
             $quotationItem = $quotation->items()->create($snapshot);
             $this->recordDiscountOverride($quotationItem, $snapshot, $quotation);
             $totals['subtotal_before_discount'] += (float) $snapshot['edited_price'] * (float) $snapshot['quantity'];
@@ -359,32 +402,45 @@ class QuotationService extends CrudService
         }
 
         foreach ($adjustments as $adjustment) {
-            $snapshot = $this->buildAdjustmentSnapshot($adjustment, $totals['subtotal_after_discount']);
+            $masterId = (int) ($adjustment['adjustment_master_id'] ?? 0);
+            $master = $masterId > 0
+                ? ($adjustmentMasters->get($masterId) ?? AdjustmentMaster::findOrFail($masterId))
+                : null;
+            $snapshot = $this->buildAdjustmentSnapshot($adjustment, $totals['subtotal_after_discount'], $master);
             $quotation->adjustments()->create($snapshot);
             $totals['total_adjustments'] += (float) $snapshot['amount'];
+            if ((float) $snapshot['amount'] < 0 || (bool) $snapshot['is_taxable']) {
+                $taxableAdjustmentTotal += (float) $snapshot['amount'];
+            }
         }
 
-        $deductionTotal = (float) $quotation->adjustments()
-            ->where('amount', '<', 0)
-            ->sum('amount');
         $subtotal = (float) $totals['subtotal_after_discount'];
         $taxFactor = $subtotal > 0
-            ? max($subtotal + $deductionTotal, 0) / $subtotal
+            ? max($subtotal + $taxableAdjustmentTotal, 0) / $subtotal
             : 0;
 
-        if ($taxFactor < 1) {
+        if (abs($taxFactor - 1) > 0.000001) {
             $totals['total_tax'] = 0;
+            $taxUpdates = [];
 
-            foreach ($quotation->items as $item) {
+            foreach ($quotation->items()->get() as $item) {
                 $taxAmount = round((float) $item->tax_amount * $taxFactor, 2);
-                $item->tax_amount = $taxAmount;
+                $lineTotal = (float) $item->line_total;
 
                 if ($quotation->pricing_mode === 'exclusive_gst') {
-                    $item->line_total = round((float) $item->taxable_amount + $taxAmount, 2);
+                    $lineTotal = round((float) $item->taxable_amount + $taxAmount, 2);
                 }
 
-                $item->save();
+                $taxUpdates[] = [
+                    'id' => $item->id,
+                    'tax_amount' => $taxAmount,
+                    'line_total' => $lineTotal,
+                ];
                 $totals['total_tax'] += $taxAmount;
+            }
+
+            if ($taxUpdates !== []) {
+                $this->updateItemTaxTotals($quotation, $taxUpdates);
             }
         }
 
@@ -393,10 +449,47 @@ class QuotationService extends CrudService
             : $subtotal + $totals['total_tax'] + $totals['total_adjustments'], 2);
 
         foreach ($terms as $term) {
-            $quotation->terms()->create($this->buildTermSnapshot($term));
+            $masterId = (int) ($term['term_master_id'] ?? 0);
+            $master = $masterId > 0
+                ? ($termMasters->get($masterId) ?? TermMaster::findOrFail($masterId))
+                : null;
+            $quotation->terms()->create($this->buildTermSnapshot($term, $master));
         }
 
         $quotation->update($totals);
+    }
+
+    private function updateItemTaxTotals(Quotation $quotation, array $updates): void
+    {
+        // These rows already exist. An upsert attempts an incomplete INSERT and
+        // fails required-column validation on MySQL before resolving duplicate IDs.
+        foreach (array_chunk($updates, 100) as $chunk) {
+            $assignments = [];
+            $bindings = [];
+
+            foreach (['tax_amount', 'line_total'] as $column) {
+                $cases = [];
+                foreach ($chunk as $row) {
+                    $cases[] = 'WHEN ? THEN ?';
+                    $bindings[] = $row['id'];
+                    $bindings[] = $row[$column];
+                }
+                $assignments[] = $column.' = CASE id '.implode(' ', $cases).' ELSE '.$column.' END';
+            }
+
+            $assignments[] = 'updated_at = ?';
+            $bindings[] = $quotation->freshTimestampString();
+            $bindings[] = $quotation->id;
+            $ids = array_column($chunk, 'id');
+            array_push($bindings, ...$ids);
+            $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+
+            $quotation->getConnection()->update(
+                'UPDATE quotation_items SET '.implode(', ', $assignments)
+                    .' WHERE quotation_id = ? AND id IN ('.$placeholders.')',
+                $bindings,
+            );
+        }
     }
 
     private function recordDiscountOverride($quotationItem, array $snapshot, Quotation $quotation): void
@@ -438,6 +531,7 @@ class QuotationService extends CrudService
             'lead',
             'brandBanner',
             'items.product.measurementUnit',
+            'items.fulfillment',
             'adjustments',
             'terms',
         ];
@@ -450,6 +544,7 @@ class QuotationService extends CrudService
             'lead',
             'brandBanner',
             'items.product.measurementUnit',
+            'items.fulfillment',
             Schema::hasTable('quotation_item_discount_overrides') ? 'items.discountOverrides' : 'items',
             'adjustments',
             'terms',
@@ -484,7 +579,11 @@ class QuotationService extends CrudService
         return $data;
     }
 
-    private function buildAdjustmentSnapshot(array $input, float $subtotalAfterDiscount): array
+    private function buildAdjustmentSnapshot(
+        array $input,
+        float $subtotalAfterDiscount,
+        ?AdjustmentMaster $master = null
+    ): array
     {
         if (empty($input['adjustment_master_id'])) {
             $name = trim((string) ($input['name'] ?? ''));
@@ -498,12 +597,12 @@ class QuotationService extends CrudService
                 'value_type' => 'fixed',
                 'value' => $amount,
                 'amount' => $amount,
-                'is_taxable' => false,
+                'is_taxable' => true,
                 'display_order' => (int) ($input['display_order'] ?? 0),
             ];
         }
 
-        $master = AdjustmentMaster::findOrFail($input['adjustment_master_id']);
+        $master ??= AdjustmentMaster::findOrFail($input['adjustment_master_id']);
         $value = (float) ($input['value'] ?? $master->default_value ?? 0);
         $amount = $master->value_type === 'percent'
             ? round(($subtotalAfterDiscount * $value) / 100, 2)
@@ -526,7 +625,7 @@ class QuotationService extends CrudService
         ];
     }
 
-    private function buildTermSnapshot(array $input): array
+    private function buildTermSnapshot(array $input, ?TermMaster $term = null): array
     {
         if (empty($input['term_master_id'])) {
             return [
@@ -537,7 +636,7 @@ class QuotationService extends CrudService
             ];
         }
 
-        $term = TermMaster::findOrFail($input['term_master_id']);
+        $term ??= TermMaster::findOrFail($input['term_master_id']);
 
         return [
             'term_master_id' => $term->id,
@@ -549,30 +648,20 @@ class QuotationService extends CrudService
 
     private function nextQuotationNumber(): string
     {
-        $setting = QuotationNumberSetting::query()->firstOrNew(['id' => 1]);
-        $columns = Schema::getColumnListing('quotation_number_settings');
+        $setting = QuotationNumberSetting::query()->lockForUpdate()->firstOrNew(['id' => 1]);
         $prefix = $this->quotationNumberPrefix();
         $padding = 3;
-        $next = 1;
+        $suffixStart = strlen($prefix) + 1;
+        $lastUsedSequence = (int) Quotation::query()
+            ->where('quotation_number', 'like', $prefix.'%')
+            ->selectRaw('MAX(CAST(SUBSTRING(quotation_number, ?) AS UNSIGNED)) as max_sequence', [$suffixStart])
+            ->value('max_sequence');
+        $next = max((int) ($setting->current_sequence ?? 1), $lastUsedSequence + 1, 1);
 
-        while (Quotation::query()->where('quotation_number', $prefix.str_pad((string) $next, $padding, '0', STR_PAD_LEFT))->exists()) {
-            $next++;
-        }
-
-        $attributes = [];
-
-        if (in_array('prefix', $columns, true)) {
-            $attributes['prefix'] = $prefix;
-        }
-
-        if (in_array('current_sequence', $columns, true)) {
-            $attributes['current_sequence'] = $next + 1;
-        }
-
-        if ($attributes !== []) {
-            $setting->fill(Arr::only($attributes, $columns));
-            $setting->save();
-        }
+        $setting->forceFill([
+            'prefix' => $prefix,
+            'current_sequence' => $next + 1,
+        ])->save();
 
         return $prefix.str_pad((string) $next, $padding, '0', STR_PAD_LEFT);
     }

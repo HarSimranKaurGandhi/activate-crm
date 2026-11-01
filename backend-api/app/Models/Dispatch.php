@@ -10,4 +10,5 @@ class Dispatch extends Model
     public function customer():BelongsTo{return $this->belongsTo(Customer::class);}
     public function creator():BelongsTo{return $this->belongsTo(User::class,'created_by');}
     public function items():HasMany{return $this->hasMany(DispatchItem::class);}
+    public function taxInvoice():\Illuminate\Database\Eloquent\Relations\HasOne{return $this->hasOne(TaxInvoice::class);}
 }

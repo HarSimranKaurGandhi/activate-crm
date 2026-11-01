@@ -12,6 +12,7 @@ const statusBadgeClass: Record<string, string> = {
   enquiry: 'bg-indigo-50 text-indigo-700',
   in_progress: 'bg-amber-50 text-amber-700',
   on_hold: 'bg-slate-100 text-slate-700',
+  order_confirmed: 'bg-indigo-50 text-indigo-700',
   closed_success: 'bg-emerald-50 text-emerald-700',
   closed_fail: 'bg-rose-50 text-rose-700',
 };
@@ -48,6 +49,8 @@ const statusLabel = (status: string) => {
       return 'In Progress';
     case 'on_hold':
       return 'On Hold';
+    case 'order_confirmed':
+      return 'Order Confirmed';
     case 'closed_success':
       return 'Closed - Success';
     case 'closed_fail':
@@ -85,6 +88,7 @@ const formatDisplayDateTime = (date?: string) => {
   if (Number.isNaN(parsed.getTime())) return date;
 
   return parsed.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -177,7 +181,9 @@ export const LeadView = () => {
                 <LeadPhoneAction
                   leadId={String(lead.id)}
                   phone={lead.phone}
+                  influencer={lead.influencer}
                   followUpDate={lead.followUpDate}
+                  followUpDateLocked={['closed_success', 'closed_fail'].includes(lead.status)}
                   onFollowUpDateChanged={(date) => setLead((current: any) =>
                     current ? { ...current, followUpDate: date } : current
                   )}
@@ -190,7 +196,9 @@ export const LeadView = () => {
               </div>
 
               <div>
-                <div className="mb-1 text-sm font-medium text-gray-500">Follow Up Date</div>
+                <div className="mb-1 text-sm font-medium text-gray-500">
+                  {['closed_success', 'closed_fail'].includes(lead.status) ? 'Closure Date' : 'Follow Up Date'}
+                </div>
                 <div className={isPastDate(lead.followUpDate) ? 'text-rose-600' : 'text-gray-900'}>{formatDisplayDate(lead.followUpDate)}</div>
               </div>
 
@@ -205,9 +213,20 @@ export const LeadView = () => {
               </div>
 
               <div>
+                <div className="mb-1 text-sm font-medium text-gray-500">Closure Hot Level</div>
+                <div className={`inline-flex rounded-full px-3 py-1 text-sm font-bold ${lead.closureHotLevel > 8 ? 'bg-red-100 text-red-700' : lead.closureHotLevel > 5 ? 'bg-orange-100 text-orange-700' : 'bg-lime-100 text-lime-700'}`}>{lead.closureHotLevel} / 10</div>
+              </div>
+
+              <div>
                 <div className="mb-1 text-sm font-medium text-gray-500">Assigned To</div>
                 <div className="text-gray-900">{lead.assignedUser?.name || '-'}</div>
                 {lead.assignedUser?.email && <div className="mt-1 text-sm text-gray-500">{lead.assignedUser.email}</div>}
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-gray-500">Influencer</div>
+                <div className="text-gray-900">{lead.influencer?.name || '-'}</div>
+                {lead.influencer?.companyName && <div className="mt-1 text-sm text-gray-500">{lead.influencer.companyName}</div>}
               </div>
 
               <div>

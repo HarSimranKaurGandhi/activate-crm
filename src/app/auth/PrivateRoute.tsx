@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from './AuthContext';
 
 export const PrivateRoute = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -17,6 +17,9 @@ export const PrivateRoute = () => {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  if (user?.role?.code === 'influencer' && !(/^\/influencer\/leads$/.test(location.pathname) || /^\/quotations(?:\/new|\/\d+\/preview)?$/.test(location.pathname))) {
+    return <Navigate to="/influencer/leads" replace />;
+  }
   return <Outlet />;
 };
 

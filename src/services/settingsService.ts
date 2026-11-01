@@ -33,4 +33,7 @@ export const settingsService = {
   async leadApiTokens(){return unwrap<any[]>(await apiClient.get('/settings/lead-api-tokens'));},
   async createLeadApiToken(name:string){return unwrap<any>(await apiClient.post('/settings/lead-api-tokens',{name}));},
   async revokeLeadApiToken(id:string|number){return unwrap<any>(await apiClient.delete(`/settings/lead-api-tokens/${id}`));},
+  async featureRequests(){return unwrap<any[]>(await apiClient.get('/settings/feature-requests'));},
+  async createFeatureRequest(payload:{title:string;description?:string|null}){return unwrap<any>(await apiClient.post('/settings/feature-requests',payload));},
+  async deleteFeatureRequest(id:string|number){return unwrap<any>(await apiClient.delete(`/settings/feature-requests/${id}`));},
 };

@@ -5,6 +5,8 @@ import { customerService } from '../../../services/customerService';
 import { LoadingState } from '../common/AsyncState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { AddOwnedProductDialog } from './AddOwnedProductDialog';
+import { GenerateRequirementDialog } from './GenerateRequirementDialog';
+import { CustomerInvoices } from './CustomerInvoices';
 
 interface Props {
   customerId: string | null;
@@ -15,6 +17,7 @@ interface Props {
 export const CustomerDetailsDialog = ({ customerId, open, onOpenChange }: Props) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [requirementOpen, setRequirementOpen] = useState(false);
   const [productPopupOpen, setProductPopupOpen] = useState(false);
 
   const load = async () => {
@@ -34,13 +37,18 @@ export const CustomerDetailsDialog = ({ customerId, open, onOpenChange }: Props)
   useEffect(() => {
     if (!open || !customerId) {
       setData(null);
+      setRequirementOpen(false);
       return;
     }
     void load();
   }, [customerId, open]);
 
   const formatDate = (value?: string) => value
-    ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: value.includes('T') ? 'short' : undefined })
+    ? new Date(value).toLocaleString('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: value.includes('T') ? 'short' : undefined,
+        timeZone: value.includes('T') ? 'Asia/Kolkata' : undefined,
+      })
     : '-';
 
   const timelineIcon = (type: string) => {
@@ -64,10 +72,14 @@ export const CustomerDetailsDialog = ({ customerId, open, onOpenChange }: Props)
             <div className="grid gap-6 lg:grid-cols-3">
               <section className="rounded-2xl border border-gray-200 bg-white p-5">
                 <h3 className="font-semibold text-gray-900">Customer Information</h3>
+                <button type="button" onClick={() => setRequirementOpen(true)} className="mt-3 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700">Generate Requirement</button>
                 <dl className="mt-4 space-y-3 text-sm">
                   {[
-                    ['Contact', data.customer.primary_name],
-                    ['Company', data.customer.company_name],
+                    [data.customer.is_company ? 'Contact Person' : 'Customer', data.customer.primary_name],
+                    ...(data.customer.is_company ? [
+                      ['Company', data.customer.company_name],
+                      ['GSTIN', data.customer.gst_number],
+                    ] : []),
                     ['Phone', data.customer.phone],
                     ['Email', data.customer.email],
                     ['Location', [data.customer.city, data.customer.state, data.customer.country].filter(Boolean).join(', ')],
@@ -104,15 +116,17 @@ export const CustomerDetailsDialog = ({ customerId, open, onOpenChange }: Props)
                     <tbody className="divide-y divide-gray-200">
                       {data.owned_products.length ? data.owned_products.map((item: any) => (
                         <tr key={item.id}>
-                          <td className="px-4 py-3 text-sm"><div className="font-medium text-gray-900">{item.product_name}</div><div className="text-xs text-gray-500">{[item.brand, item.model_number].filter(Boolean).join(' · ')}</div></td>
+                          <td className="px-4 py-3 text-sm"><div className="font-medium text-gray-900">{item.product_name}</div><div className="text-xs text-gray-500">{[item.brand, item.model_number].filter(Boolean).join(' · ')}</div>{(item.references || []).map((reference: any) => <div key={reference.id} className="mt-2 flex items-center gap-2">{reference.image_url && <a href={reference.image_url} target="_blank" rel="noreferrer"><img src={reference.image_url} alt="Serial number reference" title="Serial number image" className="h-[50px] w-[50px] rounded object-contain" /></a>}<div className="text-xs text-gray-600">{reference.serial_number && <div>Serial No.: {reference.serial_number}</div>}<div>{reference.purchase_date} · Qty {Number(reference.quantity)}</div></div></div>)}</td>
                           <td className="px-4 py-3 text-sm text-gray-700">{item.quantity} {item.measurement_unit || ''}</td>
                           <td className="px-4 py-3 text-sm text-gray-700">{formatDate(item.last_purchased_at)}{item.dispatch_number ? <div className="text-xs text-gray-500">{item.dispatch_number}</div> : null}</td>
                           <td className="px-4 py-3 text-right">
                             <button type="button" onClick={async () => {
                               if (!confirm('Remove this product from the customer?')) return;
-                              await customerService.removeOwnedProduct(customerId!, String(item.id));
-                              await load();
-                              toast.success('Product removed');
+                              try {
+                                await customerService.removeOwnedProduct(customerId!, String(item.id));
+                                await load();
+                                toast.success('Product removed');
+                              } catch (error: any) { toast.error(error.errors?.product?.[0] || error.message || 'Unable to remove product'); }
                             }} className="rounded-lg p-2 text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
                           </td>
                         </tr>
@@ -123,6 +137,7 @@ export const CustomerDetailsDialog = ({ customerId, open, onOpenChange }: Props)
               </section>
             </div>
 
+            {customerId && <CustomerInvoices customerId={customerId} onUploaded={load} />}
             <section className="mt-6 rounded-2xl border border-gray-200 bg-white p-5">
               <h3 className="font-semibold text-gray-900">Activity Timeline</h3>
               <div className="mt-5 space-y-0">
@@ -150,6 +165,7 @@ export const CustomerDetailsDialog = ({ customerId, open, onOpenChange }: Props)
         )}
       </DialogContent>
 
+      {customerId && <GenerateRequirementDialog customerId={customerId} open={requirementOpen} onOpenChange={setRequirementOpen} onGenerated={load} />}
       {customerId && <AddOwnedProductDialog customerId={customerId} open={productPopupOpen} onOpenChange={setProductPopupOpen} onAdded={load} />}
     </Dialog>
   );

@@ -28,7 +28,7 @@ class LeadApiBatchRequest extends FormRequest
             'leads.*.requirement'=>['required','string','max:5000'],
             'leads.*.expected_order_value'=>['nullable',Rule::in(['Less Than 1L','1L-5L','5L-10L','10L-30L','30L+'])],
             'leads.*.expected_closure'=>['nullable',Rule::in(['10 days','20 days','30 days','90 days'])],
-            'leads.*.status'=>['nullable',Rule::in(['new','enquiry','in_progress','on_hold','closed_success','closed_fail'])],
+            'leads.*.status'=>['nullable',Rule::in(['new','enquiry','in_progress','on_hold','order_confirmed','closed_success','closed_fail'])],
             'leads.*.tags'=>['nullable','array'],'leads.*.tags.*'=>[Rule::in(['hot','premium'])],
             'leads.*.customer_importance'=>['nullable','string',Rule::in(['UVIP','VIP','IMP'])],
             'leads.*.customer_category'=>['nullable','string',Rule::in(['GYM OWNER','GOVT OFFICIAL','BUILDER','CORPORATE','DEALER'])],

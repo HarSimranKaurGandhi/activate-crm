@@ -19,6 +19,7 @@ class InventoryMovementRequest extends FormRequest
             'slip' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.style' => ['nullable', 'string', 'max:100'],
             'items.*.godown_id' => ['required', 'integer', 'exists:godowns,id'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.packages' => ['required', 'integer', 'min:1'],

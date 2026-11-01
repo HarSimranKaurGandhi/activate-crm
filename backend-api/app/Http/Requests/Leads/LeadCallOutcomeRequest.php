@@ -16,7 +16,14 @@ class LeadCallOutcomeRequest extends FormRequest
         return [
             'connected' => ['required', 'boolean'],
             'notes' => ['nullable', 'string', 'max:5000', 'required_if:connected,true'],
-            'follow_up_date' => ['nullable', 'date_format:Y-m-d'],
+            'follow_up_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'follow_up_date.after_or_equal' => 'The follow up date cannot be before today.',
         ];
     }
 }

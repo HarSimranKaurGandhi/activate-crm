@@ -1,12 +1,14 @@
 export const quotationStatusLabel = (status: string) => {
   if (status === 'pending') return 'Pending Approval';
-  if (status === 'shared_with_client') return 'Shared with Client';
+  if (status === 'locked') return 'Locked';
+  if (status === 'executed') return 'Executed';
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
 export const quotationStatusClass = (status: string) => {
   if (status === 'approved') return 'bg-green-50 text-green-700';
-  if (status === 'shared_with_client') return 'bg-blue-50 text-blue-700';
+  if (status === 'locked') return 'bg-blue-50 text-blue-700';
+  if (status === 'executed') return 'bg-emerald-50 text-emerald-700';
   if (status === 'pending') return 'bg-amber-50 text-amber-700';
   if (status === 'rejected') return 'bg-red-50 text-red-700';
   if (status === 'revised') return 'bg-purple-50 text-purple-700';

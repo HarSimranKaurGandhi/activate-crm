@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
@@ -35,7 +36,7 @@ class QuotationApprovalService
             'description' => 'Quotation rejected.',
         ],
         'revise' => [
-            'from' => ['pending_approval', 'approved', 'shared_with_client', 'rejected'],
+            'from' => ['pending_approval', 'approved', 'locked', 'executed', 'rejected'],
             'to' => 'revised',
             'description' => 'Quotation marked for revision.',
         ],
@@ -120,19 +121,19 @@ class QuotationApprovalService
     private function transition(Quotation $quotation, string $action, User $user, Request $request): Quotation
     {
         $rule = self::TRANSITIONS[$action];
-        $currentStatus = (string) $quotation->status;
-
-        if (! in_array($currentStatus, $rule['from'], true)) {
-            throw ValidationException::withMessages([
-                'status' => [sprintf(
-                    'Quotation status must be one of [%s] before it can be changed to %s.',
-                    implode(', ', $rule['from']),
-                    $rule['to'],
-                )],
-            ]);
-        }
-
-        return DB::transaction(function () use ($quotation, $action, $rule, $currentStatus, $user, $request): Quotation {
+        return DB::transaction(function () use ($quotation, $action, $rule, $user, $request): Quotation {
+            $quotation = Quotation::query()->lockForUpdate()->findOrFail($quotation->id);
+            $currentStatus = (string) $quotation->status;
+            Gate::forUser($user)->authorize('changeStatus', [$quotation, $rule['to']]);
+            if (! in_array($currentStatus, $rule['from'], true)) {
+                throw ValidationException::withMessages([
+                    'status' => [sprintf(
+                        'Quotation status must be one of [%s] before it can be changed to %s.',
+                        implode(', ', $rule['from']),
+                        $rule['to'],
+                    )],
+                ]);
+            }
             $remarks = $request->input('remarks');
             $targetStatus = $rule['to'];
 

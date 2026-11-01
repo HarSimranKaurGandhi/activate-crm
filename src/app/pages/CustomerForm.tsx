@@ -1,3 +1,4 @@
+import { normalizeIndianPhone } from '../../utils/phone';
 import { useNavigate, useParams } from 'react-router';
 import { useData } from '../context/DataContext';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -28,7 +29,9 @@ export const CustomerForm = () => {
 
   const [formData, setFormData] = useState({
     name: '',
+    isCompany: false,
     company: '',
+    gstNumber: '',
     email: '',
     phone: '',
     addressLine1: '',
@@ -57,8 +60,16 @@ export const CustomerForm = () => {
     e.preventDefault();
     setErrors({});
 
-    if (!formData.name || !formData.phone || !formData.addressLine1 || !formData.state || !formData.country) {
-      toast.error('Please complete the required customer fields');
+    const requiredFields = [
+      ['primary_name', formData.name, 'Customer name'],
+      ...(formData.isCompany ? [['company_name', formData.company, 'Company name']] : []),
+      ['phone', formData.phone, 'Phone'], ['address_line_1', formData.addressLine1, 'Address Line 1'],
+      ['state', formData.state, 'State'], ['country', formData.country, 'Country'],
+    ];
+    const missing = requiredFields.filter(([, value]) => !String(value || '').trim());
+    if (missing.length) {
+      setErrors(Object.fromEntries(missing.map(([key, , label]) => [key, [`${label} is required.`]])));
+      toast.error(`Please fill in: ${missing.map(([, , label]) => label).join(', ')}`);
       return;
     }
 
@@ -158,10 +169,44 @@ export const CustomerForm = () => {
           </div>
         ) : (
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 space-y-6">
+          {Object.keys(errors).length > 0 && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <p className="font-semibold">Please correct the following fields:</p>
+            <ul className="mt-2 list-disc pl-5">{Object.entries(errors).flatMap(([key, messages]) => messages.map((message, index) => <li key={`${key}-${index}`}>{message}</li>))}</ul>
+          </div>}
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <input
+              type="checkbox"
+              checked={formData.isCompany}
+              onChange={(e) => setFormData({
+                ...formData,
+                isCompany: e.target.checked,
+                ...(!e.target.checked ? { company: '', gstNumber: '' } : {}),
+              })}
+              className="h-4 w-4 rounded text-blue-600"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-900">Is Company</span>
+              <span className="block text-xs text-gray-500">Enable company name, contact person and GSTIN fields.</span>
+            </span>
+          </label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {formData.isCompany && <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Company Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.company}
+                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {errors.company_name?.[0] && <p className="text-sm text-red-600 mt-1">{errors.company_name[0]}</p>}
+            </div>}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contact Person Name *
+                {formData.isCompany ? 'Contact Person Name *' : 'Customer Name *'}
               </label>
               <input
                 type="text"
@@ -173,18 +218,18 @@ export const CustomerForm = () => {
               {errors.primary_name?.[0] && <p className="text-sm text-red-600 mt-1">{errors.primary_name[0]}</p>}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Company Name
-              </label>
+            {formData.isCompany && <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">GSTIN</label>
               <input
                 type="text"
-                value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                maxLength={15}
+                value={formData.gstNumber}
+                onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) })}
+                placeholder="22AAAAA0000A1Z5"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl uppercase focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              {errors.company_name?.[0] && <p className="text-sm text-red-600 mt-1">{errors.company_name[0]}</p>}
-            </div>
+              {errors.gst_number?.[0] && <p className="text-sm text-red-600 mt-1">{errors.gst_number[0]}</p>}
+            </div>}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -213,12 +258,12 @@ export const CustomerForm = () => {
                   type="tel"
                   inputMode="numeric"
                   pattern="[0-9]{10}"
-                  maxLength={10}
+                  maxLength={30}
                   required
                   value={formData.phone}
                   onChange={(e) => setFormData({
                     ...formData,
-                    phone: e.target.value.replace(/\D/g, '').slice(0, 10),
+                    phone: normalizeIndianPhone(e.target.value),
                   })}
                   className={`w-full rounded-r-xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     errors.phone?.[0] ? 'border-red-500' : 'border-gray-200'
@@ -230,10 +275,11 @@ export const CustomerForm = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Address Line 1
+                Address Line 1 *
               </label>
               <input
                 type="text"
+                required
                 value={formData.addressLine1}
                 onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

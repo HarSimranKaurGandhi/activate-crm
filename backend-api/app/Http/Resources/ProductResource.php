@@ -19,6 +19,7 @@ class ProductResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'tags' => $this->whenLoaded('tags', fn () => $this->tags->map->only(['id', 'name'])->values()),
             'product_name' => $this->product_name,
             'model_number' => $this->model_number,
             'category_id' => $this->category_id,

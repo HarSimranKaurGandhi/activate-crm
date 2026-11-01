@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class QuotationItem extends Model
 {
@@ -26,7 +27,7 @@ class QuotationItem extends Model
             'base_price' => 'decimal:2',
             'edited_price' => 'decimal:2',
             'gst_percent' => 'decimal:2',
-            'discount_percent' => 'decimal:2',
+            'discount_percent' => 'decimal:3',
             'discount_amount' => 'decimal:2',
             'price_after_discount' => 'decimal:2',
             'taxable_amount' => 'decimal:2',
@@ -38,6 +39,11 @@ class QuotationItem extends Model
     public function quotation(): BelongsTo
     {
         return $this->belongsTo(Quotation::class);
+    }
+
+    public function fulfillment(): HasOne
+    {
+        return $this->hasOne(OrderFulfillment::class);
     }
 
     public function product(): BelongsTo

@@ -7,7 +7,6 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class TermService extends MasterService
 {
@@ -39,16 +38,5 @@ class TermService extends MasterService
         $data['display_order'] = $data['display_order'] ?? 0;
 
         return TermMaster::create($data);
-    }
-
-    public function reorder(array $items): void
-    {
-        DB::transaction(function () use ($items): void {
-            foreach ($items as $item) {
-                TermMaster::whereKey($item['id'])->update([
-                    'display_order' => $item['display_order'],
-                ]);
-            }
-        });
     }
 }

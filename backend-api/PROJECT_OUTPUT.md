@@ -43,7 +43,7 @@ backend-api/app/Http/Requests/Common/ReorderRequest.php
 backend-api/app/Http/Requests/Common/StatusRequest.php
 backend-api/app/Http/Requests/Customers/CustomerIndexRequest.php
 backend-api/app/Http/Requests/Customers/CustomerRequest.php
-backend-api/app/Http/Requests/Dashboard/QuotationSummaryRequest.php
+backend-api/app/Http/Requests/Dashboard/DashboardSummaryRequest.php
 backend-api/app/Http/Requests/Logs/ActivityLogIndexRequest.php
 backend-api/app/Http/Requests/Masters/AdjustmentIndexRequest.php
 backend-api/app/Http/Requests/Masters/AdjustmentRequest.php
@@ -177,7 +177,7 @@ backend-api/storage/logs/.gitkeep
 POST   /api/auth/login
 POST   /api/auth/logout
 GET    /api/auth/me
-GET    /api/dashboard/quotation-summary
+GET    /api/dashboard/summary
 GET    /api/users
 POST   /api/users
 GET    /api/users/{id}

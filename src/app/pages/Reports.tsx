@@ -5,7 +5,7 @@ import { LoadingState } from '../components/common/AsyncState';
 import { reportService } from '../../services/reportService';
 
 export const Reports = () => {
-  const { quotations, customers, products, loading } = useData();
+  const { quotations, loading } = useData();
   const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
@@ -54,31 +54,42 @@ export const Reports = () => {
     ? quotations.reduce((sum, q) => sum + q.grandTotal, 0) / totalQuotations
     : 0;
 
-  const topCustomers = customers
-    .map(customer => {
-      const customerQuotations = quotations.filter(q => q.customer.id === customer.id);
-      const totalValue = customerQuotations.reduce((sum, q) => sum + q.grandTotal, 0);
-      return { ...customer, quotationCount: customerQuotations.length, totalValue };
-    })
-    .filter(c => c.quotationCount > 0)
+  const topCustomers = Array.from(quotations.reduce((customersById, quotation) => {
+    if (!quotation.customerId || !quotation.customer) return customersById;
+
+    const current = customersById.get(quotation.customerId) || {
+      id: quotation.customerId,
+      company: quotation.customer.company || quotation.customer.name || 'Customer',
+      quotationCount: 0,
+      totalValue: 0,
+    };
+    current.quotationCount += 1;
+    current.totalValue += Number(quotation.grandTotal || 0);
+    customersById.set(quotation.customerId, current);
+
+    return customersById;
+  }, new Map<string, any>()).values())
     .sort((a, b) => b.totalValue - a.totalValue)
     .slice(0, 5);
 
-  const topProducts = products
-    .map(product => {
-      let totalQty = 0;
-      let totalRevenue = 0;
-      quotations.forEach(q => {
-        q.items.forEach((item: any) => {
-          if (item.product.id === product.id) {
-            totalQty += item.quantity;
-            totalRevenue += item.price * item.quantity;
-          }
-        });
-      });
-      return { ...product, totalQty, totalRevenue };
-    })
-    .filter(p => p.totalQty > 0)
+  const topProducts = Array.from(quotations.reduce((productsById, quotation) => {
+    quotation.items.forEach((item: any) => {
+      if (!item.product?.id) return;
+
+      const current = productsById.get(item.product.id) || {
+        id: item.product.id,
+        image: item.product.image,
+        name: item.product.name || 'Product',
+        totalQty: 0,
+        totalRevenue: 0,
+      };
+      current.totalQty += Number(item.quantity || 0);
+      current.totalRevenue += Number(item.price || 0) * Number(item.quantity || 0);
+      productsById.set(item.product.id, current);
+    });
+
+    return productsById;
+  }, new Map<string, any>()).values())
     .sort((a, b) => b.totalRevenue - a.totalRevenue)
     .slice(0, 5);
 

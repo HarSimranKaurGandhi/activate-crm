@@ -336,6 +336,9 @@
           <table>
             <tr class="totals-row muted"><td>Sub Total</td><td>{{ $quotation['subtotal_label'] }}</td></tr>
             @foreach($quotation['adjustments'] as $adjustment)<tr class="totals-row"><td>{{ $adjustment['name'] }}</td><td>{{ $adjustment['amount_label'] }}</td></tr>@endforeach
+            @if(count($quotation['adjustments']) > 0)
+              <tr class="totals-row"><td><strong>Total</strong></td><td><strong>{{ $quotation['before_tax_total_label'] }}</strong></td></tr>
+            @endif
             @if(!$quotation['gst_inclusive'] && $quotation['tax_amount'] > 0)
               <tr class="totals-row"><td>GST</td><td>{{ $quotation['tax_amount_label'] }}</td></tr>
             @endif

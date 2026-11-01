@@ -63,11 +63,14 @@ interface DataContextType {
   updateCustomer: (id: string, customer: any) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   quotations: any[];
-  addQuotation: (quotation: any) => Promise<void>;
+  addQuotation: (quotation: any) => Promise<any>;
   updateQuotation: (id: string, quotation: any) => Promise<void>;
   deleteQuotation: (id: string) => Promise<void>;
   duplicateQuotation: (id: string) => Promise<any>;
   updateQuotationStatus: (id: string, status: string) => Promise<void>;
+  completeQuotationCrm: (id: string, data: { close_lead: boolean; add_products: boolean; purchase_date?: string }) => Promise<any>;
+  updateQuotationFulfillment: (id: string, itemId: string, data: { stock_status: string | null; stock_comment: string }) => Promise<any>;
+  bulkUpdateQuotationFulfillment: (id: string, itemIds: string[], data: { stock_status?: string | null; stock_comment?: string }) => Promise<any>;
   submitQuotationForApproval: (id: string) => Promise<void>;
   approveQuotation: (id: string, remarks?: string) => Promise<void>;
   rejectQuotation: (id: string, remarks: string) => Promise<void>;
@@ -190,7 +193,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadQuotations = useCallback(async (force = false) => {
     return runLoader('quotations', async () => {
       const result = await quotationService.list();
-      setQuotations(asArray(result.data).map(mapQuotation));
+      const rows = [...asArray(result.data)];
+      const lastPage = Number(result.meta?.pagination?.last_page || 1);
+      for (let page = 2; page <= lastPage; page += 1) {
+        const next = await quotationService.list({ page });
+        rows.push(...asArray(next.data));
+      }
+      setQuotations(rows.map(mapQuotation));
     }, force);
   }, [runLoader]);
 
@@ -220,8 +229,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const loaders: Array<Promise<void> | undefined> = [];
 
-    if (pathname.startsWith('/quotations')) {
-      if (pathname === '/quotations' || pathname === '/quotations/approvals') {
+    if (pathname.startsWith('/quotations') || pathname === '/order-fulfillment') {
+      if (pathname === '/quotations' || pathname === '/quotations/approvals' || pathname === '/order-fulfillment') {
         loaders.push(loadQuotations());
       }
 
@@ -235,7 +244,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (pathname.startsWith('/customers')) {
-      loaders.push(loadCustomers());
+      if (pathname !== '/customers') loaders.push(loadCustomers());
       if (pathname === '/customers/new' || /^\/customers\/[^/]+\/edit$/.test(pathname)) {
         loaders.push(loadCustomFields());
       }
@@ -250,7 +259,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (pathname === '/masters/terms') loaders.push(loadTerms());
     if (pathname === '/masters/adjustments') loaders.push(loadAdjustments());
     if (pathname === '/masters/custom-fields') loaders.push(loadCustomFields());
-    if (pathname === '/reports') loaders.push(loadQuotations(), loadCustomers(), loadProducts());
+    if (pathname === '/reports') loaders.push(loadQuotations());
     if (pathname === '/settings') loaders.push(loadSettings());
 
     if (loaders.length === 0) return;
@@ -399,7 +408,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     quotations,
     async addQuotation(quotation) {
       const created = await quotationService.create(quotationPayload(quotation));
-      setQuotations((current) => [mapQuotation(created), ...current]);
+      const mapped = mapQuotation(created);
+      setQuotations((current) => [mapped, ...current]);
+      return mapped;
     },
     async updateQuotation(id, quotation) {
       const updated = await quotationService.update(id, quotationPayload(quotation));
@@ -418,6 +429,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async updateQuotationStatus(id, status) {
       const updated = await quotationService.updateStatus(id, status);
       replaceQuotationById(mapQuotation(updated));
+    },
+    async completeQuotationCrm(id, data) {
+      const updated = mapQuotation(await quotationService.completeCrm(id, data));
+      replaceQuotationById(updated);
+      return updated;
+    },
+    async updateQuotationFulfillment(id, itemId, data) {
+      const updated = await quotationService.updateFulfillment(id, itemId, data);
+      setQuotations((current) => current.map((quote) => quote.id !== id ? quote : {
+        ...quote,
+        stockProgressPercent: updated.stock_progress_percent,
+        items: quote.items.map((item: any) => item.id === itemId ? { ...item, fulfillment: updated.fulfillment } : item),
+      }));
+      return updated;
+    },
+    async bulkUpdateQuotationFulfillment(id, itemIds, data) {
+      const updated = await quotationService.bulkUpdateFulfillment(id, itemIds, data);
+      const byId = new Map(updated.items.map((item: any) => [String(item.item_id), item.fulfillment]));
+      setQuotations(current => current.map(quote => quote.id !== id ? quote : {
+        ...quote,
+        stockProgressPercent: updated.stock_progress_percent,
+        items: quote.items.map((item: any) => byId.has(item.id) ? { ...item, fulfillment: byId.get(item.id) } : item),
+      }));
+      return updated;
     },
     async submitQuotationForApproval(id) {
       const updated = await quotationService.submitForApproval(id);

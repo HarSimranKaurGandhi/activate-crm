@@ -1,9 +1,9 @@
 import { apiOrigin } from './apiClient';
 
 export type Status = 'active' | 'inactive';
-export type QuotationStatus = 'draft' | 'pending' | 'approved' | 'shared_with_client' | 'rejected' | 'revised';
+export type QuotationStatus = 'draft' | 'pending' | 'approved' | 'locked' | 'executed' | 'rejected' | 'revised';
 export type TaskStatus = 'new' | 'in_progress' | 'completed' | 'on_hold';
-export type LeadStatus = 'new' | 'enquiry' | 'in_progress' | 'on_hold' | 'closed_success' | 'closed_fail';
+export type LeadStatus = 'new' | 'enquiry' | 'in_progress' | 'on_hold' | 'order_confirmed' | 'closed_success' | 'closed_fail';
 
 const normalizeExpectedClosure = (value: unknown) => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -122,6 +122,8 @@ export const brandPayload = (brand: any) => {
 
 export const mapProduct = (product: any) => ({
   id: String(product.id),
+  tags: (product.tags || []).map((tag: any) => ({ id: String(tag.id), name: tag.name })),
+  tagIds: (product.tags || []).map((tag: any) => String(tag.id)),
   image: assetUrl(product.image_path),
   images: (product.images || []).map((image: any) => ({
     id: String(image.id),
@@ -138,9 +140,9 @@ export const mapProduct = (product: any) => ({
   unit: product.unit || 'NOS',
   unitName: product.unit_name || product.unit || 'NOS',
   mrp: asNumber(product.mrp),
-  sellingPrice: asNumber(product.usual_selling_price),
-  usualSellingPrice: asNumber(product.usual_selling_price),
-  leastSellingPrice: asNumber(product.least_selling_price),
+  sellingPrice: product.usual_selling_price == null ? '' : asNumber(product.usual_selling_price),
+  usualSellingPrice: product.usual_selling_price == null ? '' : asNumber(product.usual_selling_price),
+  leastSellingPrice: product.least_selling_price == null ? '' : asNumber(product.least_selling_price),
   gstPercent: asNumber(product.gst_percent),
   hsnCode: product.hsn_code || product.category?.hsn_code || '',
   specifications: product.specifications || '',
@@ -154,13 +156,18 @@ export const productPayload = (product: any, categories: any[] = [], brands: any
   const payload = new FormData();
 
   payload.append('product_name', product.name || '');
+  if (product.tagIds !== undefined) payload.append('tag_ids', JSON.stringify(product.tagIds));
   payload.append('model_number', product.modelNumber || '');
   if (categoryId) payload.append('category_id', String(Number(categoryId)));
   if (brandId) payload.append('brand_id', String(Number(brandId)));
   payload.append('unit', product.unit || 'NOS');
   payload.append('mrp', String(asNumber(product.mrp)));
-  payload.append('usual_selling_price', String(asNumber(product.usualSellingPrice)));
-  payload.append('least_selling_price', String(asNumber(product.leastSellingPrice)));
+  payload.append('usual_selling_price', product.usualSellingPrice === '' || product.usualSellingPrice == null
+    ? ''
+    : String(asNumber(product.usualSellingPrice)));
+  payload.append('least_selling_price', product.leastSellingPrice === '' || product.leastSellingPrice == null
+    ? ''
+    : String(asNumber(product.leastSellingPrice)));
   payload.append('specifications', product.specifications || '');
   payload.append('is_active', String(toIsActive(product.status) ? 1 : 0));
 
@@ -222,7 +229,11 @@ export const mapCustomer = (customer: any) => {
   return {
     id: String(customer.id),
     name: customer.primary_name || '',
+    isCompany: customer.is_company === undefined
+      ? customer.customer_type === 'business'
+      : Boolean(customer.is_company),
     company: customer.company_name || '',
+    gstNumber: customer.gst_number || '',
     email: customer.email || '',
     phone: customer.phone || '',
     addressLine1: customer.address_line_1 || '',
@@ -236,7 +247,6 @@ export const mapCustomer = (customer: any) => {
     customerCategory: customer.customer_category || '',
     notes: customer.notes || '',
     address: addressParts.join(', '),
-    gstNumber: customer.gst_number || '',
     panNumber: customer.pan_number || '',
     status: toStatus(customer.is_active ?? true),
     customFields,
@@ -245,7 +255,9 @@ export const mapCustomer = (customer: any) => {
 
 export const customerPayload = (customer: any, definitions: any[] = []) => ({
   primary_name: customer.name,
-  company_name: customer.company || null,
+  customer_type: customer.isCompany ? 'business' : 'individual',
+  company_name: customer.isCompany ? customer.company || null : null,
+  gst_number: customer.isCompany ? customer.gstNumber || null : null,
   email: customer.email || null,
   phone: customer.phone,
   address_line_1: customer.addressLine1 || null,
@@ -308,6 +320,7 @@ export const mapLead = (lead: any) => ({
   requirement: lead.requirement || '',
   expectedOrderValue: lead.expected_order_value || '',
   expectedClosure: normalizeExpectedClosure(lead.expected_closure),
+  closureHotLevel: Math.min(10, Math.max(1, Number(lead.closure_hot_level || 1))),
   status: (lead.status || 'new') as LeadStatus,
   failureReason: lead.failure_reason || '',
   failureReasonDetails: lead.failure_reason_details || '',
@@ -324,6 +337,19 @@ export const mapLead = (lead: any) => ({
         email: lead.assigned_user.email || '',
         phone: lead.assigned_user.phone || '',
         designation: lead.assigned_user.designation || '',
+      }
+    : null,
+  influencerId: lead.influencer_id ? String(lead.influencer_id) : '',
+  influencer: lead.influencer
+    ? {
+        id: String(lead.influencer.id),
+        name: lead.influencer.name || '',
+        phone: lead.influencer.phone || '',
+        email: lead.influencer.email || '',
+        companyName: lead.influencer.company_name || '',
+        city: lead.influencer.city || '',
+        assignedTo: lead.influencer.assigned_to ? String(lead.influencer.assigned_to) : '',
+        isActive: Boolean(lead.influencer.is_active),
       }
     : null,
   createdBy: lead.created_by ? String(lead.created_by) : '',
@@ -352,6 +378,7 @@ export const leadPayload = (lead: any) => ({
   requirement: lead.requirement || null,
   expected_order_value: lead.expectedOrderValue || null,
   expected_closure: normalizeExpectedClosure(lead.expectedClosure) || null,
+  closure_hot_level: Math.min(10, Math.max(1, Number(lead.closureHotLevel || 1))),
   status: lead.status || 'new',
   failure_reason: lead.status === 'closed_fail' ? lead.failureReason || null : null,
   failure_reason_details: lead.status === 'closed_fail' && lead.failureReason === 'other'
@@ -362,6 +389,7 @@ export const leadPayload = (lead: any) => ({
   customer_category: lead.customerCategory || null,
   follow_up_date: lead.followUpDate || null,
   assigned_to: lead.assignedTo ? Number(lead.assignedTo) : null,
+  influencer_id: lead.influencerId ? Number(lead.influencerId) : null,
 });
 
 export const mapAdjustment = (adjustment: any) => ({
@@ -419,6 +447,7 @@ export const mapQuotation = (quotation: any) => {
     name: quotation.lead.name || '',
     company: '',
     email: quotation.lead.email || '',
+    state: quotation.lead.state || '',
     phone: quotation.lead.phone || '',
     address: [
       quotation.lead.address_line_1,
@@ -435,7 +464,12 @@ export const mapQuotation = (quotation: any) => {
   customTermEnabled: Boolean(customTerm),
   customTermText: customTerm?.content || '',
   id: String(quotation.id),
+  crmPurchaseDate: quotation.crm_purchase_date || null,
+  linkedLeadStatus: quotation.lead?.status || null,
+    canManageSharing: Boolean(quotation.can_manage_sharing),
+    createdBy: quotation.created_by ? String(quotation.created_by) : '',
   number: quotation.quotation_number || '',
+  stockProgressPercent: asNumber(quotation.stock_progress_percent),
   date: quotation.quote_date || quotation.created_at || '',
   validUntil: quotation.valid_until || '',
   customer: linkedCustomer || linkedLead,
@@ -451,8 +485,21 @@ export const mapQuotation = (quotation: any) => {
     phone: quotation.salesperson_phone || '',
     email: quotation.salesperson_email || '',
   },
-  items: (quotation.items || []).map((item: any) => ({
+  items: (quotation.items || []).map((item: any) => {
+    const basePrice = asNumber(item.mrp ?? item.base_price ?? item.edited_price);
+    const discountedPrice = asNumber(
+      item.price_after_discount
+      ?? (asNumber(item.edited_price ?? item.mrp ?? item.base_price) - asNumber(item.discount_amount))
+      ?? item.edited_price
+      ?? item.base_price
+    );
+    const calculatedDiscount = basePrice > 0
+      ? Math.min(100, Math.max(0, Number((((basePrice - discountedPrice) / basePrice) * 100).toFixed(3))))
+      : 0;
+
+    return {
     id: String(item.id),
+    fulfillment: item.fulfillment || { stock_status: null, stock_comment: '' },
     product: {
       id: String(item.product_id),
       image: assetUrl(item.product_image_path),
@@ -468,19 +515,15 @@ export const mapQuotation = (quotation: any) => {
       status: 'active',
     },
     quantity: asNumber(item.quantity, 1),
-    price: asNumber(item.edited_price || item.mrp || item.base_price),
-    discount: asNumber(item.discount_percent),
-    discountedPrice: asNumber(
-      item.price_after_discount
-      ?? ((asNumber(item.edited_price || item.mrp || item.base_price)) - (asNumber(item.discount_amount)))
-      ?? item.edited_price
-      ?? item.base_price
-    ),
+    price: basePrice,
+    discount: calculatedDiscount,
+    discountedPrice,
     specifications: item.specifications || '',
     additionalInfo: item.additional_information || '',
     gstAmount: asNumber(item.tax_amount),
     lineTotal: asNumber(item.line_total),
-  })),
+    };
+  }),
   globalDiscount: asNumber(quotation.default_discount_percent),
   adjustments: (quotation.adjustments || []).reduce((acc: Record<string, { enabled: boolean; amount: number }>, adjustment: any) => {
     if (adjustment.adjustment_master_id) {
@@ -507,7 +550,7 @@ export const mapQuotation = (quotation: any) => {
     ? false
     : Boolean(quotation.round_off_net_amount_to_customer),
   showUom: quotation.show_uom_to_customer === undefined || quotation.show_uom_to_customer === null
-    ? false
+    ? true
     : Boolean(quotation.show_uom_to_customer),
   showBrandBanner: quotation.show_brand_banner_to_customer === undefined || quotation.show_brand_banner_to_customer === null
     ? false
@@ -549,7 +592,7 @@ export const quotationPayload = (quotation: any) => ({
   show_mrp_to_customer: quotation.showMrp === undefined ? true : Boolean(quotation.showMrp),
   show_item_wise_gst_to_customer: quotation.showItemWiseGst === undefined ? false : Boolean(quotation.showItemWiseGst),
   round_off_net_amount_to_customer: quotation.roundOffNetAmount === undefined ? false : Boolean(quotation.roundOffNetAmount),
-  show_uom_to_customer: quotation.showUom === undefined ? false : Boolean(quotation.showUom),
+  show_uom_to_customer: quotation.showUom === undefined ? true : Boolean(quotation.showUom),
   show_brand_banner_to_customer: quotation.showBrandBanner === undefined ? false : Boolean(quotation.showBrandBanner),
   brand_banner_id: quotation.showBrandBanner && quotation.brandBannerId ? Number(quotation.brandBannerId) : null,
   default_discount_percent: quotation.globalDiscount || null,
@@ -560,8 +603,7 @@ export const quotationPayload = (quotation: any) => ({
     sort_order: index,
     quantity: asNumber(item.quantity, 1),
     edited_price: asNumber(item.price),
-    discount_percent: asNumber(item.discount),
-    discount_amount: null,
+    discounted_price: asNumber(item.discountedPrice ?? item.price),
     additional_information: String(item.additionalInfo || '').trim() || null,
   })),
   adjustments: Object.entries(quotation.adjustments || {})

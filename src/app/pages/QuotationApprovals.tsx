@@ -126,7 +126,7 @@ export const QuotationApprovals = () => {
           <div>
             <h2 className="text-2xl font-semibold text-gray-900">Quotation Approvals</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Review quotations submitted for admin approval and send them back if updates are needed.
+              Review quotations submitted for approval and send them back if updates are needed.
             </p>
           </div>
 
